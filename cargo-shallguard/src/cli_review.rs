@@ -8,6 +8,7 @@ use anyhow::{Context, Result, bail};
 
 use super::{CliBase, ReviewArgs};
 
+#[shallguard::enforces("REQ-CLI-002")]
 pub(super) fn parse_review_args(args: &[String]) -> Result<ReviewArgs> {
     let mut provider = None;
     let mut base = None;

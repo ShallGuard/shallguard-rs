@@ -1,10 +1,13 @@
-//! Requirement-traceability anchor attributes for Rust projects.
+//! Implementation of ShallGuard's requirement-traceability anchor macros.
 //!
 //! A repository keeps numbered system requirements (`REQ-<AREA>-<NNN>`,
 //! e.g. `REQ-HRS-002`) in its configured requirements documents. These
 //! attributes anchor code and tests to those requirements so the link
 //! between document and implementation is machine-checkable instead of
 //! living only in developers' heads:
+//!
+//! Consumers use these macros through the `shallguard` crate's public
+//! namespace; they do not need to depend on this implementation crate.
 //!
 //! - [`macro@enforces`] marks an item as an enforcement site of one or
 //!   more requirements — "this code exists because this contract exists".
@@ -24,15 +27,15 @@
 //!
 //! Placement conventions:
 //!
-//! - `#[enforces]` attaches to items — and, inside a struct or enum that
-//!   itself carries `#[enforces]` (with IDs, or bare as a container
-//!   marker), to individual fields and variants: the container attribute
-//!   validates and strips the field-level anchors before the compiler or
-//!   any derive sees them.
+//! - `#[shallguard::enforces]` attaches to items — and, inside a struct or enum
+//!   that itself carries `#[shallguard::enforces]` (with IDs, or bare as a
+//!   container marker), to individual fields and variants: the container
+//!   attribute validates and strips the field-level anchors before the compiler
+//!   or any derive sees them.
 //! - A contract living on a specific branch, match arm, or statement is
-//!   anchored with the statement-position [`enforces_here!`] macro, which
-//!   expands to nothing.
-//! - `#[verifies]` goes on test functions only, above the `#[test]` /
+//!   anchored with the statement-position `shallguard::enforces_here!` macro,
+//!   which expands to nothing.
+//! - `#[shallguard::verifies]` goes on test functions only, above the `#[test]` /
 //!   `#[tokio::test]` attribute; it rejects non-test placements and
 //!   `#[ignore]`d tests at compile time.
 //! - The relation is many-to-many: one item may enforce several
@@ -40,12 +43,12 @@
 //!   several sites.
 //!
 //! ```
-//! use shallguard_macros::{enforces, verifies};
+//! # use shallguard_macros as shallguard;
 //!
-//! #[enforces("REQ-RD-006", "REQ-RD-007")]
+//! #[shallguard::enforces("REQ-RD-006", "REQ-RD-007")]
 //! fn resolve_identity_claim() {}
 //!
-//! #[verifies("REQ-RD-006")]
+//! #[shallguard::verifies("REQ-RD-006")]
 //! #[test]
 //! fn req_rd_006_exact_worker_claim_wins() {}
 //! ```
@@ -53,46 +56,46 @@
 //! Malformed IDs and invalid placements fail the build:
 //!
 //! ```compile_fail
-//! use shallguard_macros::enforces;
+//! # use shallguard_macros as shallguard;
 //!
-//! #[enforces("REQ-hrs-2")]
+//! #[shallguard::enforces("REQ-hrs-2")]
 //! fn broken() {}
 //! ```
 //!
 //! ```compile_fail
-//! use shallguard_macros::verifies;
+//! # use shallguard_macros as shallguard;
 //!
-//! #[verifies()]
+//! #[shallguard::verifies()]
 //! fn missing_id() {}
 //! ```
 //!
 //! ```compile_fail
-//! use shallguard_macros::verifies;
+//! # use shallguard_macros as shallguard;
 //!
 //! // Not a test function.
-//! #[verifies("REQ-RD-006")]
+//! #[shallguard::verifies("REQ-RD-006")]
 //! fn not_a_test() {}
 //! ```
 //!
 //! ```compile_fail
-//! use shallguard_macros::verifies;
+//! # use shallguard_macros as shallguard;
 //!
 //! // Not a function at all.
-//! #[verifies("REQ-RD-006")]
+//! #[shallguard::verifies("REQ-RD-006")]
 //! struct NotAFunction;
 //! ```
 //!
 //! ```compile_fail
-//! use shallguard_macros::verifies;
+//! # use shallguard_macros as shallguard;
 //!
 //! // Ignored tests are not evidence.
-//! #[verifies("REQ-RD-006")]
+//! #[shallguard::verifies("REQ-RD-006")]
 //! #[test]
 //! #[ignore]
 //! fn ignored_test() {}
 //! ```
 
-// The crate-level doctest shows #[verifies] above #[test] — the real
+// The crate-level doctest shows #[shallguard::verifies] above #[test] — the real
 // usage — which trips clippy's test_attr_in_doctest; the example is
 // illustrative, not an executed unit test.
 #![allow(clippy::test_attr_in_doctest)]
@@ -111,11 +114,11 @@ use syn::{LitStr, Token};
 /// and uniqueness at compile time.
 ///
 /// On a struct or enum, individual fields and variants may carry their
-/// own `#[enforces("REQ-...")]` anchors; this container attribute
+/// own `#[shallguard::enforces("REQ-...")]` anchors; this container attribute
 /// validates them and strips them from the emitted item (so derives and
 /// the compiler never see them). In that case the container attribute
-/// itself may be bare — `#[enforces]` — acting purely as the marker that
-/// enables field-level anchors.
+/// itself may be bare — `#[shallguard::enforces]` — acting purely as the marker
+/// that enables field-level anchors.
 #[proc_macro_attribute]
 pub fn enforces(args: TokenStream, item: TokenStream) -> TokenStream {
     match syn::parse::<syn::Item>(item.clone()) {
@@ -145,10 +148,10 @@ pub fn enforces(args: TokenStream, item: TokenStream) -> TokenStream {
 /// uniqueness at compile time exactly like [`macro@enforces`].
 ///
 /// ```
-/// use shallguard_macros::enforces_here;
+/// # use shallguard_macros as shallguard;
 ///
 /// fn floor(configured: usize) -> usize {
-///     enforces_here!("REQ-HRS-002");
+///     shallguard::enforces_here!("REQ-HRS-002");
 ///     configured.max(1)
 /// }
 /// ```
@@ -159,8 +162,8 @@ pub fn enforces_here(input: TokenStream) -> TokenStream {
     errors.into()
 }
 
-/// Validates the ID arguments of a container-level `#[enforces]`: bare is
-/// allowed only when field-level anchors exist, IDs are validated as
+/// Validates the ID arguments of a container-level `#[shallguard::enforces]`:
+/// bare is allowed only when field-level anchors exist, IDs are validated as
 /// usual.
 fn validate_container_args(
     args: TokenStream,
@@ -170,8 +173,8 @@ fn validate_container_args(
     validate_id_list("enforces", args, field_anchors > 0, errors);
 }
 
-/// Strips `#[enforces(...)]` anchors off every field in the iterator,
-/// validating their IDs; returns how many anchors were stripped.
+/// Strips `#[shallguard::enforces(...)]` anchors off every field in the
+/// iterator, validating their IDs; returns how many anchors were stripped.
 fn strip_field_anchors<'a>(
     fields: impl Iterator<Item = &'a mut syn::Field>,
     errors: &mut proc_macro2::TokenStream,
@@ -181,8 +184,9 @@ fn strip_field_anchors<'a>(
         .sum()
 }
 
-/// Strips `#[enforces(...)]` attributes from an attribute list,
-/// validating each stripped anchor's IDs; `#[verifies]` here is an error.
+/// Strips `#[shallguard::enforces(...)]` attributes from an attribute list,
+/// validating each stripped anchor's IDs; `#[shallguard::verifies]` here is an
+/// error.
 /// Returns the number of stripped enforcement anchors.
 fn strip_anchor_attrs(
     attrs: &mut Vec<syn::Attribute>,
@@ -200,7 +204,7 @@ fn strip_anchor_attrs(
                     _ => errors.extend(
                         syn::Error::new_spanned(
                             attr,
-                            "field-level #[enforces] needs at least one requirement ID",
+                            "field-level #[shallguard::enforces] needs at least one requirement ID",
                         )
                         .to_compile_error(),
                     ),
@@ -212,8 +216,8 @@ fn strip_anchor_attrs(
                 errors.extend(
                     syn::Error::new_spanned(
                         attr,
-                        "#[verifies] applies only to test functions; \
-                         use #[enforces] for enforcement sites",
+                        "#[shallguard::verifies] applies only to test functions; \
+                         use #[shallguard::enforces] for enforcement sites",
                     )
                     .to_compile_error(),
                 );
@@ -285,7 +289,7 @@ pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
                 errors.extend(
                     syn::Error::new_spanned(
                         &fun.sig.ident,
-                        "#[verifies] requires a test function: add #[test] / \
+                        "#[shallguard::verifies] requires a test function: add #[test] / \
                          #[tokio::test] below the anchor, or remove the anchor",
                     )
                     .to_compile_error(),
@@ -295,7 +299,7 @@ pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
                 errors.extend(
                     syn::Error::new_spanned(
                         &fun.sig.ident,
-                        "#[verifies] must not be placed on an #[ignore]d test: \
+                        "#[shallguard::verifies] must not be placed on an #[ignore]d test: \
                          evidence that does not run is not evidence",
                     )
                     .to_compile_error(),
@@ -306,8 +310,8 @@ pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
             errors.extend(
                 syn::Error::new_spanned(
                     &other,
-                    "#[verifies] applies only to test functions; \
-                     use #[enforces] for enforcement sites",
+                    "#[shallguard::verifies] applies only to test functions; \
+                     use #[shallguard::enforces] for enforcement sites",
                 )
                 .to_compile_error(),
             );

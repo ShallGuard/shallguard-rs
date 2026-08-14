@@ -62,6 +62,7 @@ pub struct ReviewWorkflowOptions<'a> {
 
 /// Outcome of a complete or replayed local review workflow.
 #[derive(Debug)]
+#[shallguard::enforces("REQ-REV-005")]
 pub struct ReviewWorkflowRun {
     /// Validated and failed local model review counts.
     pub review: ReviewRun,
@@ -277,6 +278,7 @@ fn automated_requirement_descriptions(
     Ok(automated)
 }
 
+#[shallguard::enforces("REQ-COV-001")]
 fn select_coverage_requirements(
     impacted: &BTreeSet<&str>,
     automated: &BTreeSet<String>,
@@ -300,6 +302,7 @@ fn report_coverage_requirements(
     }
 }
 
+#[shallguard::enforces("REQ-CLI-003")]
 fn coverage_requirement_progress_lines(
     requirements: &BTreeSet<String>,
     descriptions: &BTreeMap<String, String>,
@@ -362,6 +365,7 @@ mod tests {
         }
     }
 
+    #[shallguard::verifies("REQ-COV-001")]
     #[test]
     fn coverage_selection_intersects_impact_automation_and_request() {
         let impacted = BTreeSet::from(["REQ-AA-001", "REQ-AA-002", "REQ-AA-003"]);
@@ -389,6 +393,7 @@ mod tests {
         );
     }
 
+    #[shallguard::verifies("REQ-CLI-003")]
     #[test]
     fn coverage_requirement_progress_is_sorted_one_per_line_with_descriptions() {
         let requirements = BTreeSet::from(["REQ-AA-002".to_string(), "REQ-AA-001".to_string()]);
@@ -406,6 +411,7 @@ mod tests {
         );
     }
 
+    #[shallguard::verifies("REQ-REV-005")]
     #[test]
     fn deterministic_or_provider_failure_fails_the_workflow() {
         let mut run = successful_run();

@@ -3,7 +3,7 @@
 **Status:** Bootstrap specification for dogfooding and standalone extraction  
 **Project:** ShallGuard  
 **Component names:** `shallguard` deterministic core, `cargo shallguard` developer
-CLI, and `shallguard-macros` requirement anchors  
+CLI, and `shallguard` requirement anchors  
 **Current implementation:** standalone ShallGuard repository  
 **Target:** a repository-independent Rust requirement-assurance tool
 
@@ -148,25 +148,21 @@ The areas are:
   compatibility commitment; whether CLI parsing remains manual or adopts a
   dedicated argument parser.
 
-## Bootstrap and Enrollment Policy
+## Enrollment and Ratchet Policy
 
-This document is deliberately not yet included in `default_docs()`. Adding a
-new document to the hard gate before anchoring its implemented requirements
-would create new traceability debt, which the ratchet correctly rejects. The
-dogfooding migration is:
-
-1. stabilize this specification and its area ownership;
-2. make repository/document discovery configurable;
-3. add `#[enforces]`/`enforces_here!` and `#[verifies]` anchors for implemented
-   requirements;
-4. run the explicit check against this document with zero new gaps;
-5. enroll it in the standalone repository's default CI gate.
+This document is selected by the repository-owned `shallguard.toml`. Every
+implemented requirement is anchored, every automated citation resolves to its
+exact test, the committed baseline is empty, and every area is hardened.
+Requirements explicitly marked `not implemented` remain pending without false
+anchors. Every subsequent behavior change must update its requirement,
+enforcement anchor, and honest evidence together; the deterministic CI gate
+rejects any traceability regression.
 
 ## CLI User Stories
 
 ### US-CLI-001: One Requirement-Assurance Command
 
-**Status:** Implemented locally; portability work planned
+**Status:** Implemented
 
 **As a** Rust developer or CI author  
 **I want** one discoverable Cargo subcommand for requirement assurance  
@@ -257,8 +253,8 @@ dogfooding migration is:
 - **REQ-SPEC-006** — `cargo shallguard fmt --check` and `cargo shallguard lint` SHALL
   perform non-mutating structural and canonical-format validation and SHALL
   return nonzero for malformed or non-canonical selected documents.
-  *Enforced:* `src/main.rs` (`parse_format_args`, `run_format`),
-  `src/requirement_format.rs` (`check`) · *Verified:* ✅ `src/main.rs`
+  *Enforced:* `cli:src/main.rs` (`parse_format_args`, `run_format`),
+  `src/requirement_format.rs` (`check`) · *Verified:* ✅ `cli:src/cli_tests.rs`
   (`parses_requirement_format_modes_and_documents`,
   `rejects_unknown_requirement_format_flags`)
 
@@ -278,26 +274,29 @@ dogfooding migration is:
   SHALL ignore anchor-like text in comments and string literals. *Enforced:*
   `src/scan.rs` (`scan`, `walk_items`) · *Verified:* ✅ `src/scan.rs`
   (`comments_are_never_anchors`, `anchor_text_inside_strings_is_invisible`)
-- **REQ-TRACE-002** — `#[enforces]` SHALL be recognized on supported Rust
-  items, impl functions, struct fields, and enum variants, and the scanner
-  SHALL retain each anchor's source scope and executable/structural kind.
+- **REQ-TRACE-002** — `#[shallguard::enforces]` SHALL be recognized on
+  supported Rust items, impl functions, struct fields, and enum variants, and
+  the scanner SHALL retain each anchor's source scope and
+  executable/structural kind.
   *Enforced:* `src/scan.rs` (`walk_items`, `collect_item_attrs`,
   `collect_fn_attrs`) · *Verified:* ✅ `src/scan.rs`
   (`attribute_anchors_record_executable_and_structural_scopes`,
   `field_and_variant_attributes_are_anchors`,
   `enforces_attribute_on_items_and_impl_fns`)
-- **REQ-TRACE-003** — `enforces_here!("REQ-...")` SHALL be recognized in
-  statement, item, match-arm, and nested macro positions and SHALL own the
-  smallest enclosing executable block available to the syntax scanner.
+- **REQ-TRACE-003** — `shallguard::enforces_here!("REQ-...")` SHALL be
+  recognized in statement, item, match-arm, and nested macro positions and
+  SHALL own the smallest enclosing executable block available to the syntax
+  scanner.
   *Enforced:* `src/scan.rs` (`MacroVisitor`), `src/impact.rs`
-  (`ScopeCollector`) · *Verified:* ✅ `src/scan.rs`
+  (`EnforcementCollector`) · *Verified:* ✅ `src/scan.rs`
   (`enforces_here_macro_in_statement_and_item_position`,
   `enforces_here_nested_in_another_macro_body_is_found`), `src/impact.rs`
   (`branch_anchor_only_owns_its_enclosing_block`,
   `branch_anchor_without_braces_owns_its_match_arm`)
-- **REQ-TRACE-004** — `#[verifies]` SHALL count as automated evidence only on a
-  syntactically recognized, non-ignored test function; an ordinary or ignored
-  function carrying the attribute SHALL be reported invalid. *Enforced:*
+- **REQ-TRACE-004** — `#[shallguard::verifies]` SHALL count as automated
+  evidence only on a syntactically recognized, non-ignored test function; an
+  ordinary or ignored function carrying the attribute SHALL be reported
+  invalid. *Enforced:*
   `src/scan.rs` (`collect_fn_attrs`) · *Verified:* ✅ `src/scan.rs`
   (`verifies_attribute_needs_an_enabled_test`)
 - **REQ-TRACE-005** — The checker SHALL fail for malformed documents,
@@ -307,13 +306,22 @@ dogfooding migration is:
 - **REQ-TRACE-006** — An implemented requirement SHALL have its exact ID on an
   enforcement anchor in every documented enforcement file, and an automated
   requirement SHALL resolve to a test carrying its exact verification anchor.
-  *Enforced:* `src/check.rs` (`analyze`) · *Verified:* 👁 code review only
+  *Enforced:* `src/check.rs` (`analyze`, `enforced_path_has_anchor`) ·
+  *Verified:* ✅ `src/check.rs`
+  (`requires_an_anchor_in_every_documented_enforcement_file`)
 - **REQ-TRACE-007** — Anchor relations SHALL be many-to-many: one site MAY
   claim multiple requirements and one requirement MAY have multiple
   enforcement or verification sites without losing individual site identity.
   *Enforced:* `src/scan.rs` (`Anchor`, `Anchors`), `src/check.rs` (`analyze`) ·
   *Verified:* ✅ `src/test_index_tests.rs`
   (`merges_repeated_attributes_on_one_test`)
+- **REQ-TRACE-008** — The `shallguard` library SHALL expose enforcement,
+  branch-enforcement, and verification anchors as `#[shallguard::enforces]`,
+  `shallguard::enforces_here!`, and `#[shallguard::verifies]`, so consumers
+  SHALL NOT need a direct dependency on the implementation macro crate.
+  *Enforced:* `src/lib.rs` (`enforces`, `enforces_here`, `verifies`) ·
+  *Verified:* ✅ `tests/public_anchor_api.rs`
+  (`public_namespace_exposes_all_anchor_macros`)
 
 ## Baseline and Ratchet User Stories
 
@@ -403,7 +411,7 @@ dogfooding migration is:
 - **REQ-IMP-007** — Impact output SHALL be emitted as a versioned artifact with
   base/head identity, configuration, impact class, reason, confidence, source
   location, unclaimed changes, and policy findings even when policy causes a
-  nonzero exit. *Enforced:* `src/impact.rs` (`ImpactArtifact`), `src/main.rs`
+  nonzero exit. *Enforced:* `src/impact.rs` (`ImpactArtifact`), `cli:src/main.rs`
   (`run_impact`) · *Verified:* ✅ `src/impact.rs`
   (`json_artifact_uses_versioned_schema_and_configuration`)
 
@@ -493,7 +501,7 @@ dogfooding migration is:
 - **REQ-COV-006** — Coverage JSON SHALL bind source revision, exact test
   identities, test outcomes, LLVM evidence, enforcement sites, and requirement
   status, and SHALL remain available when one or more selected tests fail.
-  *Enforced:* `src/coverage.rs` (`CoverageArtifact`), `src/main.rs`
+  *Enforced:* `src/coverage.rs` (`CoverageArtifact`), `cli:src/main.rs`
   (`run_coverage`) · *Verified:* 👁 code review only
 - **REQ-COV-007** — A future patch-exercise result SHALL report whether cited
   tests execute changed executable regions inside impacted enforcement scopes
@@ -533,7 +541,7 @@ dogfooding migration is:
 - **REQ-CAP-004** — Capsule and manifest schemas SHALL be versioned, and each
   manifest entry SHALL bind the serialized capsule bytes through a stable
   content digest. *Enforced:* `src/bundle.rs` (`ReviewCapsule`, `BundleManifest`,
-  `digest`) · *Verified:* ✅ `src/bundle.rs`
+  `capsule_digest`) · *Verified:* ✅ `src/bundle.rs`
   (`digest_is_stable_and_content_sensitive`,
   `verifies_serialized_capsule_content_against_manifest_digest`)
 - **REQ-CAP-005** — Imported impact and coverage evidence SHALL be accepted
@@ -703,7 +711,7 @@ dogfooding migration is:
   that accept explicit repository/configuration inputs and return typed results
   without exiting the process or writing terminal output; the CLI SHALL remain
   a thin adapter. *Enforced:* not implemented — extract process and presentation
-  concerns from `src/main.rs` · *Verified:* ⏳ pending
+  concerns from `cli:src/main.rs` · *Verified:* ⏳ pending
 - **REQ-PORT-006** — Git, Cargo, LLVM, filesystem, and model-provider process
   execution SHALL be represented by replaceable adapters so core behavior can
   be fixture-tested and alternative implementations can be added without
@@ -718,8 +726,9 @@ dogfooding migration is:
   implemented requirements SHALL be fully anchored before the document enters
   the default CI gate, and every subsequent behavior change SHALL update the
   requirement, enforcement anchor, and honest evidence in the same merge
-  request. *Enforced:* not implemented — enrollment sequence in this document ·
-  *Verified:* ⏳ pending
+  request. *Enforced:* `src/check.rs` (`analyze`), `cli:src/main.rs` (`main`) ·
+  *Verified:* ✅ `cli:tests/external_subcommand.rs`
+  (`repository_configuration_has_zero_traceability_debt`)
 
 ## Safety and Trust User Stories
 
@@ -785,7 +794,7 @@ The bootstrap phase is complete when:
    owning source roots without compiled-in consumer constants;
 2. every requirement marked implemented has at least one honest enforcement
    anchor;
-3. every ✅ citation resolves to its exact, enabled `#[verifies]` test;
+3. every ✅ citation resolves to its exact, enabled `#[shallguard::verifies]` test;
 4. the explicit traceability check reports zero unbaselined gaps;
 5. `fmt --check`, unit/integration tests, Clippy, and the deterministic
    requirement gate pass in CI;

@@ -8,8 +8,8 @@ test coverage, static checking, and bounded LLM-assisted review.
 
 The existing traceability model and mandatory developer workflow remain defined
 in [Requirement Traceability](REQUIREMENT_TRACEABILITY.md). The design here adds
-evidence and review layers; it does not change the meaning of `#[enforces]`,
-`enforces_here!`, `#[verifies]`, or the existing `Requirements checks` CI gate.
+evidence and review layers; it does not change the meaning of `#[shallguard::enforces]`,
+`shallguard::enforces_here!`, `#[shallguard::verifies]`, or the existing `Requirements checks` CI gate.
 
 Detailed designs:
 
@@ -34,7 +34,7 @@ The current system answers deterministic traceability questions:
 - Is every referenced requirement defined?
 - Does the documented enforcement file carry an enforcement anchor?
 - Does automated evidence resolve to a real, enabled test carrying
-  `#[verifies]`?
+  `#[shallguard::verifies]`?
 
 Those checks deliberately do not answer whether arbitrary natural-language
 requirements are semantically satisfied. They also do not yet answer which
@@ -186,13 +186,13 @@ can be mapped to it.
 
 | Anchor | Source scope |
 |--------|--------------|
-| `#[enforces]` on an item | The complete annotated item |
-| `#[enforces]` on a field | The field declaration |
-| `#[enforces]` on a variant | The variant declaration and fields |
-| `enforces_here!` | The smallest enclosing executable block |
-| `#[verifies]` | The complete test function |
+| `#[shallguard::enforces]` on an item | The complete annotated item |
+| `#[shallguard::enforces]` on a field | The field declaration |
+| `#[shallguard::enforces]` on a variant | The variant declaration and fields |
+| `shallguard::enforces_here!` | The smallest enclosing executable block |
+| `#[shallguard::verifies]` | The complete test function |
 
-The existing convention requires `enforces_here!` to be the first statement of
+The existing convention requires `shallguard::enforces_here!` to be the first statement of
 the relevant branch or match-arm block. Under this design the enclosing block is
 therefore its scope. If this produces excessive false impact, a future scoped
 macro may wrap and emit an explicit block, but that is not required for the

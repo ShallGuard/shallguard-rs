@@ -1,11 +1,10 @@
 use super::*;
-use shallguard_macros::verifies;
 
 fn strings(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_string()).collect()
 }
 
-#[verifies("REQ-CLI-001")]
+#[shallguard::verifies("REQ-CLI-001")]
 #[test]
 fn removes_cargo_external_subcommand_argument() {
     assert_eq!(
@@ -18,6 +17,7 @@ fn removes_cargo_external_subcommand_argument() {
     );
 }
 
+#[shallguard::verifies("REQ-SPEC-006")]
 #[test]
 fn parses_requirement_format_modes_and_documents() {
     let format = parse_format_args(
@@ -36,6 +36,7 @@ fn parses_requirement_format_modes_and_documents() {
     assert!(lint.docs.is_empty());
 }
 
+#[shallguard::verifies("REQ-SPEC-006")]
 #[test]
 fn rejects_unknown_requirement_format_flags() {
     let error = parse_format_args(&strings(&["--write"]), false)
@@ -44,6 +45,7 @@ fn rejects_unknown_requirement_format_flags() {
     assert!(error.to_string().contains("unknown argument"));
 }
 
+#[shallguard::verifies("REQ-CLI-004")]
 #[test]
 fn parses_local_review_options() {
     let args = parse_review_args(&strings(&[
@@ -82,7 +84,7 @@ fn parses_local_review_options() {
     assert_eq!(args.cache_dir, Some(PathBuf::from("review-cache")));
 }
 
-#[verifies("REQ-CLI-002")]
+#[shallguard::verifies("REQ-CLI-002")]
 #[test]
 fn leaves_repository_review_defaults_for_configuration() {
     let args = parse_review_args(&[]).expect("default review arguments parse");
@@ -168,7 +170,7 @@ fn parses_bundle_paths() {
     assert_eq!(args.output, Some(PathBuf::from("review")));
 }
 
-#[verifies("REQ-CLI-004")]
+#[shallguard::verifies("REQ-CLI-004")]
 #[test]
 fn leaves_bundle_output_for_repository_configuration() {
     let args = parse_bundle_args(&strings(&["--impact", "impact.json"]))

@@ -54,6 +54,7 @@ impl GapKey {
 /// One committed exception for historical debt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[shallguard::enforces("REQ-BASE-001")]
 pub struct BaselineEntry {
     pub requirement: String,
     pub kind: GapKind,
@@ -178,6 +179,7 @@ mod tests {
         }
     }
 
+    #[shallguard::verifies("REQ-BASE-001")]
     #[test]
     fn serialization_is_sorted_and_round_trips() {
         let baseline = Baseline::from_entries(vec![

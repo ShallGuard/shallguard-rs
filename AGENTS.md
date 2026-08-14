@@ -11,19 +11,23 @@ cargo build --workspace
 cargo test --workspace
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
+cargo shallguard-dev fmt --check
+cargo shallguard-dev check
 cargo install --path cargo-shallguard
 ```
 
 ## Requirement workflow
 
 The product specification is
-`docs/USER_STORIES_AND_REQUIREMENTS.md`. During bootstrap it is not yet a
-default checker input because historical implementation anchors are still
-being enrolled.
+`docs/USER_STORIES_AND_REQUIREMENTS.md`. It is selected by `shallguard.toml`;
+all implemented requirements are anchored, the committed baseline is empty,
+and every area is protected by the ratcheted CI gate.
 
 - Add or update a requirement for behavior changes.
-- Anchor enforcement with `#[enforces]` or `enforces_here!`.
-- Anchor honest automated evidence with `#[verifies]`.
+- Anchor enforcement with `#[shallguard::enforces]` or
+  `shallguard::enforces_here!`.
+- Anchor honest automated evidence with `#[shallguard::verifies]`.
+- Do not add baseline entries; new implemented behavior must arrive fully anchored.
 - Never claim automated evidence without a test that exercises the contract.
 - Keep requirement IDs stable; retire them instead of reusing them.
 

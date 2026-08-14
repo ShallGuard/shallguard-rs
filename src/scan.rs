@@ -6,12 +6,12 @@
 //!
 //! - **references** — every requirement ID cited by some anchor. Used
 //!   only for unknown/retired-ID checking.
-//! - **enforcement anchors** — `#[enforces(...)]` attributes on items,
+//! - **enforcement anchors** — `#[shallguard::enforces(...)]` attributes on items,
 //!   struct fields, and enum variants, and statement-position
-//!   `enforces_here!("REQ-...")` macro invocations inside function
+//!   `shallguard::enforces_here!("REQ-...")` macro invocations inside function
 //!   bodies. Commented-out anchors or anchor-like text in strings are
 //!   invisible.
-//! - **verification anchors** — `#[verifies(...)]` attributes attached
+//! - **verification anchors** — `#[shallguard::verifies(...)]` attributes attached
 //!   to functions that carry a recognized test attribute (`#[test]`,
 //!   `#[tokio::test]`, or any attribute path ending in `test`) and are
 //!   not `#[ignore]`d. There is no statement form: a Rust test is always
@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use syn::spanned::Spanned as _;
 use syn::visit::Visit;
 
-/// An `#[enforces]` attribute or `enforces_here!` invocation.
+/// An `#[shallguard::enforces]` attribute or `shallguard::enforces_here!` invocation.
 pub struct EnforcementAnchor {
     /// Workspace-relative Rust source file.
     pub file: PathBuf,
@@ -46,7 +46,7 @@ pub struct EnforcementAnchor {
 pub enum EnforcementScopeKind {
     /// Body of an annotated free function or method.
     FunctionBody,
-    /// Smallest enclosing block of an `enforces_here!` invocation.
+    /// Smallest enclosing block of a `shallguard::enforces_here!` invocation.
     Block,
     /// Annotated constant initializer; executable only if LLVM emits regions.
     ConstInitializer,
@@ -81,7 +81,7 @@ pub struct SourceRange {
     pub end_column: usize,
 }
 
-/// A `#[verifies]` attribute on a real, enabled test function.
+/// A `#[shallguard::verifies]` attribute on a real, enabled test function.
 pub struct VerificationAnchor {
     pub file: PathBuf,
     /// 1-based line.
@@ -93,7 +93,7 @@ pub struct VerificationAnchor {
     pub ids: Vec<String>,
 }
 
-/// A structurally invalid anchor (e.g. `#[verifies]` off a test).
+/// A structurally invalid anchor (e.g. `#[shallguard::verifies]` off a test).
 pub struct InvalidAnchor {
     pub file: PathBuf,
     pub line: usize,
@@ -101,6 +101,7 @@ pub struct InvalidAnchor {
 }
 
 /// Everything the scanner found.
+#[shallguard::enforces("REQ-TRACE-007")]
 pub struct Anchors {
     /// Every requirement ID cited by an anchor: id -> (file, line).
     pub references: HashMap<String, Vec<(PathBuf, usize)>>,
@@ -118,6 +119,7 @@ impl Anchors {
     }
 }
 
+#[shallguard::enforces("REQ-TRACE-001")]
 pub fn scan(root: &Path, roots: &[&str]) -> Result<Anchors> {
     let id_re = Regex::new(r"REQ-[A-Z]{2,}-\d{3}").expect("BUG: invalid ID regex");
 
@@ -176,8 +178,9 @@ pub fn scan(root: &Path, roots: &[&str]) -> Result<Anchors> {
     Ok(anchors)
 }
 
-/// Collects `enforces_here!("REQ-...")` macro invocations anywhere in a
+/// Collects `shallguard::enforces_here!("REQ-...")` macro invocations anywhere in a
 /// file — statement position in function bodies, or item position.
+#[shallguard::enforces("REQ-TRACE-003")]
 struct MacroVisitor<'a> {
     file: &'a Path,
     id_re: &'a Regex,
@@ -207,7 +210,7 @@ impl<'ast> Visit<'ast> for MacroVisitor<'_> {
             self.record(line, &mac.tokens, self.blocks.last().copied());
         } else {
             // Another macro's body (tokio::select!, etc.) is an opaque
-            // token stream to syn — an `enforces_here!` nested inside it
+            // token stream to syn — a `shallguard::enforces_here!` nested inside it
             // still expands at compile time, so find it at token level.
             self.scan_tokens(mac.tokens.clone(), self.blocks.last().copied());
         }
@@ -216,7 +219,7 @@ impl<'ast> Visit<'ast> for MacroVisitor<'_> {
 }
 
 impl MacroVisitor<'_> {
-    /// Records one `enforces_here!` anchor whose argument tokens are
+    /// Records one `shallguard::enforces_here!` anchor whose argument tokens are
     /// `args`; an empty ID list is a structural error.
     fn record(&mut self, line: usize, args: &proc_macro2::TokenStream, scope: Option<SourceRange>) {
         let ids: Vec<String> = self
@@ -228,7 +231,7 @@ impl MacroVisitor<'_> {
             self.anchors.invalid.push(InvalidAnchor {
                 file: self.file.to_path_buf(),
                 line,
-                message: "enforces_here! without a requirement ID".to_string(),
+                message: "shallguard::enforces_here! without a requirement ID".to_string(),
             });
         } else {
             self.anchors.enforcement.push(EnforcementAnchor {
@@ -283,6 +286,7 @@ impl MacroVisitor<'_> {
 }
 
 /// Recursively walks items (modules, impls) collecting anchor attributes.
+#[shallguard::enforces("REQ-TRACE-002")]
 fn walk_items(
     items: &[syn::Item],
     file: &Path,
@@ -424,13 +428,21 @@ fn walk_items(
                 id_re,
                 anchors,
             ),
+            syn::Item::Use(u) => collect_item_attrs(
+                &u.attrs,
+                EnforcementScopeKind::Structural,
+                source_range(u.span()),
+                file,
+                id_re,
+                anchors,
+            ),
             _ => {}
         }
     }
 }
 
-/// Handles attributes on a non-function item: `#[enforces]` is an
-/// enforcement anchor, `#[verifies]` is invalid here.
+/// Handles attributes on a non-function item: `#[shallguard::enforces]` is an
+/// enforcement anchor, `#[shallguard::verifies]` is invalid here.
 fn collect_item_attrs(
     attrs: &[syn::Attribute],
     scope_kind: EnforcementScopeKind,
@@ -455,15 +467,16 @@ fn collect_item_attrs(
             Some(AnchorKind::Verifies) => anchors.invalid.push(InvalidAnchor {
                 file: file.to_path_buf(),
                 line: attr_line(attr),
-                message: "#[verifies] on a non-test item is not evidence".to_string(),
+                message: "#[shallguard::verifies] on a non-test item is not evidence".to_string(),
             }),
             None => {}
         }
     }
 }
 
-/// Handles attributes on a function (free or impl): `#[verifies]` is a
+/// Handles attributes on a function (free or impl): `#[shallguard::verifies]` is a
 /// verification anchor only when the function is a real, enabled test.
+#[shallguard::enforces("REQ-TRACE-004")]
 fn collect_fn_attrs(
     attrs: &[syn::Attribute],
     ident: &syn::Ident,
@@ -500,7 +513,7 @@ fn collect_fn_attrs(
                         file: file.to_path_buf(),
                         line: attr_line(attr),
                         message: format!(
-                            "#[verifies] on non-test function `{ident}` is not evidence"
+                            "#[shallguard::verifies] on non-test function `{ident}` is not evidence"
                         ),
                     });
                 } else if is_ignored {
@@ -508,7 +521,7 @@ fn collect_fn_attrs(
                         file: file.to_path_buf(),
                         line: attr_line(attr),
                         message: format!(
-                            "#[verifies] on #[ignore]d test `{ident}` is not evidence"
+                            "#[shallguard::verifies] on #[ignore]d test `{ident}` is not evidence"
                         ),
                     });
                 } else if let Some((line, ids)) = attr_ids(attr, id_re) {
@@ -611,6 +624,7 @@ mod tests {
         anchors
     }
 
+    #[shallguard::verifies("REQ-TRACE-001")]
     #[test]
     fn comments_are_never_anchors() {
         let anchors = scan_text(
@@ -628,22 +642,21 @@ fn b() {}
         assert!(anchors.invalid.is_empty());
     }
 
+    #[shallguard::verifies("REQ-TRACE-003")]
     #[test]
     fn enforces_here_macro_in_statement_and_item_position() {
         let anchors = scan_text(
             "\
-use shallguard_macros::enforces_here;
-
-enforces_here!(\"REQ-DYN-016\");
+shallguard::enforces_here!(\"REQ-DYN-016\");
 
 fn a(configured: usize) -> usize {
     if configured == 0 {
-        enforces_here!(\"REQ-CM-038\", \"REQ-SAFE-004\");
+        shallguard::enforces_here!(\"REQ-CM-038\", \"REQ-SAFE-004\");
         return 1;
     }
     match configured {
         1 => {
-            enforces_here!(\"REQ-CM-039\");
+            shallguard::enforces_here!(\"REQ-CM-039\");
             1
         }
         n => n,
@@ -692,22 +705,26 @@ fn a(configured: usize) -> usize {
         assert!(anchors.references.contains_key("REQ-CM-038"));
     }
 
+    #[shallguard::verifies("REQ-TRACE-002")]
     #[test]
     fn attribute_anchors_record_executable_and_structural_scopes() {
         let anchors = scan_text(
             "\
-#[enforces(\"REQ-CM-001\")]
+#[shallguard::enforces(\"REQ-CM-001\")]
 fn executable() {
     do_work();
 }
 
 struct Config {
-    #[enforces(\"REQ-CF-001\")]
+    #[shallguard::enforces(\"REQ-CF-001\")]
     value: usize,
 }
 
-#[enforces(\"REQ-CF-002\")]
+#[shallguard::enforces(\"REQ-CF-002\")]
 const DEFAULT: usize = 1;
+
+#[shallguard::enforces(\"REQ-CF-003\")]
+pub use other::Thing;
 ",
         );
 
@@ -732,8 +749,16 @@ const DEFAULT: usize = 1;
             .find(|anchor| anchor.ids == ["REQ-CF-002"])
             .expect("constant anchor exists");
         assert_eq!(constant.scope_kind, EnforcementScopeKind::ConstInitializer);
+
+        let import = anchors
+            .enforcement
+            .iter()
+            .find(|anchor| anchor.ids == ["REQ-CF-003"])
+            .expect("use anchor exists");
+        assert_eq!(import.scope_kind, EnforcementScopeKind::Structural);
     }
 
+    #[shallguard::verifies("REQ-TRACE-003")]
     #[test]
     fn enforces_here_nested_in_another_macro_body_is_found() {
         let anchors = scan_text(
@@ -743,13 +768,13 @@ async fn actor_loop() {
         event = rx.recv() => {
             match event {
                 Command::Create => {
-                    enforces_here!(\"REQ-CM-037\");
+                    shallguard::enforces_here!(\"REQ-CM-037\");
                 }
                 _ => {}
             }
         }
         _ = tick.tick() => {
-            enforces_here!(\"REQ-OP-048\", \"REQ-OP-046\");
+            shallguard::enforces_here!(\"REQ-OP-048\", \"REQ-OP-046\");
         }
     }
 }
@@ -775,7 +800,7 @@ async fn actor_loop() {
         let anchors = scan_text(
             "\
 fn a() {
-    enforces_here!();
+    shallguard::enforces_here!();
 }
 ",
         );
@@ -788,22 +813,23 @@ fn a() {
         );
     }
 
+    #[shallguard::verifies("REQ-TRACE-002")]
     #[test]
     fn field_and_variant_attributes_are_anchors() {
         let anchors = scan_text(
             "\
-#[enforces]
+#[shallguard::enforces]
 struct Config {
-    #[enforces(\"REQ-CM-036\")]
+    #[shallguard::enforces(\"REQ-CM-036\")]
     max_creating_providers: usize,
     other: u32,
 }
 
-#[enforces(\"REQ-CM-048\")]
+#[shallguard::enforces(\"REQ-CM-048\")]
 enum Input {
-    #[enforces(\"REQ-CM-049\")]
+    #[shallguard::enforces(\"REQ-CM-049\")]
     Evict {
-        #[enforces(\"REQ-CM-050\")]
+        #[shallguard::enforces(\"REQ-CM-050\")]
         id: u32,
     },
 }
@@ -820,33 +846,35 @@ enum Input {
         assert!(all.contains(&"REQ-CM-050"));
     }
 
+    #[shallguard::verifies("REQ-TRACE-001")]
     #[test]
     fn anchor_text_inside_strings_is_invisible() {
         let anchors = scan_text(
             r##"
 fn a() {
-    let _s = "enforces_here!(\"REQ-HRS-001\") - not an anchor";
-    let _r = r#"#[enforces("REQ-HRS-001")] - not an anchor"#;
+    let _s = "shallguard::enforces_here!(\"REQ-HRS-001\") - not an anchor";
+    let _r = r#"#[shallguard::enforces("REQ-HRS-001")] - not an anchor"#;
 }
-/* enforces_here!("REQ-HRS-001"); - inside a block comment, invisible */
+/* shallguard::enforces_here!("REQ-HRS-001"); - inside a block comment, invisible */
 "##,
         );
         assert!(anchors.enforcement.is_empty());
         assert!(anchors.references.is_empty());
     }
 
+    #[shallguard::verifies("REQ-TRACE-004")]
     #[test]
     fn verifies_attribute_needs_an_enabled_test() {
         let anchors = scan_text(
             "\
-#[verifies(\"REQ-RD-006\")]
+#[shallguard::verifies(\"REQ-RD-006\")]
 #[test]
 fn valid_test() {}
 
-#[verifies(\"REQ-RD-007\")]
+#[shallguard::verifies(\"REQ-RD-007\")]
 fn not_a_test() {}
 
-#[verifies(\"REQ-RD-008\")]
+#[shallguard::verifies(\"REQ-RD-008\")]
 #[test]
 #[ignore]
 fn ignored_test() {}
@@ -858,21 +886,22 @@ fn ignored_test() {}
         assert_eq!(anchors.invalid.len(), 2);
     }
 
+    #[shallguard::verifies("REQ-TRACE-002")]
     #[test]
     fn enforces_attribute_on_items_and_impl_fns() {
         let anchors = scan_text(
             "\
-#[enforces(\"REQ-HRS-002\", \"REQ-SAFE-001\")]
+#[shallguard::enforces(\"REQ-HRS-002\", \"REQ-SAFE-001\")]
 fn site() {}
 
 struct S;
 impl S {
-    #[enforces(\"REQ-RD-007\")]
+    #[shallguard::enforces(\"REQ-RD-007\")]
     fn method(&self) {}
 }
 
 mod inner {
-    #[enforces(\"REQ-DYN-016\")]
+    #[shallguard::enforces(\"REQ-DYN-016\")]
     pub struct Gate;
 }
 ",
@@ -896,7 +925,7 @@ mod inner {
             "\
 mod outer {
 mod tests {
-#[shallguard_macros::verifies(
+#[shallguard::verifies(
     \"REQ-RD-007\",
     \"REQ-RD-008\",
 )]

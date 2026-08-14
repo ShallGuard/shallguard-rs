@@ -2,8 +2,9 @@
 //!
 //! Cross-checks numbered system requirements in selected
 //! `USER_STORIES_AND_REQUIREMENTS.md` documents against the code and test
-//! anchors in the source tree (`#[enforces]` / `#[verifies]` attributes
-//! and `enforces_here!` branch anchors from `shallguard-macros`).
+//! anchors in the source tree (`#[shallguard::enforces]` /
+//! `#[shallguard::verifies]` attributes and `shallguard::enforces_here!`
+//! branch anchors).
 //!
 //! Hard errors (always fail):
 //! - a document fails to parse or yields fewer configured requirements;
@@ -21,6 +22,8 @@
 //!
 //! The binary prints a per-area coverage report; the repo-wide check also
 //! runs as this crate's integration test, which is the CI gate.
+
+extern crate self as shallguard;
 
 pub mod baseline;
 pub mod bundle;
@@ -42,6 +45,8 @@ mod workspace;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+#[shallguard_macros::enforces("REQ-TRACE-008")]
+pub use shallguard_macros::{enforces, enforces_here, verifies};
 pub use workspace::workspace_root;
 
 /// A human-readable update from a long-running command.
@@ -91,6 +96,7 @@ pub(crate) fn clear_live_progress(progress: Option<ProgressCallback>) {
 /// A requirements document and the source tree that unprefixed `src/` and
 /// `tests/` references inside it resolve to.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[shallguard::enforces("REQ-PORT-002")]
 pub struct DocSpec {
     /// Workspace-relative document path.
     pub path: String,

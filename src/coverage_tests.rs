@@ -51,6 +51,7 @@ fn accumulator(kind: EnforcementScopeKind) -> RequirementAccumulator {
     }
 }
 
+#[shallguard::verifies("REQ-COV-004")]
 #[test]
 fn source_range_intersection_is_half_open() {
     assert!(ranges_overlap(range(10, 20), range(19, 21)));
@@ -58,6 +59,7 @@ fn source_range_intersection_is_half_open() {
     assert!(!ranges_overlap(range(10, 20), range(1, 10)));
 }
 
+#[shallguard::verifies("REQ-COV-004")]
 #[test]
 fn covered_llvm_regions_reach_the_owning_enforcement_scope() {
     let mut requirement = accumulator(EnforcementScopeKind::FunctionBody);
@@ -87,6 +89,7 @@ fn covered_llvm_regions_reach_the_owning_enforcement_scope() {
     assert_eq!(result.sites[0].reached_by, ["crate:lib:crate:test"]);
 }
 
+#[shallguard::verifies("REQ-COV-005")]
 #[test]
 fn zero_count_region_is_instrumented_but_not_reached() {
     let mut requirement = accumulator(EnforcementScopeKind::Block);
@@ -108,6 +111,7 @@ fn zero_count_region_is_instrumented_but_not_reached() {
     assert_eq!(result.executable_sites.reached, 0);
 }
 
+#[shallguard::verifies("REQ-COV-005")]
 #[test]
 fn declarations_are_structural_only() {
     let result = accumulator(EnforcementScopeKind::Structural).finish();
@@ -126,6 +130,7 @@ fn initializer_without_an_llvm_region_is_structural() {
     assert_eq!(result.executable_sites.total, 0);
 }
 
+#[shallguard::verifies("REQ-COV-005")]
 #[test]
 fn execution_errors_take_precedence_over_reach() {
     let mut requirement = accumulator(EnforcementScopeKind::FunctionBody);

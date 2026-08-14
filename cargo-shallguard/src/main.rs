@@ -35,7 +35,6 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use shallguard_macros::enforces;
 
 #[path = "cli_progress.rs"]
 mod cli_progress;
@@ -119,7 +118,7 @@ struct ReviewArgs {
     cache_dir: Option<PathBuf>,
 }
 
-#[enforces("REQ-CLI-001", "REQ-CLI-002")]
+#[shallguard::enforces("REQ-CLI-001", "REQ-CLI-002", "REQ-PORT-008", "REQ-SEC-001")]
 fn main() -> ExitCode {
     let args = normalized_args(std::env::args().skip(1).collect());
     let command = match args.as_slice() {
@@ -303,11 +302,11 @@ fn main() -> ExitCode {
     }
 }
 
-#[enforces("REQ-CLI-001")]
+#[shallguard::enforces("REQ-CLI-001")]
 fn normalized_args(mut args: Vec<String>) -> Vec<String> {
     // Cargo passes the external subcommand name as argv[1] when it invokes an
-    // installed `cargo-shallguard` executable. The workspace alias invokes this
-    // binary through `cargo run` and therefore does not add that argument.
+    // installed `cargo-shallguard` executable. The repository's development
+    // alias invokes this binary through `cargo run` and omits that argument.
     if args
         .first()
         .is_some_and(|argument| argument == "shallguard")
@@ -317,6 +316,7 @@ fn normalized_args(mut args: Vec<String>) -> Vec<String> {
     args
 }
 
+#[shallguard::enforces("REQ-SEC-004")]
 fn run_clean(root: &Path, config: &shallguard::config::RepositoryConfig) -> ExitCode {
     let bundle_dir = config.bundle_dir();
     match shallguard::bundle::clean_bundle(root, &bundle_dir) {
@@ -338,6 +338,7 @@ fn run_clean(root: &Path, config: &shallguard::config::RepositoryConfig) -> Exit
     }
 }
 
+#[shallguard::enforces("REQ-SPEC-006")]
 fn run_format(root: &Path, docs: &[shallguard::DocSpec], args: &FormatArgs) -> ExitCode {
     let report = if args.check {
         shallguard::requirement_format::check(root, docs)
@@ -642,6 +643,7 @@ fn parse_coverage_args(args: &[String]) -> Result<CoverageArgs> {
     })
 }
 
+#[shallguard::enforces("REQ-IMP-007")]
 fn run_impact(
     root: &Path,
     docs: &[shallguard::DocSpec],
@@ -713,7 +715,7 @@ fn write_artifact(path: &Path, content: &str) -> Result<()> {
     std::fs::write(path, content).with_context(|| format!("writing artifact {}", path.display()))
 }
 
-#[enforces("REQ-CLI-004")]
+#[shallguard::enforces("REQ-CLI-004")]
 fn run_bundle(
     root: &Path,
     docs: &[shallguard::DocSpec],
@@ -790,7 +792,7 @@ fn run_test_index(root: &Path, docs: &[shallguard::DocSpec], args: &TestIndexArg
     }
 }
 
-#[enforces("REQ-CLI-004")]
+#[shallguard::enforces("REQ-CLI-004", "REQ-COV-006")]
 fn run_coverage(
     root: &Path,
     docs: &[shallguard::DocSpec],
@@ -840,7 +842,7 @@ fn run_coverage(
     }
 }
 
-#[enforces("REQ-CLI-002", "REQ-CLI-004")]
+#[shallguard::enforces("REQ-CLI-002", "REQ-CLI-004")]
 fn run_review(
     root: &Path,
     docs: &[shallguard::DocSpec],

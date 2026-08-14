@@ -23,6 +23,10 @@ jobs:
       run: cargo clippy --workspace --all-targets --locked -- -D warnings
     - name: Test
       run: cargo test --workspace --locked
+    - name: Requirement assurance
+      run: |
+        cargo shallguard-dev fmt --check
+        cargo shallguard-dev check
     - name: Documentation
       env:
         RUSTDOCFLAGS: -D warnings

@@ -2,10 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use shallguard_macros::verifies;
 use tempfile::tempdir;
 
-#[verifies("REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
+#[shallguard::verifies("REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
 #[test]
 fn installed_subcommand_checks_a_single_package_fixture() {
     let fixture = tempdir().expect("create fixture repository");
@@ -36,6 +35,25 @@ fn installed_subcommand_checks_a_single_package_fixture() {
     );
 }
 
+#[shallguard::verifies("REQ-PORT-008")]
+#[test]
+fn repository_configuration_has_zero_traceability_debt() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("BUG: CLI package must have a workspace parent");
+    let config = shallguard::config::RepositoryConfig::load(root)
+        .expect("repository ShallGuard configuration should load");
+    let report = shallguard::check::run(root, &config.documents(), &config)
+        .expect("repository traceability check should run");
+
+    assert!(report.errors.is_empty(), "errors: {:#?}", report.errors);
+    assert!(
+        report.warnings.is_empty(),
+        "warnings: {:#?}",
+        report.warnings
+    );
+}
+
 fn write_fixture(root: &Path) {
     fs::create_dir(root.join("src")).expect("create source directory");
     fs::create_dir(root.join("docs")).expect("create documentation directory");
@@ -47,12 +65,12 @@ fn write_fixture(root: &Path) {
     .expect("write Cargo manifest");
     fs::write(
         root.join("src/lib.rs"),
-        r#"#[shallguard_macros::enforces("REQ-DEMO-001")]
+        r#"#[shallguard::enforces("REQ-DEMO-001")]
 pub fn answer() -> u8 { 42 }
 
 #[cfg(test)]
 mod tests {
-    #[shallguard_macros::verifies("REQ-DEMO-001")]
+    #[shallguard::verifies("REQ-DEMO-001")]
     #[test]
     fn answer_is_stable() { assert_eq!(super::answer(), 42); }
 }

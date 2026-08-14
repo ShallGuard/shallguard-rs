@@ -223,7 +223,7 @@ statement is always included. The model must not review only a lossy extraction.
 
 - before and after form of each changed enclosing item;
 - minimal unified diff;
-- every unchanged direct `#[enforces]` / `enforces_here!` site needed to
+- every unchanged direct `#[shallguard::enforces]` / `shallguard::enforces_here!` site needed to
   understand the invariant, resolved from the head syntax tree;
 - one-hop dependencies selected by deterministic impact analysis;
 - signatures and relevant types for called helpers;

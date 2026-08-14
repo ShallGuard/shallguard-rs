@@ -5,7 +5,6 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
-use shallguard_macros::enforces;
 
 #[derive(Deserialize)]
 struct CargoMetadata {
@@ -18,7 +17,7 @@ struct CargoMetadata {
 ///
 /// Returns an error when the current directory cannot be read, Cargo metadata
 /// fails, or Cargo returns malformed metadata.
-#[enforces("REQ-PORT-001")]
+#[shallguard::enforces("REQ-PORT-001")]
 pub fn workspace_root() -> Result<PathBuf> {
     let invocation_dir = std::env::current_dir().context("reading the invocation directory")?;
     workspace_root_from(&invocation_dir)
@@ -52,12 +51,11 @@ fn workspace_root_from(invocation_dir: &Path) -> Result<PathBuf> {
 mod tests {
     use std::fs;
 
-    use shallguard_macros::verifies;
     use tempfile::tempdir;
 
     use super::workspace_root_from;
 
-    #[verifies("REQ-PORT-001")]
+    #[shallguard::verifies("REQ-PORT-001")]
     #[test]
     fn discovers_single_package_and_virtual_workspace_roots() {
         let single = tempdir().expect("BUG: single-package temporary directory should exist");

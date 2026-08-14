@@ -1,5 +1,6 @@
 use super::*;
 
+#[shallguard::verifies("REQ-COV-003")]
 #[test]
 fn parses_workspace_code_regions_and_deduplicates_instantiations() {
     let json = br#"
@@ -33,6 +34,7 @@ fn parses_workspace_code_regions_and_deduplicates_instantiations() {
     assert!(parsed.regions_for("dependency.rs").is_empty());
 }
 
+#[shallguard::verifies("REQ-COV-003")]
 #[test]
 fn rejects_an_unknown_export_type() {
     let error = parse_export(
@@ -44,6 +46,7 @@ fn rejects_an_unknown_export_type() {
     assert!(error.to_string().contains("unexpected LLVM export type"));
 }
 
+#[shallguard::verifies("REQ-COV-003")]
 #[test]
 fn source_paths_must_stay_inside_the_workspace() {
     assert_eq!(
