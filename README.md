@@ -50,7 +50,7 @@ shallguard-macros = { git = "https://github.com/sigi64/shallguard.git", rev = "<
 cargo install \
   --git https://github.com/sigi64/shallguard.git \
   --rev <published-sha> \
-  --package cargo-shallguard
+  --locked cargo-shallguard
 ```
 
 Copy and adapt the [repository configuration example](docs/CONFIGURATION.md)
