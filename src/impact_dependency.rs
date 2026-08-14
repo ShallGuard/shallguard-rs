@@ -159,7 +159,7 @@ pub(crate) fn definition_for_trait_item(
 
 /// Finds requirements whose anchored source scopes depend directly on a
 /// changed definition in either the base or head syntax graph.
-#[shallguard_macros::enforces("REQ-IMP-006", "REQ-PORT-004")]
+#[shallguard::enforces("REQ-IMP-006", "REQ-PORT-004")]
 pub(crate) fn analyze(
     root: &Path,
     base_commit: &str,

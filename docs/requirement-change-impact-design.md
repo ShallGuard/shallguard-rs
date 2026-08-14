@@ -31,7 +31,7 @@ Implemented in this slice:
 - normalized Rust item comparison with comments and formatting excluded;
 - item-level `direct`, `evidence`, `anchor`, `specification`, `structural`,
   `transitive`, and parse-fallback classification, with changed-line
-  intersection restricting `enforces_here!` to its smallest enclosing block;
+  intersection restricting `shallguard::enforces_here!` to its smallest enclosing block;
 - base/head source indexing and one reverse-dependency hop from changed local
   functions, methods, types, constants, and statics to anchored enforcement
   scopes;
@@ -172,7 +172,7 @@ with `syn`, using span locations to index:
 - impl and trait members;
 - fields and variants;
 - blocks, statements, arms, and expressions needed for local impact;
-- `#[enforces]`, `enforces_here!`, and `#[verifies]` anchors.
+- `#[shallguard::enforces]`, `shallguard::enforces_here!`, and `#[shallguard::verifies]` anchors.
 
 ### 5.2 Base index
 
@@ -220,10 +220,10 @@ Direct impact is based on source-scope intersection:
 
 - an item anchor owns the complete item;
 - a field or variant anchor owns that declaration;
-- `enforces_here!` owns its smallest enclosing executable block;
+- `shallguard::enforces_here!` owns its smallest enclosing executable block;
 - a verification anchor owns the complete test function.
 
-If an `enforces_here!` invocation is not the first executable statement in its
+If a `shallguard::enforces_here!` invocation is not the first executable statement in its
 block, report an advisory placement finding. The impact engine still uses the
 block conservatively.
 
@@ -407,7 +407,7 @@ Unit tests cover:
 Repository-fixture tests cover:
 
 - function modification;
-- branch modification under `enforces_here!`;
+- branch modification under `shallguard::enforces_here!`;
 - moved/renamed files and items;
 - deleted anchors;
 - changed verification tests;

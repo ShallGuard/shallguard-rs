@@ -232,7 +232,7 @@ fn add_range(
     Ok(())
 }
 
-#[shallguard_macros::enforces("REQ-REV-003", "REQ-SEC-005")]
+#[shallguard::enforces("REQ-REV-003", "REQ-SEC-005")]
 pub(super) fn validate_response(
     result: ReviewResult,
     metadata: &CapsuleMetadata,
@@ -295,7 +295,7 @@ pub(super) fn validate_response(
     Ok(result)
 }
 
-#[shallguard_macros::enforces("REQ-REV-004", "REQ-SEC-002")]
+#[shallguard::enforces("REQ-REV-004", "REQ-SEC-002")]
 fn validate_citations(
     citations: &[Citation],
     metadata: &CapsuleMetadata,

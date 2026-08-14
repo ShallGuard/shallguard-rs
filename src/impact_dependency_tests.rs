@@ -25,14 +25,14 @@ fn changed_function(name: &str) -> ChangedDefinition {
     }
 }
 
-#[shallguard_macros::verifies("REQ-IMP-006")]
+#[shallguard::verifies("REQ-IMP-006")]
 #[test]
 fn propagates_changed_helper_to_anchored_caller() {
     let index = index_fixture(
         r#"
         fn helper() {}
 
-        #[enforces("REQ-ZZ-001")]
+        #[shallguard::enforces("REQ-ZZ-001")]
         fn apply() { helper(); }
         "#,
     );
@@ -46,14 +46,14 @@ fn propagates_changed_helper_to_anchored_caller() {
     assert!(analysis.claimed_changes.contains("change-0001"));
 }
 
-#[shallguard_macros::verifies("REQ-IMP-006")]
+#[shallguard::verifies("REQ-IMP-006")]
 #[test]
 fn classifies_changed_type_dependency_as_structural() {
     let index = index_fixture(
         r#"
         struct Config { value: u8 }
 
-        #[enforces("REQ-ZZ-001")]
+        #[shallguard::enforces("REQ-ZZ-001")]
         fn apply(config: Config) { consume(config); }
         "#,
     );
@@ -84,7 +84,7 @@ fn branch_anchor_does_not_claim_call_outside_its_block() {
 
         fn apply(flag: bool) {
             if flag {
-                enforces_here!("REQ-ZZ-001");
+                shallguard::enforces_here!("REQ-ZZ-001");
                 guarded();
             }
             helper();
@@ -108,7 +108,7 @@ fn resolves_self_associated_function_in_same_impl() {
         impl Gate {
             fn helper() {}
 
-            #[enforces("REQ-ZZ-001")]
+            #[shallguard::enforces("REQ-ZZ-001")]
             fn apply() { Self::helper(); }
         }
         "#,
@@ -137,7 +137,7 @@ fn direct_requirement_is_not_duplicated_as_transitive() {
         r#"
         fn helper() {}
 
-        #[enforces("REQ-ZZ-001")]
+        #[shallguard::enforces("REQ-ZZ-001")]
         fn apply() { helper(); }
         "#,
     );

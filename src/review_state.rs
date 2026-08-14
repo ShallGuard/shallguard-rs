@@ -95,7 +95,7 @@ pub(super) struct ReviewStore<'a> {
 }
 
 impl<'a> ReviewStore<'a> {
-    #[shallguard_macros::enforces("REQ-REV-007")]
+    #[shallguard::enforces("REQ-REV-007")]
     pub(super) fn open(
         options: &'a ReviewOptions<'_>,
         manifest: &BundleManifest,
@@ -275,7 +275,7 @@ impl<'a> ReviewStore<'a> {
         Ok(Some(result))
     }
 
-    #[shallguard_macros::enforces("REQ-REV-008")]
+    #[shallguard::enforces("REQ-REV-008")]
     pub(super) fn cache(&self, cache_key: &str, metadata: &CapsuleMetadata) -> Reuse<CachedUnit> {
         let Some(path) = self.cache_entry_dir(cache_key) else {
             return Reuse::Miss;
@@ -314,7 +314,7 @@ impl<'a> ReviewStore<'a> {
         write_json_atomic(&attempt.dir.join("attempt.json"), review)
     }
 
-    #[shallguard_macros::enforces("REQ-REV-006")]
+    #[shallguard::enforces("REQ-REV-006")]
     pub(super) fn write_checkpoint(
         &self,
         entry: &BundleEntry,
@@ -414,7 +414,7 @@ fn create_parent(path: &Path) -> Result<()> {
         .with_context(|| format!("creating output parent {}", parent.display()))
 }
 
-#[shallguard_macros::enforces("REQ-REV-008", "REQ-SEC-005")]
+#[shallguard::enforces("REQ-REV-008", "REQ-SEC-005")]
 fn read_cached_unit(
     path: &Path,
     cache_key: &str,
@@ -447,7 +447,7 @@ fn read_cached_unit(
     }))
 }
 
-#[shallguard_macros::enforces("REQ-SEC-002")]
+#[shallguard::enforces("REQ-SEC-002")]
 fn safe_output_path(root: &Path, relative: &str) -> Result<PathBuf> {
     let path = Path::new(relative);
     if path.is_absolute()

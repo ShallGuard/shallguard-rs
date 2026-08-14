@@ -40,7 +40,7 @@ fn valid_result() -> ReviewResult {
     }
 }
 
-#[shallguard_macros::verifies("REQ-REV-001")]
+#[shallguard::verifies("REQ-REV-001")]
 #[test]
 fn parses_provider_names() {
     assert_eq!(
@@ -54,7 +54,7 @@ fn parses_provider_names() {
     assert!("other".parse::<ReviewProvider>().is_err());
 }
 
-#[shallguard_macros::verifies("REQ-REV-001", "REQ-REV-002", "REQ-SEC-003")]
+#[shallguard::verifies("REQ-REV-001", "REQ-REV-002", "REQ-SEC-003")]
 #[test]
 fn codex_command_is_ephemeral_and_read_only() {
     let spec = command_spec(
@@ -81,7 +81,7 @@ fn codex_command_is_ephemeral_and_read_only() {
     assert!(args.iter().any(|argument| argument == "--oss"));
 }
 
-#[shallguard_macros::verifies("REQ-REV-001", "REQ-REV-002", "REQ-SEC-003")]
+#[shallguard::verifies("REQ-REV-001", "REQ-REV-002", "REQ-SEC-003")]
 #[test]
 fn claude_command_disables_tools_and_sessions() {
     let spec = command_spec(ReviewProvider::Claude, None, None, "{}");
@@ -98,7 +98,7 @@ fn claude_command_disables_tools_and_sessions() {
     assert!(args.iter().any(|argument| argument == "--safe-mode"));
 }
 
-#[shallguard_macros::verifies("REQ-REV-002", "REQ-SEC-003")]
+#[shallguard::verifies("REQ-REV-002", "REQ-SEC-003")]
 #[test]
 fn provider_environment_excludes_unrelated_ci_secrets() {
     assert!(provider_environment_allowed(OsStr::new("PATH")));
@@ -113,14 +113,14 @@ fn provider_environment_excludes_unrelated_ci_secrets() {
     assert!(!provider_environment_allowed(OsStr::new("JIRA_API_TOKEN")));
 }
 
-#[shallguard_macros::verifies("REQ-REV-004")]
+#[shallguard::verifies("REQ-REV-004")]
 #[test]
 fn validates_complete_result_with_supplied_citation() {
     let result = validate_response(valid_result(), &metadata()).expect("result validates");
     assert_eq!(result.verdict, ReviewVerdict::Satisfied);
 }
 
-#[shallguard_macros::verifies("REQ-REV-003")]
+#[shallguard::verifies("REQ-REV-003")]
 #[test]
 fn response_schema_binds_capsule_and_requirement_identity_exactly() {
     let schema = response_schema(&metadata());
@@ -160,7 +160,7 @@ fn classifies_identity_and_citation_protocol_failures() {
     ));
 }
 
-#[shallguard_macros::verifies("REQ-REV-004")]
+#[shallguard::verifies("REQ-REV-004")]
 #[test]
 fn coverage_anchor_and_scope_are_citable_protocol_locations() {
     let (capsule, capsule_digest) = crate::bundle::review_test_capsule_with_coverage();
@@ -190,7 +190,7 @@ fn coverage_anchor_and_scope_are_citable_protocol_locations() {
     validate_response(result, &metadata).expect("coverage anchor citation validates");
 }
 
-#[shallguard_macros::verifies("REQ-REV-004")]
+#[shallguard::verifies("REQ-REV-004")]
 #[test]
 fn rejects_citation_outside_capsule() {
     let mut result = valid_result();
@@ -199,7 +199,7 @@ fn rejects_citation_outside_capsule() {
     assert!(error.to_string().contains("outside supplied capsule"));
 }
 
-#[shallguard_macros::verifies("REQ-REV-003")]
+#[shallguard::verifies("REQ-REV-003")]
 #[test]
 fn rejects_missing_clause_review() {
     let mut result = valid_result();
@@ -273,7 +273,7 @@ fn completed_review_progress_reports_concise_findings_and_result_path() {
     );
 }
 
-#[shallguard_macros::verifies("REQ-REV-006")]
+#[shallguard::verifies("REQ-REV-006")]
 #[test]
 fn aggregate_artifact_is_refreshed_from_running_to_completed() {
     let directory = tempfile::tempdir().expect("temporary directory");

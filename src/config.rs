@@ -5,7 +5,6 @@ use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
-use shallguard_macros::enforces;
 
 use crate::DocSpec;
 
@@ -71,7 +70,7 @@ pub struct ReviewConfig {
 
 impl RepositoryConfig {
     /// Loads and validates the configuration owned by `root`.
-    #[enforces("REQ-CLI-004", "REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
+    #[shallguard::enforces("REQ-CLI-004", "REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
     pub fn load(root: &Path) -> Result<Self> {
         let path = root.join(CONFIG_PATH);
         let text = std::fs::read_to_string(&path)
@@ -128,7 +127,7 @@ impl RepositoryConfig {
     }
 
     /// Whether a historical gap is forbidden for this area and dimension.
-    #[enforces("REQ-BASE-003")]
+    #[shallguard::enforces("REQ-BASE-003")]
     pub fn area_is_hard(&self, area: &str, verification: bool) -> bool {
         self.areas.get(area).is_some_and(|policy| {
             if verification {
@@ -280,7 +279,6 @@ fn valid_prefix(prefix: &str) -> bool {
 mod tests {
     use std::fs;
 
-    use shallguard_macros::verifies;
     use tempfile::tempdir;
 
     use super::*;
@@ -314,7 +312,7 @@ root = "target/shallguard"
         .expect("write fixture configuration");
     }
 
-    #[verifies("REQ-CLI-004", "REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
+    #[shallguard::verifies("REQ-CLI-004", "REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
     #[test]
     fn loads_single_package_repository_configuration() {
         let fixture = tempdir().expect("create fixture");
@@ -331,7 +329,7 @@ root = "target/shallguard"
         assert!(config.area_is_hard("PORT", false));
     }
 
-    #[verifies("REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
+    #[shallguard::verifies("REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
     #[test]
     fn loads_virtual_workspace_repository_configuration() {
         let fixture = tempdir().expect("create fixture");
@@ -348,7 +346,7 @@ root = "target/shallguard"
         assert_eq!(document.prefixes["core"], "crates/core");
     }
 
-    #[verifies("REQ-PORT-003")]
+    #[shallguard::verifies("REQ-PORT-003")]
     #[test]
     fn rejects_paths_that_escape_repository() {
         let fixture = tempdir().expect("create fixture");

@@ -41,16 +41,16 @@ use state::{Attempt, CachedUnit, Reuse, ReviewStore};
 use validation::{CapsuleMetadata, ReviewValidationError, capsule_metadata, validate_response};
 
 /// Version of an individual validated semantic-review response.
-#[shallguard_macros::enforces("REQ-CLI-005")]
+#[shallguard::enforces("REQ-CLI-005")]
 pub const REVIEW_RESULT_SCHEMA: &str = "shallguard.requirement-review-result/v1";
 /// Version of the aggregate local-review run artifact.
-#[shallguard_macros::enforces("REQ-CLI-005")]
+#[shallguard::enforces("REQ-CLI-005")]
 pub const REVIEW_RUN_SCHEMA: &str = "shallguard.requirement-local-review/v1";
 
 /// Locally installed model CLI used to review capsules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[shallguard_macros::enforces("REQ-REV-001")]
+#[shallguard::enforces("REQ-REV-001")]
 pub enum ReviewProvider {
     /// OpenAI Codex CLI in ephemeral, read-only, non-interactive mode.
     Codex,
@@ -131,7 +131,7 @@ pub struct ReviewRun {
 /// Returns an error when the bundle is malformed, a requested requirement is
 /// absent, the provider executable is unavailable, or the output artifact
 /// cannot be created.
-#[shallguard_macros::enforces("REQ-SEC-001")]
+#[shallguard::enforces("REQ-SEC-001")]
 pub fn generate(options: &ReviewOptions<'_>) -> Result<ReviewRun> {
     validate_local_provider(options.provider, options.local_provider)?;
     report_progress(options.progress, "review: reading deterministic bundle");
@@ -311,7 +311,7 @@ enum ReviewFailureKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[shallguard_macros::enforces("REQ-REV-005")]
+#[shallguard::enforces("REQ-REV-005")]
 enum ReviewVerdict {
     Satisfied,
     Violated,
@@ -504,7 +504,7 @@ fn hydrate_descriptions(bundle_dir: &Path, entries: &mut [BundleEntry]) -> Resul
     Ok(())
 }
 
-#[shallguard_macros::enforces("REQ-REV-001")]
+#[shallguard::enforces("REQ-REV-001")]
 fn review_capsule(
     options: &ReviewOptions<'_>,
     entry: &BundleEntry,
@@ -642,7 +642,7 @@ fn review_capsule(
     Ok(review)
 }
 
-#[shallguard_macros::enforces("REQ-SEC-003")]
+#[shallguard::enforces("REQ-SEC-003")]
 fn prepare_review(
     options: &ReviewOptions<'_>,
     entry: &BundleEntry,
@@ -684,7 +684,7 @@ fn write_review_materials(attempt: &Attempt, prepared: &PreparedReview) -> Resul
         .context("writing review prompt")
 }
 
-#[shallguard_macros::enforces("REQ-REV-008")]
+#[shallguard::enforces("REQ-REV-008")]
 fn materialize_cached_review(
     store: &ReviewStore<'_>,
     entry: &BundleEntry,
@@ -811,7 +811,7 @@ fn invoke_provider(options: &ProviderInvocation<'_>) -> Result<Invocation> {
     })
 }
 
-#[shallguard_macros::enforces("REQ-REV-002", "REQ-SEC-003")]
+#[shallguard::enforces("REQ-REV-002", "REQ-SEC-003")]
 fn sanitize_provider_environment(command: &mut Command) {
     command.env_clear();
     for (name, value) in std::env::vars_os() {
@@ -858,7 +858,7 @@ fn provider_environment_allowed(name: &OsStr) -> bool {
     .any(|prefix| name.starts_with(prefix))
 }
 
-#[shallguard_macros::enforces("REQ-REV-001", "REQ-REV-002", "REQ-SEC-003")]
+#[shallguard::enforces("REQ-REV-001", "REQ-REV-002", "REQ-SEC-003")]
 fn command_spec(
     provider: ReviewProvider,
     model: Option<&str>,
@@ -998,7 +998,7 @@ fn validate_bundle_file(file: &str) -> Result<()> {
     Ok(())
 }
 
-#[shallguard_macros::enforces("REQ-REV-006")]
+#[shallguard::enforces("REQ-REV-006")]
 fn persist_review_artifact(output_dir: &Path, artifact: &ReviewRunArtifact) -> Result<()> {
     state::write_json_atomic(&output_dir.join("manifest.json"), artifact)?;
     state::write_atomic(

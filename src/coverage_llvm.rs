@@ -86,7 +86,7 @@ pub(super) fn prepare(root: &Path) -> Result<()> {
     Ok(())
 }
 
-#[shallguard_macros::enforces("REQ-COV-002")]
+#[shallguard::enforces("REQ-COV-002")]
 pub(super) fn collect_test(
     root: &Path,
     work_dir: &Path,
@@ -202,7 +202,7 @@ struct LlvmFunction {
     regions: Vec<[u64; 8]>,
 }
 
-#[shallguard_macros::enforces("REQ-COV-003")]
+#[shallguard::enforces("REQ-COV-003")]
 fn parse_export(root: &Path, bytes: &[u8]) -> Result<RegionIndex> {
     let export: LlvmExport =
         serde_json::from_slice(bytes).context("decoding LLVM coverage JSON")?;

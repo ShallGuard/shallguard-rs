@@ -3,7 +3,7 @@
 **Status:** Bootstrap specification for dogfooding and standalone extraction  
 **Project:** ShallGuard  
 **Component names:** `shallguard` deterministic core, `cargo shallguard` developer
-CLI, and `shallguard-macros` requirement anchors  
+CLI, and `shallguard` requirement anchors  
 **Current implementation:** standalone ShallGuard repository  
 **Target:** a repository-independent Rust requirement-assurance tool
 
@@ -274,26 +274,29 @@ rejects any traceability regression.
   SHALL ignore anchor-like text in comments and string literals. *Enforced:*
   `src/scan.rs` (`scan`, `walk_items`) · *Verified:* ✅ `src/scan.rs`
   (`comments_are_never_anchors`, `anchor_text_inside_strings_is_invisible`)
-- **REQ-TRACE-002** — `#[enforces]` SHALL be recognized on supported Rust
-  items, impl functions, struct fields, and enum variants, and the scanner
-  SHALL retain each anchor's source scope and executable/structural kind.
+- **REQ-TRACE-002** — `#[shallguard::enforces]` SHALL be recognized on
+  supported Rust items, impl functions, struct fields, and enum variants, and
+  the scanner SHALL retain each anchor's source scope and
+  executable/structural kind.
   *Enforced:* `src/scan.rs` (`walk_items`, `collect_item_attrs`,
   `collect_fn_attrs`) · *Verified:* ✅ `src/scan.rs`
   (`attribute_anchors_record_executable_and_structural_scopes`,
   `field_and_variant_attributes_are_anchors`,
   `enforces_attribute_on_items_and_impl_fns`)
-- **REQ-TRACE-003** — `enforces_here!("REQ-...")` SHALL be recognized in
-  statement, item, match-arm, and nested macro positions and SHALL own the
-  smallest enclosing executable block available to the syntax scanner.
+- **REQ-TRACE-003** — `shallguard::enforces_here!("REQ-...")` SHALL be
+  recognized in statement, item, match-arm, and nested macro positions and
+  SHALL own the smallest enclosing executable block available to the syntax
+  scanner.
   *Enforced:* `src/scan.rs` (`MacroVisitor`), `src/impact.rs`
   (`EnforcementCollector`) · *Verified:* ✅ `src/scan.rs`
   (`enforces_here_macro_in_statement_and_item_position`,
   `enforces_here_nested_in_another_macro_body_is_found`), `src/impact.rs`
   (`branch_anchor_only_owns_its_enclosing_block`,
   `branch_anchor_without_braces_owns_its_match_arm`)
-- **REQ-TRACE-004** — `#[verifies]` SHALL count as automated evidence only on a
-  syntactically recognized, non-ignored test function; an ordinary or ignored
-  function carrying the attribute SHALL be reported invalid. *Enforced:*
+- **REQ-TRACE-004** — `#[shallguard::verifies]` SHALL count as automated
+  evidence only on a syntactically recognized, non-ignored test function; an
+  ordinary or ignored function carrying the attribute SHALL be reported
+  invalid. *Enforced:*
   `src/scan.rs` (`collect_fn_attrs`) · *Verified:* ✅ `src/scan.rs`
   (`verifies_attribute_needs_an_enabled_test`)
 - **REQ-TRACE-005** — The checker SHALL fail for malformed documents,
@@ -312,6 +315,13 @@ rejects any traceability regression.
   *Enforced:* `src/scan.rs` (`Anchor`, `Anchors`), `src/check.rs` (`analyze`) ·
   *Verified:* ✅ `src/test_index_tests.rs`
   (`merges_repeated_attributes_on_one_test`)
+- **REQ-TRACE-008** — The `shallguard` library SHALL expose enforcement,
+  branch-enforcement, and verification anchors as `#[shallguard::enforces]`,
+  `shallguard::enforces_here!`, and `#[shallguard::verifies]`, so consumers
+  SHALL NOT need a direct dependency on the implementation macro crate.
+  *Enforced:* `src/lib.rs` (`enforces`, `enforces_here`, `verifies`) ·
+  *Verified:* ✅ `tests/public_anchor_api.rs`
+  (`public_namespace_exposes_all_anchor_macros`)
 
 ## Baseline and Ratchet User Stories
 
@@ -784,7 +794,7 @@ The bootstrap phase is complete when:
    owning source roots without compiled-in consumer constants;
 2. every requirement marked implemented has at least one honest enforcement
    anchor;
-3. every ✅ citation resolves to its exact, enabled `#[verifies]` test;
+3. every ✅ citation resolves to its exact, enabled `#[shallguard::verifies]` test;
 4. the explicit traceability check reports zero unbaselined gaps;
 5. `fmt --check`, unit/integration tests, Clippy, and the deterministic
    requirement gate pass in CI;

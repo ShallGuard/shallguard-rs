@@ -42,7 +42,7 @@ isolated profile cycle. Only `.profraw` data is cleared between tests, so the
 instrumented Cargo artifacts are reused. Each LLVM JSON export is hashed and
 then projected only onto the requirements claimed by that test.
 
-`#[enforces]` functions and methods map to their body; `enforces_here!` maps to
+`#[shallguard::enforces]` functions and methods map to their body; `shallguard::enforces_here!` maps to
 its smallest recoverable enclosing block. Const/static initializers are
 runtime sites only when LLVM emits a region. Fields, variants, traits, types,
 and other declarations are structural and excluded from executable-site
@@ -77,7 +77,7 @@ source.
 Test identity resolution has been exercised against both workspace shapes:
 the example core library harness and example application's library plus `basic` and
 `telemetry` integration harnesses. Coverage v1 has end-to-end fixtures for an
-annotated router function and an `enforces_here!` branch block. Impact-driven
+annotated router function and a `shallguard::enforces_here!` branch block. Impact-driven
 selection, changed-region/branch exercise, timeouts, and coverage CI wiring
 remain follow-up work.
 
@@ -92,7 +92,7 @@ verifying test -> requirement -> enforcement scope
 
 By preserving per-test attribution, the system can answer:
 
-- Did a test claiming `#[verifies("REQ-X")]` execute code that enforces
+- Did a test claiming `#[shallguard::verifies("REQ-X")]` execute code that enforces
   `REQ-X`?
 - Which enforcement sites did it reach?
 - Did the requirement's tests execute the executable regions changed by this
@@ -117,7 +117,7 @@ the requirement.
 
 - Claiming that line or branch execution proves semantic correctness.
 - Requiring every structural requirement to have runtime coverage.
-- Replacing the existing `#[verifies]` and evidence-citation checks.
+- Replacing the existing `#[shallguard::verifies]` and evidence-citation checks.
 - Requiring 100 percent line or branch coverage for every enforcement item.
 - Attributing a combined workspace profile to individual tests.
 - Instrumenting production binaries.
@@ -202,7 +202,7 @@ evidence is classified as suite-level rather than exact-test evidence.
 
 ### 7.1 Full mode
 
-Full mode selects every resolved, non-ignored `#[verifies]` test and produces a
+Full mode selects every resolved, non-ignored `#[shallguard::verifies]` test and produces a
 workspace assurance baseline.
 
 ### 7.2 MR mode
@@ -283,7 +283,7 @@ enforced behavior.
 | Const/static initializer | Executable when LLVM emits a region; otherwise structural |
 | Field declaration | Structural, not expected to execute |
 | Enum variant declaration | Structural, not expected to execute |
-| `enforces_here!` block | Executable statements in the enclosing block |
+| `shallguard::enforces_here!` block | Executable statements in the enclosing block |
 | Trait/type declaration | Structural unless a concrete executable child is anchored |
 
 Structural scopes are excluded from runtime denominators. Their evidence remains
@@ -493,7 +493,7 @@ Fixture tests must demonstrate:
 - multiple tests verifying one requirement;
 - per-test profile separation;
 - reached and unreached anchored functions;
-- `enforces_here!` block mapping;
+- `shallguard::enforces_here!` block mapping;
 - structural field/variant anchors;
 - changed-region intersection;
 - branch coverage;

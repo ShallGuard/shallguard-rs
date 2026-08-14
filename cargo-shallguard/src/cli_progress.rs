@@ -4,7 +4,7 @@ use std::io::{IsTerminal, Write};
 
 use shallguard::ProgressEvent;
 
-#[shallguard_macros::enforces("REQ-CLI-003")]
+#[shallguard::enforces("REQ-CLI-003")]
 pub(crate) fn print_progress(event: ProgressEvent<'_>) {
     let stderr = std::io::stderr();
     let interactive = stderr.is_terminal();

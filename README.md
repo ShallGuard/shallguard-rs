@@ -2,7 +2,7 @@
 
 ShallGuard is requirement-assurance tooling for Cargo projects. The workspace
 contains the reusable `shallguard` library, the `cargo-shallguard` Cargo
-subcommand, and the `shallguard-macros` anchor crate.
+subcommand, and its internal procedural-macro crate.
 
 The project is licensed under the [MIT License](LICENSE).
 
@@ -46,11 +46,24 @@ Codex or Claude; deterministic checking does not require a model provider.
 
 ## Git integration before crates.io
 
-Pin the macros and CLI to the same immutable commit:
+Pin the library and CLI to the same immutable commit:
 
 ```toml
 [dependencies]
-shallguard-macros = { git = "https://github.com/sigi64/shallguard.git", rev = "<published-sha>" }
+shallguard = { git = "https://github.com/sigi64/shallguard.git", rev = "<published-sha>" }
+```
+
+Anchor requirements through the library's public namespace:
+
+```rust
+#[shallguard::enforces("REQ-RD-001")]
+fn enforce_contract() {
+    shallguard::enforces_here!("REQ-RD-001");
+}
+
+#[shallguard::verifies("REQ-RD-001")]
+#[test]
+fn contract_is_enforced() {}
 ```
 
 ```bash

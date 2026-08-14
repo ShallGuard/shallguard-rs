@@ -24,8 +24,9 @@ all implemented requirements are anchored, the committed baseline is empty,
 and every area is protected by the ratcheted CI gate.
 
 - Add or update a requirement for behavior changes.
-- Anchor enforcement with `#[enforces]` or `enforces_here!`.
-- Anchor honest automated evidence with `#[verifies]`.
+- Anchor enforcement with `#[shallguard::enforces]` or
+  `shallguard::enforces_here!`.
+- Anchor honest automated evidence with `#[shallguard::verifies]`.
 - Do not add baseline entries; new implemented behavior must arrive fully anchored.
 - Never claim automated evidence without a test that exercises the contract.
 - Keep requirement IDs stable; retire them instead of reusing them.

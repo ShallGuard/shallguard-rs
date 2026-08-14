@@ -3,15 +3,16 @@
 ## Architecture
 
 The repository is a Rust workspace with three packages: the root `shallguard`
-library, the `cargo-shallguard` executable package, and the independent
+library, the `cargo-shallguard` executable package, and the internal
 `shallguard-macros` procedural macro package.
 
 - The library parses requirement Markdown and Rust syntax and produces typed
   reports and versioned artifacts.
 - The CLI discovers the invoked Cargo workspace and adapts library results to
   terminal output and files.
-- The macro crate validates requirement ID syntax at compile time while
-  emitting annotated Rust items unchanged.
+- The library re-exports the anchor macros under its public `shallguard::`
+  namespace. The internal macro crate validates requirement ID syntax at
+  compile time while emitting annotated Rust items unchanged.
 - Git, Cargo, LLVM, and optional model providers are invoked as local
   subprocesses. There is no long-running runtime or network service.
 

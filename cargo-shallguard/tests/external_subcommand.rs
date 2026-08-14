@@ -2,10 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use shallguard_macros::verifies;
 use tempfile::tempdir;
 
-#[verifies("REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
+#[shallguard::verifies("REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
 #[test]
 fn installed_subcommand_checks_a_single_package_fixture() {
     let fixture = tempdir().expect("create fixture repository");
@@ -36,7 +35,7 @@ fn installed_subcommand_checks_a_single_package_fixture() {
     );
 }
 
-#[verifies("REQ-PORT-008")]
+#[shallguard::verifies("REQ-PORT-008")]
 #[test]
 fn repository_configuration_has_zero_traceability_debt() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -66,12 +65,12 @@ fn write_fixture(root: &Path) {
     .expect("write Cargo manifest");
     fs::write(
         root.join("src/lib.rs"),
-        r#"#[shallguard_macros::enforces("REQ-DEMO-001")]
+        r#"#[shallguard::enforces("REQ-DEMO-001")]
 pub fn answer() -> u8 { 42 }
 
 #[cfg(test)]
 mod tests {
-    #[shallguard_macros::verifies("REQ-DEMO-001")]
+    #[shallguard::verifies("REQ-DEMO-001")]
     #[test]
     fn answer_is_stable() { assert_eq!(super::answer(), 42); }
 }

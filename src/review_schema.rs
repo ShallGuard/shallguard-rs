@@ -41,7 +41,7 @@ pub(super) fn review_prompt(
     )
 }
 
-#[shallguard_macros::enforces("REQ-REV-003")]
+#[shallguard::enforces("REQ-REV-003")]
 pub(super) fn response_schema(metadata: &CapsuleMetadata) -> Value {
     let verdict = json!([
         "satisfied",

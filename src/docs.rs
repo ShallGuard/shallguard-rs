@@ -69,7 +69,7 @@ pub struct ParsedDoc {
     pub path_spans: Vec<(usize, PathBuf)>,
 }
 
-#[shallguard_macros::enforces("REQ-TRACE-005")]
+#[shallguard::enforces("REQ-TRACE-005")]
 pub fn parse_doc(root: &Path, spec: &DocSpec) -> Result<ParsedDoc> {
     let text = std::fs::read_to_string(root.join(&spec.path))
         .with_context(|| format!("reading {}", spec.path))?;
@@ -78,7 +78,7 @@ pub fn parse_doc(root: &Path, spec: &DocSpec) -> Result<ParsedDoc> {
 
 /// Parses requirement-document content supplied by callers such as the
 /// base-revision impact analyzer.
-#[shallguard_macros::enforces("REQ-SPEC-001")]
+#[shallguard::enforces("REQ-SPEC-001")]
 pub(crate) fn parse_text(text: &str, spec: &DocSpec) -> ParsedDoc {
     let def_re =
         Regex::new(r"^- \*\*(REQ-([A-Z]{2,})-\d{3})\*\*").expect("BUG: invalid requirement regex");
@@ -121,7 +121,7 @@ pub(crate) fn parse_text(text: &str, spec: &DocSpec) -> ParsedDoc {
     }
 }
 
-#[shallguard_macros::enforces("REQ-SPEC-003", "REQ-SPEC-004")]
+#[shallguard::enforces("REQ-SPEC-003", "REQ-SPEC-004")]
 fn parse_chunk(
     spec: &DocSpec,
     id: String,
@@ -255,7 +255,7 @@ fn statement_title(chunk: &str) -> String {
 /// start with `src/` or `tests/` (optionally behind a crate prefix like
 /// `router:`), may carry a `:NNN` / `:NNN-MMM` line suffix after `.rs`,
 /// and either name a `.rs` file or a directory (`.../`).
-#[shallguard_macros::enforces("REQ-PORT-004")]
+#[shallguard::enforces("REQ-PORT-004")]
 fn resolve_path_span(spec: &DocSpec, raw: &str) -> Option<PathBuf> {
     // A leading segment before `:` is a source-root prefix only when it maps
     // in this document's repository configuration. Otherwise the `:` may be
@@ -319,7 +319,7 @@ mod tests {
 Prose citing `tests/basic.rs` and a symbol span `update_goal_weights`.
 ";
 
-    #[shallguard_macros::verifies("REQ-SPEC-001", "REQ-SPEC-003")]
+    #[shallguard::verifies("REQ-SPEC-001", "REQ-SPEC-003")]
     #[test]
     fn parses_requirements_and_segments() {
         let doc = parse_text(SAMPLE, &spec());

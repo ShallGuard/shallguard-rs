@@ -75,7 +75,7 @@ Recognized initial kinds:
 | Kind | Meaning |
 |------|---------|
 | `enforcement-anchor` | Enforced file has no matching enforcement anchor |
-| `verification-anchor` | Automated requirement has no matching `#[verifies]` test |
+| `verification-anchor` | Automated requirement has no matching `#[shallguard::verifies]` test |
 | `evidence-citation` | Automated evidence lacks a concrete resolvable test citation |
 
 An entry does not suppress unknown IDs, duplicate requirements, dead paths,

@@ -218,7 +218,7 @@ pub fn prune_baseline(
 
 /// Detects invariant failures and traceability gaps without deciding
 /// whether historical debt is allowed.
-#[shallguard_macros::enforces(
+#[shallguard::enforces(
     "REQ-SPEC-001",
     "REQ-SPEC-003",
     "REQ-SPEC-004",
@@ -421,8 +421,8 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
                     file: req.doc.to_string(),
                     line: req.line,
                     message: format!(
-                        "{} \"{}\" - no enforcement anchor (#[enforces] or \
-                         enforces_here!) in documented file(s): {}",
+                        "{} \"{}\" - no enforcement anchor (#[shallguard::enforces] or \
+                         shallguard::enforces_here!) in documented file(s): {}",
                         req.id,
                         req.title,
                         missing.join(", ")
@@ -494,7 +494,7 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
                             line: req.line,
                             message: format!(
                                 "{} - cited evidence {cited} does not resolve to \
-                                 a #[verifies] anchor for this requirement",
+                                 a #[shallguard::verifies] anchor for this requirement",
                                 req.id
                             ),
                         },
@@ -552,7 +552,7 @@ fn enforced_path_has_anchor(enforced: &Path, files: Option<&HashSet<&Path>>) -> 
     })
 }
 
-#[shallguard_macros::enforces("REQ-BASE-002")]
+#[shallguard::enforces("REQ-BASE-002")]
 fn record_gap(
     gaps: &mut BTreeMap<GapKey, TraceabilityGap>,
     req: &Requirement,
@@ -568,7 +568,7 @@ fn record_gap(
         .push(finding);
 }
 
-#[shallguard_macros::enforces("REQ-BASE-002", "REQ-BASE-004")]
+#[shallguard::enforces("REQ-BASE-002", "REQ-BASE-004")]
 fn apply_baseline(
     analysis: &mut Analysis,
     baseline: &Baseline,
@@ -687,7 +687,7 @@ fn baseline_finding(config: &RepositoryConfig, message: String) -> Finding {
     }
 }
 
-#[shallguard_macros::enforces("REQ-BASE-003")]
+#[shallguard::enforces("REQ-BASE-003")]
 fn gap_is_hard(kind: GapKind, area: &str, config: &RepositoryConfig) -> bool {
     match kind {
         GapKind::EnforcementAnchor => config.area_is_hard(area, false),
@@ -910,7 +910,7 @@ mod tests {
         }
     }
 
-    #[shallguard_macros::verifies("REQ-TRACE-006")]
+    #[shallguard::verifies("REQ-TRACE-006")]
     #[test]
     fn requires_an_anchor_in_every_documented_enforcement_file() {
         let anchored = Path::new("src/anchored.rs");
@@ -922,7 +922,7 @@ mod tests {
         assert!(!enforced_path_has_anchor(anchored, None));
     }
 
-    #[shallguard_macros::verifies("REQ-BASE-002")]
+    #[shallguard::verifies("REQ-BASE-002")]
     #[test]
     fn exact_baseline_gap_is_known_warning() {
         let kind = GapKind::EnforcementAnchor;
@@ -940,7 +940,7 @@ mod tests {
         assert_eq!(stats.known, 1);
     }
 
-    #[shallguard_macros::verifies("REQ-BASE-002")]
+    #[shallguard::verifies("REQ-BASE-002")]
     #[test]
     fn unbaselined_gap_is_a_regression() {
         let kind = GapKind::VerificationAnchor;
@@ -957,7 +957,7 @@ mod tests {
         assert_eq!(stats.new, 1);
     }
 
-    #[shallguard_macros::verifies("REQ-BASE-004")]
+    #[shallguard::verifies("REQ-BASE-004")]
     #[test]
     fn fixed_gap_makes_entry_stale() {
         let kind = GapKind::EvidenceCitation;
@@ -974,7 +974,7 @@ mod tests {
         assert_eq!(stats.resolved, 1);
     }
 
-    #[shallguard_macros::verifies("REQ-BASE-004")]
+    #[shallguard::verifies("REQ-BASE-004")]
     #[test]
     fn prune_mode_accepts_resolved_entry_for_removal() {
         let kind = GapKind::EvidenceCitation;
@@ -990,7 +990,7 @@ mod tests {
         assert_eq!(stats.resolved, 1);
     }
 
-    #[shallguard_macros::verifies("REQ-BASE-003")]
+    #[shallguard::verifies("REQ-BASE-003")]
     #[test]
     fn hard_area_cannot_be_baselined() {
         let kind = GapKind::EnforcementAnchor;
