@@ -1,0 +1,37 @@
+[package]
+name = "req-trace"
+version = "0.1.0"
+authors = ["Tomas Siegl <tomas.siegl@gmail.com>"]
+edition = "2024"
+publish = false
+autobins = false
+description = "Shallguard requirement traceability, executable coverage, and review tooling"
+license = "MIT"
+
+[workspace]
+members = ["shallguard-macros"]
+resolver = "3"
+
+[lib]
+name = "req_trace"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cargo-req-cov"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+shallguard-macros = { path = "shallguard-macros", version = "0.1.0" }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+regex = "1.4.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10.8"
+syn = { version = "2", features = ["full", "visit"] }
+thiserror = "2.0"
+toml = "0.9.5"
+
+[dev-dependencies]
+tempfile = "3.23.0"

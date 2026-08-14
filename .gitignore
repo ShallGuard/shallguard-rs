@@ -1,0 +1,11 @@
+/target/
+/.cache/
+/requirement-impact.json
+/requirement-impact.md
+/requirement-tests.json
+/requirement-tests.md
+/requirement-coverage.json
+/requirement-coverage.md
+/harness-tests.json
+/requirement-review/
+/requirement-local-review/
