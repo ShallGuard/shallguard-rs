@@ -36,6 +36,8 @@ pub struct ReviewArtifactPaths<'a> {
 pub struct ReviewWorkflowOptions<'a> {
     /// Comparison base. `None` replays the existing bundle.
     pub base: Option<BaseSelection<'a>>,
+    /// Repository-relative traceability baseline used by impact analysis.
+    pub baseline_path: &'a Path,
     /// Whether orchestrated mode should execute relevant verification tests.
     pub with_coverage: bool,
     /// Local model CLI.
@@ -127,7 +129,14 @@ pub fn run(
             options.progress,
             format!("impact: analyzing changes against {}", base_label(*base)),
         );
-        let impact = impact::analyze(root, docs, &ImpactOptions { base: *base })?;
+        let impact = impact::analyze(
+            root,
+            docs,
+            &ImpactOptions {
+                base: *base,
+                baseline_path: options.baseline_path,
+            },
+        )?;
         impacted_requirements = impact.requirements.len();
         if impacted_requirements == 0 {
             bail!("impact analysis selected no requirements for local review");

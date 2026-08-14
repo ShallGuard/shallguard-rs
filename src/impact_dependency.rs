@@ -15,8 +15,6 @@ use syn::visit::Visit;
 
 use crate::scan::collect_rs_files;
 
-const SOURCE_ROOTS: &[&str] = &["example-app/src", "example-core/src"];
-
 /// A declaration that a changed source scope provides.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Definition {
@@ -164,14 +162,15 @@ pub(crate) fn definition_for_trait_item(
 pub(crate) fn analyze(
     root: &Path,
     base_commit: &str,
+    source_roots: &BTreeSet<String>,
     changes: &[ChangedDefinition],
 ) -> Result<DependencyAnalysis> {
     if changes.is_empty() {
         return Ok(DependencyAnalysis::default());
     }
 
-    let base = index_base(root, base_commit)?;
-    let head = index_head(root)?;
+    let base = index_base(root, base_commit, source_roots)?;
+    let head = index_head(root, source_roots)?;
     Ok(propagate(changes, [base, head]))
 }
 
@@ -400,9 +399,9 @@ fn reference_candidates(
     candidates
 }
 
-fn index_head(root: &Path) -> Result<RevisionIndex> {
+fn index_head(root: &Path, source_roots: &BTreeSet<String>) -> Result<RevisionIndex> {
     let mut files = Vec::new();
-    for source_root in SOURCE_ROOTS {
+    for source_root in source_roots {
         collect_rs_files(&root.join(source_root), &mut files)?;
     }
     files.sort();
@@ -419,17 +418,15 @@ fn index_head(root: &Path) -> Result<RevisionIndex> {
     Ok(index)
 }
 
-fn index_base(root: &Path, revision: &str) -> Result<RevisionIndex> {
-    let output = ProcessCommand::new("git")
-        .args([
-            "ls-tree",
-            "-r",
-            "-z",
-            revision,
-            "--",
-            SOURCE_ROOTS[0],
-            SOURCE_ROOTS[1],
-        ])
+fn index_base(
+    root: &Path,
+    revision: &str,
+    source_roots: &BTreeSet<String>,
+) -> Result<RevisionIndex> {
+    let mut command = ProcessCommand::new("git");
+    command.args(["ls-tree", "-r", "-z", revision, "--"]);
+    command.args(source_roots);
+    let output = command
         .current_dir(root)
         .output()
         .context("listing base source files for dependency analysis")?;
@@ -868,13 +865,14 @@ fn module_root(path: &Path) -> String {
         .components()
         .filter_map(|component| component.as_os_str().to_str())
         .collect::<Vec<_>>();
-    let crate_name = components
-        .first()
-        .map_or("workspace", |name| *name)
-        .replace('-', "_");
     let source_index = components
         .iter()
         .position(|component| *component == "src" || *component == "tests");
+    let crate_name = source_index
+        .and_then(|index| index.checked_sub(1))
+        .and_then(|index| components.get(index).copied())
+        .unwrap_or("workspace")
+        .replace('-', "_");
     let mut parts = vec![crate_name];
     if let Some(source_index) = source_index {
         parts.extend(

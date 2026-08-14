@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use regex::Regex;
 
-use crate::{DocSpec, PREFIX_CRATES};
+use crate::DocSpec;
 
 /// One concrete piece of automated evidence cited in a *Verified:* line:
 /// a test file plus, ideally, the test function name.
@@ -253,18 +253,18 @@ fn statement_title(chunk: &str) -> String {
 /// `router:`), may carry a `:NNN` / `:NNN-MMM` line suffix after `.rs`,
 /// and either name a `.rs` file or a directory (`.../`).
 fn resolve_path_span(spec: &DocSpec, raw: &str) -> Option<PathBuf> {
-    // A leading segment before `:` is a crate prefix only when it maps in
-    // PREFIX_CRATES — otherwise the `:` belongs to a line suffix.
-    let (crate_name, rest) = match raw.split_once(':') {
-        Some((prefix, rest)) if PREFIX_CRATES.iter().any(|(p, _)| *p == prefix) => {
-            let mapped = PREFIX_CRATES
-                .iter()
-                .find(|(p, _)| *p == prefix)
-                .map(|(_, c)| *c)
-                .expect("BUG: prefix matched above");
-            (mapped, rest)
-        }
-        _ => (spec.default_crate.as_str(), raw),
+    // A leading segment before `:` is a source-root prefix only when it maps
+    // in this document's repository configuration. Otherwise the `:` may be
+    // a line suffix and remains part of `raw` until stripped below.
+    let (source_root, rest) = match raw.split_once(':') {
+        Some((prefix, rest)) if spec.prefixes.contains_key(prefix) => (
+            spec.prefixes
+                .get(prefix)
+                .expect("BUG: prefix matched above")
+                .as_str(),
+            rest,
+        ),
+        _ => (spec.source_root.as_str(), raw),
     };
     // Strip a line suffix such as `:88-289` after the file name.
     let path = match rest.find(".rs:") {
@@ -276,7 +276,11 @@ fn resolve_path_span(spec: &DocSpec, raw: &str) -> Option<PathBuf> {
     if !looks_like_root || !looks_like_code || path.contains(char::is_whitespace) {
         return None;
     }
-    Some(PathBuf::from(crate_name).join(path))
+    Some(if source_root == "." {
+        PathBuf::from(path)
+    } else {
+        PathBuf::from(source_root).join(path)
+    })
 }
 
 #[cfg(test)]
@@ -284,8 +288,11 @@ mod tests {
     use super::*;
 
     fn spec() -> DocSpec {
-        DocSpec::from_path("example-app/docs/USER_STORIES_AND_REQUIREMENTS.md")
-            .expect("BUG: valid test doc path")
+        DocSpec::new(
+            "example-app/docs/USER_STORIES_AND_REQUIREMENTS.md",
+            "example-app",
+            std::collections::BTreeMap::from([("core".to_string(), "example-core".to_string())]),
+        )
     }
 
     const SAMPLE: &str = "\
@@ -374,6 +381,19 @@ Prose citing `tests/basic.rs` and a symbol span `update_goal_weights`.
         assert_eq!(
             resolve_path_span(&spec(), "core:src/router/hash_rate.rs:34"),
             Some(PathBuf::from("example-core/src/router/hash_rate.rs"))
+        );
+    }
+
+    #[test]
+    fn repository_root_source_paths_are_normalized() {
+        let spec = DocSpec::new(
+            "docs/requirements.md",
+            ".",
+            std::collections::BTreeMap::new(),
+        );
+        assert_eq!(
+            resolve_path_span(&spec, "src/lib.rs"),
+            Some(PathBuf::from("src/lib.rs"))
         );
     }
 

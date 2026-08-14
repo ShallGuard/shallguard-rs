@@ -49,7 +49,7 @@ content hashes that authors would need to maintain.
 
 ## 4. Baseline file
 
-The proposed file is `.req-cov/baseline.toml`:
+The proposed file is `.shallguard/baseline.toml`:
 
 ```toml
 schema = 1
@@ -134,8 +134,8 @@ requirement could later regress under its old exception.
 The normal tool supports only monotonic maintenance:
 
 ```text
-req-trace baseline check
-req-trace baseline prune
+shallguard baseline check
+shallguard baseline prune
 ```
 
 `baseline prune` may remove entries for gaps that are now fixed or requirements

@@ -323,8 +323,11 @@ mod tests {
     use super::*;
 
     fn spec() -> DocSpec {
-        DocSpec::from_path("crate/docs/USER_STORIES_AND_REQUIREMENTS.md")
-            .expect("valid document spec")
+        DocSpec::new(
+            "crate/docs/USER_STORIES_AND_REQUIREMENTS.md",
+            "crate",
+            std::collections::BTreeMap::new(),
+        )
     }
 
     #[test]

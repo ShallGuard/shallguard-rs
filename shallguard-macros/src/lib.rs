@@ -1,9 +1,7 @@
 //! Requirement-traceability anchor attributes for Rust projects.
 //!
-//! The workspace keeps numbered system requirements
-//! (`REQ-<AREA>-<NNN>`, e.g. `REQ-HRS-002`) in
-//! `example-app/docs/USER_STORIES_AND_REQUIREMENTS.md` and
-//! `example-core/docs/USER_STORIES_AND_REQUIREMENTS.md`. These
+//! A repository keeps numbered system requirements (`REQ-<AREA>-<NNN>`,
+//! e.g. `REQ-HRS-002`) in its configured requirements documents. These
 //! attributes anchor code and tests to those requirements so the link
 //! between document and implementation is machine-checkable instead of
 //! living only in developers' heads:
@@ -21,7 +19,7 @@
 //! as dead anchors. Whether a well-formed ID actually exists in the
 //! requirements documents is deliberately out of scope here (a macro
 //! cannot detect *missing* anchors either); that is the job of the
-//! external `req-trace` checker which scans anchors syntactically.
+//! external ShallGuard checker, which scans anchors syntactically.
 //! Comments are never anchors.
 //!
 //! Placement conventions:

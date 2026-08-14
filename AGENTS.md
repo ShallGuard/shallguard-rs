@@ -1,4 +1,4 @@
-# Shallguard contributor guidance
+# ShallGuard contributor guidance
 
 This repository contains a one-shot Rust developer tool, reusable analysis
 library, and procedural anchor macros. It has no service runtime, database,
@@ -11,7 +11,7 @@ cargo build --workspace
 cargo test --workspace
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo install --path .
+cargo install --path cargo-shallguard
 ```
 
 ## Requirement workflow

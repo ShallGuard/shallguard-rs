@@ -10,7 +10,7 @@ component of [Requirement Assurance Design](requirement-assurance-design.md).
 The first deterministic slice is available through:
 
 ```bash
-cargo req-cov impact \
+cargo shallguard impact \
   --base <merge-base> \
   --json requirement-impact.json \
   --markdown requirement-impact.md
@@ -324,7 +324,7 @@ It distinguishes:
 
 A normative change automatically impacts all enforcement and verification sites
 for that requirement. Adding or modifying a requirement without the required
-head-revision anchors remains a deterministic `req-trace` error.
+head-revision anchors remains a deterministic `shallguard` error.
 
 ## 12. Output schema
 

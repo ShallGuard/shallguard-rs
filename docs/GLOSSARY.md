@@ -1,4 +1,4 @@
-# Shallguard glossary
+# ShallGuard glossary
 
 | Term | Meaning |
 |---|---|

@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-pub const BASELINE_PATH: &str = ".req-cov/baseline.toml";
 pub const BASELINE_SCHEMA: u32 = 1;
 
 /// A traceability dimension that may have historical debt.
@@ -85,8 +84,8 @@ impl Baseline {
         baseline
     }
 
-    pub fn load(root: &Path) -> Result<Self> {
-        let path = root.join(BASELINE_PATH);
+    pub fn load(root: &Path, relative_path: &Path) -> Result<Self> {
+        let path = root.join(relative_path);
         let text = std::fs::read_to_string(&path)
             .with_context(|| format!("reading traceability baseline {}", path.display()))?;
         Self::parse(&text, &path.display().to_string())
@@ -127,15 +126,19 @@ impl Baseline {
         let body = toml::to_string_pretty(&sorted).context("serializing traceability baseline")?;
         Ok(format!(
             "# Historical traceability debt. Do not add or refresh entries.\n\
-             # `cargo req-cov baseline prune` only removes resolved debt.\n\n\
+             # `cargo shallguard baseline prune` only removes resolved debt.\n\n\
              {body}"
         ))
     }
 
     /// Creates the initial baseline without ever replacing an existing
     /// policy file.
-    pub fn create_new(&self, root: &Path) -> Result<PathBuf> {
-        let path = root.join(BASELINE_PATH);
+    pub fn create_new(&self, root: &Path, relative_path: &Path) -> Result<PathBuf> {
+        let path = root.join(relative_path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("creating baseline directory {}", parent.display()))?;
+        }
         let mut file = OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -152,8 +155,8 @@ impl Baseline {
     }
 
     /// Replaces an existing baseline after a monotonic prune.
-    pub fn write_pruned(&self, root: &Path) -> Result<PathBuf> {
-        let path = root.join(BASELINE_PATH);
+    pub fn write_pruned(&self, root: &Path, relative_path: &Path) -> Result<PathBuf> {
+        let path = root.join(relative_path);
         std::fs::write(&path, self.render()?)
             .with_context(|| format!("writing pruned baseline {}", path.display()))?;
         Ok(path)

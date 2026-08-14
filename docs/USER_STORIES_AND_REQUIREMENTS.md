@@ -1,10 +1,10 @@
 # Requirement Assurance Tool: User Stories and Requirements
 
 **Status:** Bootstrap specification for dogfooding and standalone extraction  
-**Project:** Shallguard  
-**Component names:** `req-trace` deterministic core, `cargo req-cov` developer
-CLI, and requirement anchor macros  
-**Current implementation:** standalone local Shallguard repository  
+**Project:** ShallGuard  
+**Component names:** `shallguard` deterministic core, `cargo shallguard` developer
+CLI, and `shallguard-macros` requirement anchors  
+**Current implementation:** standalone ShallGuard repository  
 **Target:** a repository-independent Rust requirement-assurance tool
 
 This document specifies the requirement-assurance tool itself. It records the
@@ -57,8 +57,8 @@ The areas are:
 
 - **Type:** developer tool composed of a Cargo external subcommand, reusable
   deterministic library, and supporting procedural macros.
-- **Owner/repository:** standalone Shallguard project; remote owner and repository
-  location require approval.
+- **Owner/repository:** standalone ShallGuard project at
+  `https://github.com/sigi64/shallguard`.
 - **New artifact or extension:** extraction and generalization of an existing
   internal implementation.
 - **User/operator/developer/service audience:** Rust developers, reviewers, CI
@@ -73,7 +73,7 @@ The areas are:
   test-harness protocols for build discovery, `serde` for versioned JSON/TOML,
   and SHA-256 for content identity. Keep Git, Cargo, LLVM, and model providers
   behind explicit adapters.
-- **Interface:** `cargo req-cov`, a process-independent Rust library API, and
+- **Interface:** `cargo shallguard`, a process-independent Rust library API, and
   versioned JSON artifacts. Human terminal output is presentation, not a stable
   machine API.
 - **Packaging/container model:** installable Cargo binary plus publishable Rust
@@ -175,29 +175,33 @@ dogfooding migration is:
 **System Requirements:**
 
 - **REQ-CLI-001** — The executable SHALL support Cargo external-subcommand
-  invocation as `cargo req-cov` and direct binary invocation without changing
-  command semantics. *Enforced:* `src/main.rs` (`normalized_args`) ·
-  *Verified:* ✅ `src/main.rs` (`removes_cargo_external_subcommand_argument`)
-- **REQ-CLI-002** — With no command, `cargo req-cov` SHALL run the deterministic
-  traceability check, while `cargo req-cov review` SHALL default to Codex,
-  `origin/master` merge-base impact, executable coverage, and output beneath
-  `target/`. *Enforced:* `src/main.rs` (`main`), `src/cli_review.rs`
-  (`parse_review_args`) ·
-  *Verified:* ✅ `src/main.rs`
-  (`defaults_review_to_codex_master_impact_and_coverage`)
+  invocation as `cargo shallguard` and direct binary invocation without changing
+  command semantics. *Enforced:* `cli:src/main.rs`
+  (`normalized_args`) · *Verified:* ✅ `cli:src/cli_tests.rs`
+  (`removes_cargo_external_subcommand_argument`)
+- **REQ-CLI-002** — With no command, `cargo shallguard` SHALL run the deterministic
+  traceability check, while `cargo shallguard review` SHALL default to Codex,
+  the configured target branch, executable coverage, and configured artifact
+  paths. *Enforced:* `cli:src/main.rs` (`main`, `run_review`),
+  `cli:src/cli_review.rs` (`parse_review_args`) · *Verified:* ✅
+  `cli:src/cli_tests.rs`
+  (`leaves_repository_review_defaults_for_configuration`)
 - **REQ-CLI-003** — Long-running coverage and review commands SHALL report the
   active requirement ID, concise requirement description, position, and
   elapsed time; interactive status MAY update one terminal line while
   redirected output SHALL retain durable progress heartbeats. *Enforced:*
-  `src/cli_progress.rs`, `src/review_progress.rs`,
+  `cli:src/cli_progress.rs`, `src/review_progress.rs`,
   `src/review_workflow.rs` · *Verified:* ✅ `src/review_progress.rs`
   (`provider_status_includes_position_description_and_elapsed_time`),
   `src/review_workflow.rs`
   (`coverage_requirement_progress_is_sorted_one_per_line_with_descriptions`)
 - **REQ-CLI-004** — Generated bundles, coverage work, and local review output
-  SHALL default beneath the repository `target/` directory and SHALL permit
-  explicit output overrides. *Enforced:* `src/main.rs` (argument defaults) ·
-  *Verified:* ✅ `src/main.rs` (`defaults_bundle_output_under_target`,
+  SHALL default beneath the configured artifact root and SHALL permit explicit
+  output overrides. *Enforced:* `src/config.rs` (`RepositoryConfig`),
+  `cli:src/main.rs` (`run_bundle`, `run_coverage`, `run_review`) ·
+  *Verified:* ✅ `src/config.rs`
+  (`loads_single_package_repository_configuration`),
+  `cli:src/cli_tests.rs` (`leaves_bundle_output_for_repository_configuration`,
   `parses_local_review_options`)
 - **REQ-CLI-005** — Machine-readable artifacts SHALL use versioned schemas and
   explicit paths or stdout, while terminal prose SHALL remain a human interface
@@ -241,7 +245,7 @@ dogfooding migration is:
   `src/requirement_format.rs` (`lint_block`), `src/check.rs` (`analyze`) ·
   *Verified:* ✅ `src/requirement_format.rs`
   (`permits_retired_requirements_without_evidence_segments`)
-- **REQ-SPEC-005** — `cargo req-cov fmt` SHALL format only requirement list
+- **REQ-SPEC-005** — `cargo shallguard fmt` SHALL format only requirement list
   blocks, preserve surrounding Markdown, prove parsed semantic equivalence,
   write atomically, and refuse all writes when any selected document has a
   lint failure. *Enforced:* `src/requirement_format.rs` (`format`,
@@ -250,7 +254,7 @@ dogfooding migration is:
   (`formats_requirement_blocks_without_touching_surrounding_markdown`,
   `formatting_is_idempotent_and_semantically_equivalent`,
   `lint_failures_prevent_formatter_writes`)
-- **REQ-SPEC-006** — `cargo req-cov fmt --check` and `cargo req-cov lint` SHALL
+- **REQ-SPEC-006** — `cargo shallguard fmt --check` and `cargo shallguard lint` SHALL
   perform non-mutating structural and canonical-format validation and SHALL
   return nonzero for malformed or non-canonical selected documents.
   *Enforced:* `src/main.rs` (`parse_format_args`, `run_format`),
@@ -334,7 +338,7 @@ dogfooding migration is:
   `unbaselined_gap_is_a_regression`)
 - **REQ-BASE-003** — Areas configured as fully hardened SHALL NOT accept
   baseline exceptions. *Enforced:* `src/check.rs` (`gap_is_hard`),
-  `src/lib.rs` (`HARD_CODE_ANCHOR_AREAS`, `HARD_TEST_ANCHOR_AREAS`) ·
+  `src/config.rs` (`RepositoryConfig::area_is_hard`) ·
   *Verified:* ✅ `src/check.rs` (`hard_area_cannot_be_baselined`)
 - **REQ-BASE-004** — A resolved or retired gap SHALL make its baseline entry
   stale and fail checking until `baseline prune` removes it; pruning SHALL
@@ -652,7 +656,7 @@ dogfooding migration is:
 
 ### US-PORT-001: Standalone Use in Any Rust Repository
 
-**Status:** Extraction in progress
+**Status:** Portable repository configuration implemented
 
 **As a** maintainer of a Rust crate or workspace  
 **I want** to adopt requirement assurance without repository-specific assumptions  
@@ -668,18 +672,33 @@ dogfooding migration is:
   (`discovers_single_package_and_virtual_workspace_roots`)
 - **REQ-PORT-002** — The standalone tool SHALL support both an ordinary
   single-package Rust repository and a Cargo workspace, including virtual
-  workspace roots. *Enforced:* not implemented — portable document/package
-  ownership and repository configuration model · *Verified:* ⏳ pending
+  workspace roots. *Enforced:* `src/config.rs` (`RepositoryConfig::load`,
+  `RepositoryConfig::documents`), `src/lib.rs` (`DocSpec`) · *Verified:* ✅
+  `src/config.rs` (`loads_single_package_repository_configuration`,
+  `loads_virtual_workspace_repository_configuration`),
+  `cli:tests/external_subcommand.rs`
+  (`installed_subcommand_checks_a_single_package_fixture`)
 - **REQ-PORT-003** — Repository configuration SHALL declare requirement
   documents, owning packages/source roots, cross-package path prefixes, area
   labels, hardened policies, baseline path, artifact defaults, and optional
-  providers without recompiling the tool. *Enforced:* not implemented —
-  repository configuration schema · *Verified:* ⏳ pending
+  providers without recompiling the tool. *Enforced:* `src/config.rs`
+  (`RepositoryConfig`, `DocumentConfig`, `AreaConfig`, `ArtifactConfig`,
+  `ReviewConfig`) · *Verified:* ✅ `src/config.rs`
+  (`loads_single_package_repository_configuration`,
+  `loads_virtual_workspace_repository_configuration`,
+  `rejects_paths_that_escape_repository`),
+  `cli:tests/external_subcommand.rs`
+  (`installed_subcommand_checks_a_single_package_fixture`)
 - **REQ-PORT-004** — The standalone implementation SHALL NOT hardcode consumer
   document paths, package names, area lists, removed paths, default
   branch names, or repository-specific minimum requirement counts. *Enforced:*
-  not implemented — replace constants in `src/lib.rs` and repository-specific
-  checks in `src/check.rs` · *Verified:* ⏳ pending
+  `src/config.rs` (`RepositoryConfig`), `src/check.rs` (`analyze`),
+  `src/docs.rs` (`resolve_path_span`), `src/impact.rs` (`analyze`),
+  `src/impact_dependency.rs` (`analyze`) · *Verified:* ✅ `src/config.rs`
+  (`loads_single_package_repository_configuration`,
+  `loads_virtual_workspace_repository_configuration`),
+  `cli:tests/external_subcommand.rs`
+  (`installed_subcommand_checks_a_single_package_fixture`)
 - **REQ-PORT-005** — Deterministic analysis SHALL live in reusable library APIs
   that accept explicit repository/configuration inputs and return typed results
   without exiting the process or writing terminal output; the CLI SHALL remain
@@ -717,7 +736,7 @@ dogfooding migration is:
 - **REQ-SEC-001** — Deterministic check, impact, test-index, coverage mapping,
   bundle, and review-input stages SHALL treat repository source and Git history
   as read-only; only explicit `fmt` MAY modify a requirement document.
-  *Enforced:* `src/main.rs`, `src/impact.rs`, `src/test_index.rs`,
+  *Enforced:* `cli:src/main.rs`, `src/impact.rs`, `src/test_index.rs`,
   `src/coverage.rs`, `src/bundle.rs`, `src/review.rs` · *Verified:* 👁 code
   review only
 - **REQ-SEC-002** — Any path read from an artifact, capsule, cache, or provider
@@ -737,9 +756,9 @@ dogfooding migration is:
 - **REQ-SEC-004** — Destructive cleanup SHALL remove only a validated generated
   artifact at the configured default location, SHALL preserve unknown
   directories, and SHALL be idempotent. *Enforced:* `src/bundle.rs`
-  (`clean_default_bundle`), `src/main.rs` (`run_clean`) · *Verified:* ✅
+  (`clean_bundle`), `cli:src/main.rs` (`run_clean`) · *Verified:* ✅
   `src/bundle.rs` (`clean_removes_only_a_valid_default_bundle_and_is_idempotent`,
-  `clean_preserves_a_directory_without_a_req_cov_manifest`)
+  `clean_preserves_a_directory_without_a_shallguard_manifest`)
 - **REQ-SEC-005** — Coverage, capsule, checkpoint, cache, and provider results
   SHALL carry sufficient identity and digest data to detect stale, corrupt, or
   substituted inputs before reuse; validation failure SHALL produce unavailable
@@ -770,5 +789,5 @@ The bootstrap phase is complete when:
 4. the explicit traceability check reports zero unbaselined gaps;
 5. `fmt --check`, unit/integration tests, Clippy, and the deterministic
    requirement gate pass in CI;
-6. a self-change to `req-trace` can produce impact, coverage, capsule, and
+6. a self-change to ShallGuard can produce impact, coverage, capsule, and
    optional local review artifacts from these requirements.

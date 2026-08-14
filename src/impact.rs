@@ -18,7 +18,7 @@ use syn::spanned::Spanned as _;
 use syn::visit::Visit;
 
 use crate::DocSpec;
-use crate::baseline::{BASELINE_PATH, Baseline, GapKey};
+use crate::baseline::{Baseline, GapKey};
 use crate::docs::{Requirement, parse_text};
 use crate::impact_dependency::{
     self, ChangedDefinition, Definition, DependencyClass, definition_for_impl_item,
@@ -32,6 +32,8 @@ pub const IMPACT_SCHEMA: &str = "shallguard.requirement-impact/v1";
 pub struct ImpactOptions<'a> {
     /// How the comparison base is selected.
     pub base: BaseSelection<'a>,
+    /// Repository-relative traceability baseline configured by the consumer.
+    pub baseline_path: &'a Path,
 }
 
 /// Git base selection for local, MR, and branch pipelines.
@@ -296,8 +298,19 @@ pub fn analyze(
     };
     let head_commit = resolve_revision(root, "HEAD")?;
     let changed_files = changed_files(root, &base_commit)?;
-    let baseline = Baseline::load(root)?;
+    let baseline = Baseline::load(root, options.baseline_path)?;
     let mut state = AnalysisState::new();
+    let source_roots = docs
+        .iter()
+        .flat_map(DocSpec::source_roots)
+        .map(|root| {
+            if root == "." {
+                "src".to_string()
+            } else {
+                format!("{root}/src")
+            }
+        })
+        .collect::<BTreeSet<_>>();
 
     let (base_requirements, head_requirements) = load_requirements(root, docs, &base_commit)?;
     compare_requirement_documents(
@@ -306,13 +319,20 @@ pub fn analyze(
         &baseline,
         &mut state,
     );
-    compare_baseline(root, &base_commit, &baseline, &mut state)?;
+    compare_baseline(
+        root,
+        &base_commit,
+        options.baseline_path,
+        &baseline,
+        &mut state,
+    )?;
     compare_rust_files(
         root,
         &base_commit,
         &changed_files,
         &base_requirements,
         &head_requirements,
+        &source_roots,
         &mut state,
     )?;
     apply_dependency_impacts(
@@ -320,6 +340,7 @@ pub fn analyze(
         &base_commit,
         &base_requirements,
         &head_requirements,
+        &source_roots,
         &mut state,
     )?;
 
@@ -671,16 +692,18 @@ fn requirement_change_reasons(
 fn compare_baseline(
     root: &Path,
     base: &str,
+    baseline_path: &Path,
     head: &Baseline,
     state: &mut AnalysisState,
 ) -> Result<()> {
-    let Some(text) = git_file(root, base, Path::new(BASELINE_PATH))? else {
+    let baseline_name = baseline_path.to_string_lossy().into_owned();
+    let Some(text) = git_file(root, base, baseline_path)? else {
         if !head.gaps.is_empty() {
             state.findings.push(ImpactFinding {
                 code: "baseline-initialized".to_string(),
                 severity: FindingSeverity::Warning,
                 requirement: None,
-                file: Some(BASELINE_PATH.to_string()),
+                file: Some(baseline_name.clone()),
                 line: Some(1),
                 message: format!(
                     "initial baseline introduces {} historical gap exceptions; review the \
@@ -691,7 +714,7 @@ fn compare_baseline(
         }
         return Ok(());
     };
-    let before = Baseline::parse(&text, &format!("{base}:{BASELINE_PATH}"))?;
+    let before = Baseline::parse(&text, &format!("{base}:{baseline_name}"))?;
     let old: BTreeSet<GapKey> = before.gaps.iter().map(|entry| entry.key()).collect();
     for added in head
         .gaps
@@ -703,7 +726,7 @@ fn compare_baseline(
             code: "baseline-entry-added".to_string(),
             severity: FindingSeverity::Error,
             requirement: Some(added.requirement.clone()),
-            file: Some(BASELINE_PATH.to_string()),
+            file: Some(baseline_name.clone()),
             line: Some(1),
             message: format!(
                 "MR adds a {} exception; baseline maintenance is removal-only",
@@ -766,11 +789,12 @@ fn compare_rust_files(
     changed_files: &[ChangedFile],
     base_requirements: &BTreeMap<String, Requirement>,
     head_requirements: &BTreeMap<String, Requirement>,
+    source_roots: &BTreeSet<String>,
     state: &mut AnalysisState,
 ) -> Result<()> {
     for file in changed_files
         .iter()
-        .filter(|file| relevant_rust_path(file.display_path()))
+        .filter(|file| relevant_rust_path(file.display_path(), source_roots))
     {
         let base_text = match &file.base_path {
             Some(path) => git_file(root, base, path)?,
@@ -839,9 +863,11 @@ fn apply_dependency_impacts(
     base_commit: &str,
     base_requirements: &BTreeMap<String, Requirement>,
     head_requirements: &BTreeMap<String, Requirement>,
+    source_roots: &BTreeSet<String>,
     state: &mut AnalysisState,
 ) -> Result<()> {
-    let analysis = impact_dependency::analyze(root, base_commit, &state.dependency_changes)?;
+    let analysis =
+        impact_dependency::analyze(root, base_commit, source_roots, &state.dependency_changes)?;
     for impact in analysis.impacts {
         let area = requirement_area(&impact.requirement, base_requirements, head_requirements);
         let class = match impact.class {
@@ -880,13 +906,9 @@ fn apply_dependency_impacts(
     Ok(())
 }
 
-fn relevant_rust_path(path: &Path) -> bool {
-    let text = path.to_string_lossy();
+fn relevant_rust_path(path: &Path, source_roots: &BTreeSet<String>) -> bool {
     path.extension().is_some_and(|extension| extension == "rs")
-        && (text.starts_with("example-app/src/")
-            || text.starts_with("example-app/tests/")
-            || text.starts_with("example-core/src/")
-            || text.starts_with("example-core/tests/"))
+        && source_roots.iter().any(|root| path.starts_with(root))
 }
 
 fn changed_line_ranges(
@@ -1851,13 +1873,14 @@ fn module_root(path: &Path) -> String {
         .components()
         .filter_map(|component| component.as_os_str().to_str())
         .collect::<Vec<_>>();
-    let crate_name = components
-        .first()
-        .map_or("workspace", |name| *name)
-        .replace('-', "_");
     let source_index = components
         .iter()
         .position(|component| *component == "src" || *component == "tests");
+    let crate_name = source_index
+        .and_then(|index| index.checked_sub(1))
+        .and_then(|index| components.get(index).copied())
+        .unwrap_or("workspace")
+        .replace('-', "_");
     let mut parts = vec![crate_name];
     if let Some(source_index) = source_index {
         parts.extend(
@@ -2176,6 +2199,15 @@ mod tests {
         )));
         assert!(test_fixture_path(Path::new("crate/src/router_tests.rs")));
         assert!(!test_fixture_path(Path::new("crate/src/router.rs")));
+    }
+
+    #[test]
+    fn module_roots_support_repository_and_nested_package_sources() {
+        assert_eq!(module_root(Path::new("src/lib.rs")), "workspace");
+        assert_eq!(
+            module_root(Path::new("crates/widget-app/src/router.rs")),
+            "widget_app::router"
+        );
     }
 
     #[test]

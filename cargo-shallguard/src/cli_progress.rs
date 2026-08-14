@@ -2,7 +2,7 @@
 
 use std::io::{IsTerminal, Write};
 
-use req_trace::ProgressEvent;
+use shallguard::ProgressEvent;
 
 pub(crate) fn print_progress(event: ProgressEvent<'_>) {
     let stderr = std::io::stderr();
@@ -12,21 +12,21 @@ pub(crate) fn print_progress(event: ProgressEvent<'_>) {
     match event {
         ProgressEvent::Message(message) => {
             clear_line(&mut stderr, interactive);
-            let _ = writeln!(stderr, "[req-cov] {message}");
+            let _ = writeln!(stderr, "[shallguard] {message}");
         }
         ProgressEvent::LiveStatus {
             message,
             log_when_redirected: _,
         } if interactive => {
             clear_line(&mut stderr, true);
-            let _ = write!(stderr, "[req-cov] {message}");
+            let _ = write!(stderr, "[shallguard] {message}");
             let _ = stderr.flush();
         }
         ProgressEvent::LiveStatus {
             message,
             log_when_redirected: true,
         } => {
-            let _ = writeln!(stderr, "[req-cov] {message}");
+            let _ = writeln!(stderr, "[shallguard] {message}");
         }
         ProgressEvent::LiveStatus {
             log_when_redirected: false,

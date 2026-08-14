@@ -1,9 +1,9 @@
-# Shallguard technical documentation
+# ShallGuard technical documentation
 
 ## Architecture
 
-The repository is a Rust workspace with a root package containing both the
-`req_trace` library and `cargo-req-cov` executable, plus the independent
+The repository is a Rust workspace with three packages: the root `shallguard`
+library, the `cargo-shallguard` executable package, and the independent
 `shallguard-macros` procedural macro package.
 
 - The library parses requirement Markdown and Rust syntax and produces typed
@@ -25,12 +25,16 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
-cargo package --allow-dirty
+cargo package --allow-dirty -p shallguard-macros
 ```
 
-An installed-binary smoke test must run `cargo req-cov` from a separate fixture
-workspace so compile-time source paths cannot accidentally become repository
-discovery inputs.
+Package verification for `shallguard` and `cargo-shallguard` additionally
+requires their version-matched dependencies to exist in the target registry;
+release them in dependency order: macros, library, then CLI.
+
+An installed-binary smoke test must run `cargo shallguard` from a separate
+fixture workspace so compile-time source paths cannot accidentally become
+repository discovery inputs.
 
 ## State and data
 
@@ -40,6 +44,6 @@ results to revisions, configuration, schema versions, and content digests.
 
 ## Release status
 
-The packages are currently `publish = false` and licensed under MIT. Final
-package names, MSRV, remote repository metadata, and registry automation must
-be resolved before publication.
+The packages are currently `publish = false` and licensed under MIT. Their
+public names and GitHub metadata are final; MSRV and registry automation remain
+to be resolved before crates.io publication.

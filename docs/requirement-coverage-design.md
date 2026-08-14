@@ -13,12 +13,12 @@ and consumes
 Exact verification-test identity resolution is available through:
 
 ```bash
-cargo req-cov test-index --enumerate \
+cargo shallguard test-index --enumerate \
   --json requirement-tests.json --markdown requirement-tests.md \
   --catalog-output harness-tests.json
 
 # Limit local enumeration to one package while developing.
-cargo req-cov test-index --enumerate \
+cargo shallguard test-index --enumerate \
   --package example-core --json requirement-tests.json
 ```
 
@@ -27,11 +27,11 @@ Executable enforcement reach is available through:
 ```bash
 # Run every resolved verification test. This can include integration tests
 # and therefore needs the same service prerequisites as the normal test jobs.
-cargo req-cov coverage \
+cargo shallguard coverage \
   --json requirement-coverage.json --markdown requirement-coverage.md
 
 # Fast, focused local run. Both flags are repeatable.
-cargo req-cov coverage \
+cargo shallguard coverage \
   --package example-core --requirement REQ-CF-009 \
   --json requirement-coverage.json --markdown requirement-coverage.md
 ```

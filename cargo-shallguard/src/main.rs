@@ -4,20 +4,20 @@
 //! Usage:
 //!
 //! ```text
-//! cargo req-cov [check] [<doc.md> ...]
-//! cargo req-cov fmt [--check] [<doc.md> ...]
-//! cargo req-cov lint [<doc.md> ...]
-//! cargo req-cov clean
-//! cargo req-cov baseline check
-//! cargo req-cov baseline prune
-//! cargo req-cov impact --base <revision> --json requirement-impact.json
-//! cargo req-cov impact --target origin/master --json requirement-impact.json
-//! cargo req-cov bundle --impact requirement-impact.json --output requirement-review
-//! cargo req-cov test-index --enumerate --json requirement-tests.json
-//! cargo req-cov test-index --catalog harness-tests.json --json requirement-tests.json
-//! cargo req-cov coverage --requirement REQ-HRS-001 --json requirement-coverage.json
-//! cargo req-cov review --provider codex --bundle requirement-review
-//! cargo run -p req-trace -- example-app/docs/USER_STORIES_AND_REQUIREMENTS.md
+//! cargo shallguard [check] [<doc.md> ...]
+//! cargo shallguard fmt [--check] [<doc.md> ...]
+//! cargo shallguard lint [<doc.md> ...]
+//! cargo shallguard clean
+//! cargo shallguard baseline check
+//! cargo shallguard baseline prune
+//! cargo shallguard impact --base <revision> --json requirement-impact.json
+//! cargo shallguard impact --target origin/main --json requirement-impact.json
+//! cargo shallguard bundle --impact requirement-impact.json --output requirement-review
+//! cargo shallguard test-index --enumerate --json requirement-tests.json
+//! cargo shallguard test-index --catalog harness-tests.json --json requirement-tests.json
+//! cargo shallguard coverage --requirement REQ-HRS-001 --json requirement-coverage.json
+//! cargo shallguard review --provider codex --bundle requirement-review
+//! cargo run -p cargo-shallguard -- shallguard check
 //! ```
 //!
 //! Each argument is a workspace-relative requirements document; its
@@ -35,6 +35,7 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
+use shallguard_macros::enforces;
 
 #[path = "cli_progress.rs"]
 mod cli_progress;
@@ -45,7 +46,7 @@ use cli_review::parse_review_args;
 
 /// Warnings printed in full detail before the rest is summarized.
 const WARNING_DETAIL_LIMIT: usize = 15;
-const COMMAND_NAME: &str = "cargo req-cov";
+const COMMAND_NAME: &str = "cargo shallguard";
 
 enum Command {
     Help,
@@ -67,7 +68,7 @@ struct FormatArgs {
 }
 
 struct ImpactArgs {
-    base: CliBase,
+    base: Option<CliBase>,
     json: PathBuf,
     markdown: Option<PathBuf>,
 }
@@ -80,7 +81,7 @@ enum CliBase {
 struct BundleArgs {
     impact: PathBuf,
     coverage: Option<PathBuf>,
-    output: PathBuf,
+    output: Option<PathBuf>,
 }
 
 struct TestIndexArgs {
@@ -99,25 +100,26 @@ enum TestHarnessCli {
 struct CoverageArgs {
     packages: BTreeSet<String>,
     requirements: BTreeSet<String>,
-    work_dir: PathBuf,
+    work_dir: Option<PathBuf>,
     json: PathBuf,
     markdown: Option<PathBuf>,
 }
 
 struct ReviewArgs {
-    provider: req_trace::review::ReviewProvider,
+    provider: Option<shallguard::review::ReviewProvider>,
     base: Option<CliBase>,
-    with_coverage: bool,
-    bundle: PathBuf,
-    output: PathBuf,
+    with_coverage: Option<bool>,
+    bundle: Option<PathBuf>,
+    output: Option<PathBuf>,
     model: Option<String>,
     local_provider: Option<String>,
     requirements: BTreeSet<String>,
-    timeout: Duration,
+    timeout: Option<Duration>,
     resume: bool,
     cache_dir: Option<PathBuf>,
 }
 
+#[enforces("REQ-CLI-001", "REQ-CLI-002")]
 fn main() -> ExitCode {
     let args = normalized_args(std::env::args().skip(1).collect());
     let command = match args.as_slice() {
@@ -207,24 +209,22 @@ fn main() -> ExitCode {
         | Command::Coverage(_)
         | Command::Review(_) => &[],
     };
-    let docs = if doc_args.is_empty() {
-        req_trace::default_docs()
-    } else {
-        match doc_args
-            .iter()
-            .map(|a| req_trace::DocSpec::from_path(a))
-            .collect::<Result<Vec<_>, _>>()
-        {
-            Ok(docs) => docs,
-            Err(err) => {
-                eprintln!("{COMMAND_NAME}: {err:#}");
-                return ExitCode::FAILURE;
-            }
+    let root = match shallguard::workspace_root() {
+        Ok(root) => root,
+        Err(err) => {
+            eprintln!("{COMMAND_NAME}: {err:#}");
+            return ExitCode::FAILURE;
         }
     };
-
-    let root = match req_trace::workspace_root() {
-        Ok(root) => root,
+    let config = match shallguard::config::RepositoryConfig::load(&root) {
+        Ok(config) => config,
+        Err(err) => {
+            eprintln!("{COMMAND_NAME}: {err:#}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let docs = match config.select_documents(doc_args) {
+        Ok(docs) => docs,
         Err(err) => {
             eprintln!("{COMMAND_NAME}: {err:#}");
             return ExitCode::FAILURE;
@@ -233,13 +233,13 @@ fn main() -> ExitCode {
     match command {
         Command::Help => unreachable!("help returned before workspace discovery"),
         Command::Clean => {
-            return run_clean(&root);
+            return run_clean(&root, &config);
         }
         Command::Format(args) => {
             return run_format(&root, &docs, &args);
         }
         Command::BaselineInit => {
-            return match req_trace::check::initialize_baseline(&root, &docs) {
+            return match shallguard::check::initialize_baseline(&root, &docs, &config) {
                 Ok(change) => {
                     println!(
                         "created {} with {} historical gap(s)",
@@ -255,7 +255,7 @@ fn main() -> ExitCode {
             };
         }
         Command::BaselinePrune => {
-            return match req_trace::check::prune_baseline(&root, &docs) {
+            return match shallguard::check::prune_baseline(&root, &docs, &config) {
                 Ok(change) => {
                     println!(
                         "pruned {} resolved gap(s); {} historical gap(s) remain in {}",
@@ -272,24 +272,24 @@ fn main() -> ExitCode {
             };
         }
         Command::Impact(args) => {
-            return run_impact(&root, &docs, &args);
+            return run_impact(&root, &docs, &config, &args);
         }
         Command::Bundle(args) => {
-            return run_bundle(&root, &docs, &args);
+            return run_bundle(&root, &docs, &config, &args);
         }
         Command::TestIndex(args) => {
             return run_test_index(&root, &docs, &args);
         }
         Command::Coverage(args) => {
-            return run_coverage(&root, &docs, &args);
+            return run_coverage(&root, &docs, &config, &args);
         }
         Command::Review(args) => {
-            return run_review(&root, &docs, &args);
+            return run_review(&root, &docs, &config, &args);
         }
         Command::Check(_) => {}
     }
 
-    let report = match req_trace::check::run(&root, &docs) {
+    let report = match shallguard::check::run(&root, &docs, &config) {
         Ok(report) => report,
         Err(err) => {
             eprintln!("{COMMAND_NAME} failed to run: {err:#}");
@@ -303,18 +303,23 @@ fn main() -> ExitCode {
     }
 }
 
+#[enforces("REQ-CLI-001")]
 fn normalized_args(mut args: Vec<String>) -> Vec<String> {
     // Cargo passes the external subcommand name as argv[1] when it invokes an
-    // installed `cargo-req-cov` executable. The workspace alias invokes this
+    // installed `cargo-shallguard` executable. The workspace alias invokes this
     // binary through `cargo run` and therefore does not add that argument.
-    if args.first().is_some_and(|argument| argument == "req-cov") {
+    if args
+        .first()
+        .is_some_and(|argument| argument == "shallguard")
+    {
         args.remove(0);
     }
     args
 }
 
-fn run_clean(root: &Path) -> ExitCode {
-    match req_trace::bundle::clean_default_bundle(root) {
+fn run_clean(root: &Path, config: &shallguard::config::RepositoryConfig) -> ExitCode {
+    let bundle_dir = config.bundle_dir();
+    match shallguard::bundle::clean_bundle(root, &bundle_dir) {
         Ok(Some(path)) => {
             println!("removed generated requirement bundle {}", path.display());
             ExitCode::SUCCESS
@@ -322,7 +327,7 @@ fn run_clean(root: &Path) -> ExitCode {
         Ok(None) => {
             println!(
                 "no generated requirement bundle at {}",
-                root.join(req_trace::bundle::DEFAULT_BUNDLE_DIR).display()
+                root.join(bundle_dir).display()
             );
             ExitCode::SUCCESS
         }
@@ -333,11 +338,11 @@ fn run_clean(root: &Path) -> ExitCode {
     }
 }
 
-fn run_format(root: &Path, docs: &[req_trace::DocSpec], args: &FormatArgs) -> ExitCode {
+fn run_format(root: &Path, docs: &[shallguard::DocSpec], args: &FormatArgs) -> ExitCode {
     let report = if args.check {
-        req_trace::requirement_format::check(root, docs)
+        shallguard::requirement_format::check(root, docs)
     } else {
-        req_trace::requirement_format::format(root, docs)
+        shallguard::requirement_format::format(root, docs)
     };
     let report = match report {
         Ok(report) => report,
@@ -398,36 +403,36 @@ fn print_help() {
         r#"Requirement traceability, executable coverage, and local semantic review.
 
 Usage:
-  cargo req-cov [check] [<doc.md> ...]
-  cargo req-cov fmt [--check] [<doc.md> ...]
-  cargo req-cov lint [<doc.md> ...]
-  cargo req-cov clean
-  cargo req-cov baseline <check|init|prune>
-  cargo req-cov impact --base <revision> [--json <path>] [--markdown <path>]
-  cargo req-cov bundle --impact <impact.json> [--coverage <coverage.json>] [options]
-  cargo req-cov test-index <--enumerate|--catalog <path>> [options]
-  cargo req-cov coverage [--package <crate>] [--requirement <REQ-ID>] [options]
-  cargo req-cov review [--base <revision>|--target <branch>] [options]
+  cargo shallguard [check] [<doc.md> ...]
+  cargo shallguard fmt [--check] [<doc.md> ...]
+  cargo shallguard lint [<doc.md> ...]
+  cargo shallguard clean
+  cargo shallguard baseline <check|init|prune>
+  cargo shallguard impact --base <revision> [--json <path>] [--markdown <path>]
+  cargo shallguard bundle --impact <impact.json> [--coverage <coverage.json>] [options]
+  cargo shallguard test-index <--enumerate|--catalog <path>> [options]
+  cargo shallguard coverage [--package <crate>] [--requirement <REQ-ID>] [options]
+  cargo shallguard review [--base <revision>|--target <branch>] [options]
 
 Review options:
-  --provider <name>          Local model CLI [default: codex]
+  --provider <name>          Local model CLI [default: shallguard.toml, then codex]
   --base <revision>          Compare against an exact revision
-  --target <branch>          Compare against its merge base [default: origin/master]
-  --with-coverage            Run impacted verification tests [default]
+  --target <branch>          Compare against its merge base [default: shallguard.toml]
+  --with-coverage            Run impacted verification tests [configured default]
   --without-coverage         Skip executable coverage collection
   --bundle <directory>       Generated bundle, or existing bundle in replay mode
-                             [default: target/requirement-review]
+                             [default: shallguard.toml artifact root]
   --output <directory>       New auditable result directory
-                             [default: target/requirement-local-review]
+                             [default: shallguard.toml artifact root]
   --resume                   Continue the compatible run in --output
   --cache-dir <directory>    Reuse validated responses across run directories
   --model <identifier>       Provider-specific model override
   --local-provider <name>    Codex on-device inference: ollama or lmstudio
   --requirement <REQ-ID>     Review only this requirement; repeatable
-  --timeout-seconds <n>      Per-requirement timeout [default: 300]
+  --timeout-seconds <n>      Per-requirement timeout [default: shallguard.toml, then 300]
 
 `fmt` lints and formats requirement blocks; `fmt --check` and `lint` never write.
-`clean` removes only the validated default bundle at target/requirement-review.
+`clean` removes only the validated bundle at the configured artifact location.
 Model verdicts are advisory. Provider or schema failures return nonzero."#
     );
 }
@@ -500,11 +505,7 @@ fn parse_impact_args(args: &[String]) -> Result<ImpactArgs> {
             std::env::var("CI_DEFAULT_BRANCH")
                 .ok()
                 .map(|branch| CliBase::Target(format!("origin/{branch}")))
-        })
-        .context(
-            "provide --base <revision> or --target <branch>; CI may provide \
-             CI_MERGE_REQUEST_DIFF_BASE_SHA or CI_DEFAULT_BRANCH",
-        )?;
+        });
     Ok(ImpactArgs {
         base,
         json,
@@ -515,7 +516,7 @@ fn parse_impact_args(args: &[String]) -> Result<ImpactArgs> {
 fn parse_bundle_args(args: &[String]) -> Result<BundleArgs> {
     let mut impact = None;
     let mut coverage = None;
-    let mut output = PathBuf::from(req_trace::bundle::DEFAULT_BUNDLE_DIR);
+    let mut output = None;
     let mut index = 0usize;
     while index < args.len() {
         let flag = args[index].as_str();
@@ -532,7 +533,7 @@ fn parse_bundle_args(args: &[String]) -> Result<BundleArgs> {
         match flag {
             "--impact" => impact = Some(PathBuf::from(value)),
             "--coverage" => coverage = Some(PathBuf::from(value)),
-            "--output" => output = PathBuf::from(value),
+            "--output" => output = Some(PathBuf::from(value)),
             _ => unreachable!("flag matched above"),
         }
     }
@@ -602,7 +603,7 @@ fn parse_test_index_args(args: &[String]) -> Result<TestIndexArgs> {
 fn parse_coverage_args(args: &[String]) -> Result<CoverageArgs> {
     let mut packages = BTreeSet::new();
     let mut requirements = BTreeSet::new();
-    let mut work_dir = PathBuf::from("target/req-trace-coverage");
+    let mut work_dir = None;
     let mut json = PathBuf::from("-");
     let mut markdown = None;
     let mut index = 0usize;
@@ -626,7 +627,7 @@ fn parse_coverage_args(args: &[String]) -> Result<CoverageArgs> {
             "--requirement" => {
                 requirements.insert(value.clone());
             }
-            "--work-dir" => work_dir = PathBuf::from(value),
+            "--work-dir" => work_dir = Some(PathBuf::from(value)),
             "--json" => json = PathBuf::from(value),
             "--markdown" => markdown = Some(PathBuf::from(value)),
             _ => unreachable!("flag matched above"),
@@ -641,13 +642,31 @@ fn parse_coverage_args(args: &[String]) -> Result<CoverageArgs> {
     })
 }
 
-fn run_impact(root: &Path, docs: &[req_trace::DocSpec], args: &ImpactArgs) -> ExitCode {
-    let base = match &args.base {
-        CliBase::Revision(revision) => req_trace::impact::BaseSelection::Revision(revision),
-        CliBase::Target(target) => req_trace::impact::BaseSelection::MergeBaseWith(target),
+fn run_impact(
+    root: &Path,
+    docs: &[shallguard::DocSpec],
+    config: &shallguard::config::RepositoryConfig,
+    args: &ImpactArgs,
+) -> ExitCode {
+    let base = match args.base.as_ref() {
+        Some(CliBase::Revision(revision)) => shallguard::impact::BaseSelection::Revision(revision),
+        Some(CliBase::Target(target)) => shallguard::impact::BaseSelection::MergeBaseWith(target),
+        None => match config.review.target.as_deref() {
+            Some(target) => shallguard::impact::BaseSelection::MergeBaseWith(target),
+            None => {
+                eprintln!(
+                    "{COMMAND_NAME} impact failed: provide --base or --target, set a CI base, \
+                     or configure review.target in shallguard.toml"
+                );
+                return ExitCode::FAILURE;
+            }
+        },
     };
-    let options = req_trace::impact::ImpactOptions { base };
-    let artifact = match req_trace::impact::analyze(root, docs, &options) {
+    let options = shallguard::impact::ImpactOptions {
+        base,
+        baseline_path: &config.baseline,
+    };
+    let artifact = match shallguard::impact::analyze(root, docs, &options) {
         Ok(artifact) => artifact,
         Err(err) => {
             eprintln!("{COMMAND_NAME} impact failed: {err:#}");
@@ -685,16 +704,32 @@ fn write_artifact(path: &Path, content: &str) -> Result<()> {
         print!("{content}");
         return Ok(());
     }
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating artifact directory {}", parent.display()))?;
+    }
     std::fs::write(path, content).with_context(|| format!("writing artifact {}", path.display()))
 }
 
-fn run_bundle(root: &Path, docs: &[req_trace::DocSpec], args: &BundleArgs) -> ExitCode {
-    let options = req_trace::bundle::BundleOptions {
+#[enforces("REQ-CLI-004")]
+fn run_bundle(
+    root: &Path,
+    docs: &[shallguard::DocSpec],
+    config: &shallguard::config::RepositoryConfig,
+    args: &BundleArgs,
+) -> ExitCode {
+    let output_dir = args
+        .output
+        .clone()
+        .unwrap_or_else(|| root.join(config.bundle_dir()));
+    let options = shallguard::bundle::BundleOptions {
         impact_file: &args.impact,
         coverage_file: args.coverage.as_deref(),
-        output_dir: &args.output,
+        output_dir: &output_dir,
     };
-    match req_trace::bundle::generate(root, docs, &options) {
+    match shallguard::bundle::generate(root, docs, &options) {
         Ok(result) => {
             println!(
                 "created {} review capsule(s) in {}",
@@ -710,17 +745,17 @@ fn run_bundle(root: &Path, docs: &[req_trace::DocSpec], args: &BundleArgs) -> Ex
     }
 }
 
-fn run_test_index(root: &Path, docs: &[req_trace::DocSpec], args: &TestIndexArgs) -> ExitCode {
+fn run_test_index(root: &Path, docs: &[shallguard::DocSpec], args: &TestIndexArgs) -> ExitCode {
     let harness = match &args.harness {
-        TestHarnessCli::Enumerate => req_trace::test_index::HarnessSource::Enumerate,
-        TestHarnessCli::Catalog(path) => req_trace::test_index::HarnessSource::Catalog(path),
+        TestHarnessCli::Enumerate => shallguard::test_index::HarnessSource::Enumerate,
+        TestHarnessCli::Catalog(path) => shallguard::test_index::HarnessSource::Catalog(path),
     };
-    let options = req_trace::test_index::TestIndexOptions {
+    let options = shallguard::test_index::TestIndexOptions {
         harness,
         packages: &args.packages,
         catalog_output: args.catalog_output.as_deref(),
     };
-    let artifact = match req_trace::test_index::generate(root, docs, &options) {
+    let artifact = match shallguard::test_index::generate(root, docs, &options) {
         Ok(artifact) => artifact,
         Err(err) => {
             eprintln!("{COMMAND_NAME} test-index failed: {err:#}");
@@ -755,14 +790,24 @@ fn run_test_index(root: &Path, docs: &[req_trace::DocSpec], args: &TestIndexArgs
     }
 }
 
-fn run_coverage(root: &Path, docs: &[req_trace::DocSpec], args: &CoverageArgs) -> ExitCode {
-    let options = req_trace::coverage::CoverageOptions {
+#[enforces("REQ-CLI-004")]
+fn run_coverage(
+    root: &Path,
+    docs: &[shallguard::DocSpec],
+    config: &shallguard::config::RepositoryConfig,
+    args: &CoverageArgs,
+) -> ExitCode {
+    let work_dir = args
+        .work_dir
+        .clone()
+        .unwrap_or_else(|| root.join(config.coverage_work_dir()));
+    let options = shallguard::coverage::CoverageOptions {
         packages: &args.packages,
         requirements: &args.requirements,
-        work_dir: &args.work_dir,
+        work_dir: &work_dir,
         progress: Some(print_progress),
     };
-    let artifact = match req_trace::coverage::generate(root, docs, &options) {
+    let artifact = match shallguard::coverage::generate(root, docs, &options) {
         Ok(artifact) => artifact,
         Err(err) => {
             eprintln!("{COMMAND_NAME} coverage failed: {err:#}");
@@ -795,33 +840,98 @@ fn run_coverage(root: &Path, docs: &[req_trace::DocSpec], args: &CoverageArgs) -
     }
 }
 
-fn run_review(root: &Path, docs: &[req_trace::DocSpec], args: &ReviewArgs) -> ExitCode {
-    let base = args.base.as_ref().map(|base| match base {
-        CliBase::Revision(revision) => req_trace::impact::BaseSelection::Revision(revision),
-        CliBase::Target(target) => req_trace::impact::BaseSelection::MergeBaseWith(target),
-    });
-    let options = req_trace::review_workflow::ReviewWorkflowOptions {
+#[enforces("REQ-CLI-002", "REQ-CLI-004")]
+fn run_review(
+    root: &Path,
+    docs: &[shallguard::DocSpec],
+    config: &shallguard::config::RepositoryConfig,
+    args: &ReviewArgs,
+) -> ExitCode {
+    let configured_target = if args.base.is_none() && !args.resume && args.bundle.is_none() {
+        config.review.target.as_deref()
+    } else {
+        None
+    };
+    let base = args
+        .base
+        .as_ref()
+        .map(|base| match base {
+            CliBase::Revision(revision) => shallguard::impact::BaseSelection::Revision(revision),
+            CliBase::Target(target) => shallguard::impact::BaseSelection::MergeBaseWith(target),
+        })
+        .or_else(|| configured_target.map(shallguard::impact::BaseSelection::MergeBaseWith));
+    if base.is_none() && !args.resume && args.bundle.is_none() {
+        eprintln!(
+            "{COMMAND_NAME} review failed: configure review.target in shallguard.toml or pass \
+             --base, --target, or --bundle"
+        );
+        return ExitCode::FAILURE;
+    }
+    let provider = match args.provider {
+        Some(provider) => provider,
+        None => match config.review.provider.as_deref() {
+            Some(provider) => match provider.parse() {
+                Ok(provider) => provider,
+                Err(error) => {
+                    eprintln!("{COMMAND_NAME} review failed: {error:#}");
+                    return ExitCode::FAILURE;
+                }
+            },
+            None => shallguard::review::ReviewProvider::Codex,
+        },
+    };
+    let bundle_dir = args
+        .bundle
+        .clone()
+        .unwrap_or_else(|| root.join(config.bundle_dir()));
+    let review_output_dir = args
+        .output
+        .clone()
+        .unwrap_or_else(|| root.join(config.review_dir()));
+    let with_coverage = if base.is_some() {
+        args.with_coverage
+            .or(config.review.with_coverage)
+            .unwrap_or(true)
+    } else {
+        args.with_coverage.unwrap_or(false)
+    };
+    let timeout = args
+        .timeout
+        .unwrap_or_else(|| Duration::from_secs(config.review.timeout_seconds.unwrap_or(300)));
+    let model = args.model.as_deref().or(config.review.model.as_deref());
+    let local_provider = args
+        .local_provider
+        .as_deref()
+        .or(config.review.local_provider.as_deref());
+    let artifact_root = root.join(&config.artifacts.root);
+    let impact_json = artifact_root.join("requirement-impact.json");
+    let impact_markdown = artifact_root.join("requirement-impact.md");
+    let coverage_json = artifact_root.join("requirement-coverage.json");
+    let coverage_markdown = artifact_root.join("requirement-coverage.md");
+    let coverage_work_dir = root.join(config.coverage_work_dir());
+    let options = shallguard::review_workflow::ReviewWorkflowOptions {
         base,
-        with_coverage: args.with_coverage,
-        provider: args.provider,
-        model: args.model.as_deref(),
-        local_provider: args.local_provider.as_deref(),
+        baseline_path: &config.baseline,
+        with_coverage,
+        provider,
+        model,
+        local_provider,
         requirements: &args.requirements,
-        timeout: args.timeout,
+        timeout,
         resume: args.resume,
         cache_dir: args.cache_dir.as_deref(),
-        artifacts: req_trace::review_workflow::ReviewArtifactPaths {
-            impact_json: Path::new("target/requirement-impact.json"),
-            impact_markdown: Path::new("target/requirement-impact.md"),
-            coverage_json: Path::new("target/requirement-coverage.json"),
-            coverage_markdown: Path::new("target/requirement-coverage.md"),
-            coverage_work_dir: Path::new("target/req-trace-coverage"),
-            bundle_dir: &args.bundle,
-            review_output_dir: &args.output,
+        artifacts: shallguard::review_workflow::ReviewArtifactPaths {
+            impact_json: &impact_json,
+            impact_markdown: &impact_markdown,
+            coverage_json: &coverage_json,
+            coverage_markdown: &coverage_markdown,
+            coverage_work_dir: &coverage_work_dir,
+            bundle_dir: &bundle_dir,
+            review_output_dir: &review_output_dir,
         },
         progress: Some(print_progress),
     };
-    match req_trace::review_workflow::run(root, docs, &options) {
+    match shallguard::review_workflow::run(root, docs, &options) {
         Ok(run) if !run.has_failures() => {
             if run.impacted_requirements == 0 {
                 println!(
@@ -861,234 +971,5 @@ fn run_review(root: &Path, docs: &[req_trace::DocSpec], args: &ReviewArgs) -> Ex
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn strings(values: &[&str]) -> Vec<String> {
-        values.iter().map(|value| (*value).to_string()).collect()
-    }
-
-    #[test]
-    fn removes_cargo_external_subcommand_argument() {
-        assert_eq!(
-            normalized_args(strings(&["req-cov", "coverage"])),
-            strings(&["coverage"])
-        );
-        assert_eq!(
-            normalized_args(strings(&["coverage"])),
-            strings(&["coverage"])
-        );
-    }
-
-    #[test]
-    fn parses_requirement_format_modes_and_documents() {
-        let format = parse_format_args(
-            &strings(&[
-                "--check",
-                "example-app/docs/USER_STORIES_AND_REQUIREMENTS.md",
-            ]),
-            false,
-        )
-        .expect("format arguments parse");
-        assert!(format.check);
-        assert_eq!(format.docs.len(), 1);
-
-        let lint = parse_format_args(&[], true).expect("lint arguments parse");
-        assert!(lint.check);
-        assert!(lint.docs.is_empty());
-    }
-
-    #[test]
-    fn rejects_unknown_requirement_format_flags() {
-        let error = parse_format_args(&strings(&["--write"]), false)
-            .err()
-            .expect("unknown format flag fails");
-        assert!(error.to_string().contains("unknown argument"));
-    }
-
-    #[test]
-    fn parses_local_review_options() {
-        let args = parse_review_args(&strings(&[
-            "--provider",
-            "codex",
-            "--bundle",
-            "review-input",
-            "--output",
-            "review-output",
-            "--model",
-            "gpt-test",
-            "--local-provider",
-            "ollama",
-            "--requirement",
-            "REQ-HRS-001",
-            "--timeout-seconds",
-            "45",
-            "--resume",
-            "--cache-dir",
-            "review-cache",
-        ]))
-        .expect("review arguments parse");
-        assert_eq!(args.provider, req_trace::review::ReviewProvider::Codex);
-        assert!(args.base.is_none());
-        assert!(!args.with_coverage);
-        assert_eq!(args.bundle, PathBuf::from("review-input"));
-        assert_eq!(args.output, PathBuf::from("review-output"));
-        assert_eq!(args.model.as_deref(), Some("gpt-test"));
-        assert_eq!(args.local_provider.as_deref(), Some("ollama"));
-        assert!(args.requirements.contains("REQ-HRS-001"));
-        assert_eq!(args.timeout, Duration::from_secs(45));
-        assert!(args.resume);
-        assert_eq!(args.cache_dir, Some(PathBuf::from("review-cache")));
-    }
-
-    #[test]
-    fn defaults_review_to_codex_master_impact_and_coverage() {
-        let args = parse_review_args(&[]).expect("default review arguments parse");
-
-        assert_eq!(args.provider, req_trace::review::ReviewProvider::Codex);
-        assert!(matches!(
-            args.base,
-            Some(CliBase::Target(ref target)) if target == "origin/master"
-        ));
-        assert!(args.with_coverage);
-        assert!(!args.resume);
-        assert!(args.cache_dir.is_none());
-        assert_eq!(args.bundle, PathBuf::from("target/requirement-review"));
-        assert_eq!(
-            args.output,
-            PathBuf::from("target/requirement-local-review")
-        );
-    }
-
-    #[test]
-    fn resume_replays_the_frozen_default_bundle() {
-        let args =
-            parse_review_args(&strings(&["--resume"])).expect("resume review arguments parse");
-
-        assert!(args.base.is_none());
-        assert!(!args.with_coverage);
-        assert_eq!(args.bundle, PathBuf::from("target/requirement-review"));
-        assert_eq!(
-            args.output,
-            PathBuf::from("target/requirement-local-review")
-        );
-    }
-
-    #[test]
-    fn parses_requested_one_command_review() {
-        let args = parse_review_args(&strings(&[
-            "--provider",
-            "codex",
-            "--base",
-            "2810dced",
-            "--with-coverage",
-        ]))
-        .expect("orchestrated review arguments parse");
-
-        assert!(matches!(
-            args.base,
-            Some(CliBase::Revision(ref base)) if base == "2810dced"
-        ));
-        assert!(args.with_coverage);
-    }
-
-    #[test]
-    fn parses_explicit_impact_outputs() {
-        let args = parse_impact_args(&strings(&[
-            "--base",
-            "abc123",
-            "--json",
-            "impact.json",
-            "--markdown",
-            "impact.md",
-        ]))
-        .expect("impact arguments parse");
-        assert!(matches!(args.base, CliBase::Revision(ref base) if base == "abc123"));
-        assert_eq!(args.json, PathBuf::from("impact.json"));
-        assert_eq!(args.markdown, Some(PathBuf::from("impact.md")));
-    }
-
-    #[test]
-    fn rejects_ambiguous_base_selection() {
-        let error = parse_impact_args(&strings(&["--base", "abc123", "--target", "origin/master"]))
-            .err()
-            .expect("ambiguous selection fails");
-        assert!(error.to_string().contains("exactly one"));
-    }
-
-    #[test]
-    fn parses_bundle_paths() {
-        let args = parse_bundle_args(&strings(&[
-            "--impact",
-            "impact.json",
-            "--coverage",
-            "coverage.json",
-            "--output",
-            "review",
-        ]))
-        .expect("bundle arguments parse");
-        assert_eq!(args.impact, PathBuf::from("impact.json"));
-        assert_eq!(args.coverage, Some(PathBuf::from("coverage.json")));
-        assert_eq!(args.output, PathBuf::from("review"));
-    }
-
-    #[test]
-    fn defaults_bundle_output_under_target() {
-        let args = parse_bundle_args(&strings(&["--impact", "impact.json"]))
-            .expect("default bundle arguments parse");
-
-        assert_eq!(args.output, PathBuf::from("target/requirement-review"));
-    }
-
-    #[test]
-    fn parses_enumerated_test_index_outputs_and_package_filter() {
-        let args = parse_test_index_args(&strings(&[
-            "--enumerate",
-            "--package",
-            "example-core",
-            "--catalog-output",
-            "catalog.json",
-            "--json",
-            "tests.json",
-            "--markdown",
-            "tests.md",
-        ]))
-        .expect("test-index arguments parse");
-        assert!(matches!(args.harness, TestHarnessCli::Enumerate));
-        assert!(args.packages.contains("example-core"));
-        assert_eq!(args.catalog_output, Some(PathBuf::from("catalog.json")));
-        assert_eq!(args.json, PathBuf::from("tests.json"));
-        assert_eq!(args.markdown, Some(PathBuf::from("tests.md")));
-    }
-
-    #[test]
-    fn rejects_ambiguous_test_index_harness_source() {
-        let error = parse_test_index_args(&strings(&["--enumerate", "--catalog", "catalog.json"]))
-            .err()
-            .expect("ambiguous harness source fails");
-        assert!(error.to_string().contains("exactly one"));
-    }
-
-    #[test]
-    fn parses_filtered_coverage_outputs() {
-        let args = parse_coverage_args(&strings(&[
-            "--package",
-            "example-core",
-            "--requirement",
-            "REQ-HRS-001",
-            "--work-dir",
-            "target/coverage-fixture",
-            "--json",
-            "coverage.json",
-            "--markdown",
-            "coverage.md",
-        ]))
-        .expect("coverage arguments parse");
-
-        assert!(args.packages.contains("example-core"));
-        assert!(args.requirements.contains("REQ-HRS-001"));
-        assert_eq!(args.work_dir, PathBuf::from("target/coverage-fixture"));
-        assert_eq!(args.json, PathBuf::from("coverage.json"));
-        assert_eq!(args.markdown, Some(PathBuf::from("coverage.md")));
-    }
-}
+#[path = "cli_tests.rs"]
+mod tests;

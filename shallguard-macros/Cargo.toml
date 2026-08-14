@@ -4,8 +4,9 @@ version = "0.1.0"
 authors = ["Tomas Siegl <tomas.siegl@gmail.com>"]
 edition = "2024"
 publish = false
-description = "Compile-time requirement traceability anchors for Shallguard"
+description = "Compile-time requirement traceability anchors for ShallGuard"
 license = "MIT"
+repository = "https://github.com/sigi64/shallguard"
 
 [lib]
 proc-macro = true

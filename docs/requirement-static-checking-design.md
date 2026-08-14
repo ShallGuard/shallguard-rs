@@ -32,7 +32,7 @@ arbitrary prose into a proof obligation automatically.
   inputs and outputs.
 - Running third-party checker code inside the core traceability process without
   an explicit trust and version boundary.
-- Making unstable compiler internals a dependency of the fast `cargo req-cov check`
+- Making unstable compiler internals a dependency of the fast `cargo shallguard check`
   path.
 
 ## 3. Assurance classes
@@ -59,7 +59,7 @@ req-dyn-016-validation-dominates-mutation
 ```
 
 The initial implementation keeps registrations in a versioned workspace file,
-for example `req-trace/static-checks.toml`:
+for example `shallguard/static-checks.toml`:
 
 ```toml
 schema = 1
@@ -85,7 +85,7 @@ The registry is declarative policy. The implementation name resolves through a
 closed built-in registry or a configured external checker executable; arbitrary
 commands from the TOML file are forbidden.
 
-`req-trace` validates that:
+`shallguard` validates that:
 
 - IDs are unique;
 - referenced requirements exist and are not retired;
@@ -159,7 +159,7 @@ require the compiler backend.
 
 Checks needing resolution or control flow run outside the core checker through
 a pinned compiler-aware executable. The recommended boundary is a versioned
-JSON protocol, not an in-process dependency from `req-trace` to `rustc_private`.
+JSON protocol, not an in-process dependency from `shallguard` to `rustc_private`.
 
 ```mermaid
 graph LR

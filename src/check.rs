@@ -6,13 +6,11 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 
-use crate::baseline::{BASELINE_PATH, Baseline, BaselineEntry, GapKey, GapKind};
+use crate::DocSpec;
+use crate::baseline::{Baseline, BaselineEntry, GapKey, GapKind};
+use crate::config::RepositoryConfig;
 use crate::docs::{Requirement, parse_doc};
 use crate::scan::{Anchors, scan};
-use crate::{
-    DocSpec, HARD_CODE_ANCHOR_AREAS, HARD_TEST_ANCHOR_AREAS, KNOWN_REMOVED_PATHS,
-    VERIFY_OUTLIER_THRESHOLD, area_label,
-};
 
 /// One finding, locatable in a file.
 #[derive(Debug, Clone)]
@@ -80,7 +78,7 @@ impl Report {
             return false;
         }
 
-        println!("\ncargo req-cov: OK");
+        println!("\ncargo shallguard: OK");
         true
     }
 }
@@ -122,16 +120,17 @@ fn print_grouped(findings: &[Finding], limit: usize, to_stderr: bool) {
 
 /// Runs every check, including committed-baseline policy, for the given
 /// documents against the workspace at `root`.
-pub fn run(root: &Path, docs: &[DocSpec]) -> Result<Report> {
-    let mut analysis = analyze(root, docs)?;
-    let baseline = Baseline::load(root)?;
+pub fn run(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<Report> {
+    let mut analysis = analyze(root, docs, config)?;
+    let baseline = Baseline::load(root, &config.baseline)?;
     let baseline_stats = apply_baseline(
         &mut analysis,
         &baseline,
-        covers_default_documents(docs),
+        covers_configured_documents(docs, config),
         true,
+        config,
     );
-    let summary = render_summary(&analysis.stats, &analysis.anchors, &baseline_stats);
+    let summary = render_summary(&analysis.stats, &analysis.anchors, &baseline_stats, config);
     Ok(Report {
         errors: analysis.errors,
         warnings: analysis.warnings,
@@ -141,15 +140,19 @@ pub fn run(root: &Path, docs: &[DocSpec]) -> Result<Report> {
 
 /// Creates the one-time initial baseline. Existing baseline files are
 /// never replaced.
-pub fn initialize_baseline(root: &Path, docs: &[DocSpec]) -> Result<BaselineChange> {
-    require_complete_scope(docs, "initialize")?;
-    let analysis = analyze(root, docs)?;
+pub fn initialize_baseline(
+    root: &Path,
+    docs: &[DocSpec],
+    config: &RepositoryConfig,
+) -> Result<BaselineChange> {
+    require_complete_scope(docs, config, "initialize")?;
+    let analysis = analyze(root, docs, config)?;
     ensure_no_non_gap_errors(&analysis, "initialize")?;
 
     if let Some((key, _)) = analysis
         .gaps
         .iter()
-        .find(|(key, gap)| gap_is_hard(key.kind, &gap.area))
+        .find(|(key, gap)| gap_is_hard(key.kind, &gap.area, config))
     {
         bail!(
             "cannot initialize baseline: hard-area gap {} ({}) must be fixed",
@@ -168,7 +171,7 @@ pub fn initialize_baseline(root: &Path, docs: &[DocSpec]) -> Result<BaselineChan
         .collect();
     let baseline = Baseline::from_entries(entries);
     let count = baseline.gaps.len();
-    let path = baseline.create_new(root)?;
+    let path = baseline.create_new(root, &config.baseline)?;
     Ok(BaselineChange {
         path,
         entries: count,
@@ -178,12 +181,16 @@ pub fn initialize_baseline(root: &Path, docs: &[DocSpec]) -> Result<BaselineChan
 
 /// Removes only entries whose gaps are fixed or whose requirements are
 /// retired. It never adds exceptions.
-pub fn prune_baseline(root: &Path, docs: &[DocSpec]) -> Result<BaselineChange> {
-    require_complete_scope(docs, "prune")?;
-    let mut analysis = analyze(root, docs)?;
-    let mut baseline = Baseline::load(root)?;
+pub fn prune_baseline(
+    root: &Path,
+    docs: &[DocSpec],
+    config: &RepositoryConfig,
+) -> Result<BaselineChange> {
+    require_complete_scope(docs, config, "prune")?;
+    let mut analysis = analyze(root, docs, config)?;
+    let mut baseline = Baseline::load(root, &config.baseline)?;
     let before = baseline.gaps.len();
-    apply_baseline(&mut analysis, &baseline, true, false);
+    apply_baseline(&mut analysis, &baseline, true, false, config);
     ensure_no_non_gap_errors(&analysis, "prune")?;
 
     let current: HashSet<GapKey> = analysis.gaps.keys().cloned().collect();
@@ -198,9 +205,9 @@ pub fn prune_baseline(root: &Path, docs: &[DocSpec]) -> Result<BaselineChange> {
     });
     let removed = before - baseline.gaps.len();
     let path = if removed == 0 {
-        root.join(BASELINE_PATH)
+        root.join(&config.baseline)
     } else {
-        baseline.write_pruned(root)?
+        baseline.write_pruned(root, &config.baseline)?
     };
     Ok(BaselineChange {
         path,
@@ -211,7 +218,7 @@ pub fn prune_baseline(root: &Path, docs: &[DocSpec]) -> Result<BaselineChange> {
 
 /// Detects invariant failures and traceability gaps without deciding
 /// whether historical debt is allowed.
-fn analyze(root: &Path, docs: &[DocSpec]) -> Result<Analysis> {
+fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<Analysis> {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
 
@@ -219,14 +226,15 @@ fn analyze(root: &Path, docs: &[DocSpec]) -> Result<Analysis> {
     let mut path_spans: Vec<(String, usize, PathBuf)> = Vec::new();
     for spec in docs {
         let doc = parse_doc(root, spec)?;
-        if doc.requirements.len() < 20 {
+        if doc.requirements.len() < config.minimum_requirements {
             errors.push(Finding {
                 file: spec.path.clone(),
                 line: 1,
                 message: format!(
                     "parsed only {} requirements - document format drifted \
-                     from what cargo req-cov understands",
-                    doc.requirements.len()
+                     from the configured minimum of {}",
+                    doc.requirements.len(),
+                    config.minimum_requirements
                 ),
             });
         }
@@ -238,15 +246,28 @@ fn analyze(root: &Path, docs: &[DocSpec]) -> Result<Analysis> {
         requirements.extend(doc.requirements);
     }
 
-    let scan_roots: Vec<String> = {
-        let mut crates: Vec<&str> = docs.iter().map(|d| d.default_crate.as_str()).collect();
-        crates.sort_unstable();
-        crates.dedup();
-        crates
-            .iter()
-            .flat_map(|c| [format!("{c}/src"), format!("{c}/tests")])
-            .collect()
-    };
+    let mut unknown_areas = HashSet::new();
+    for requirement in &requirements {
+        if !config.areas.contains_key(&requirement.area)
+            && unknown_areas.insert(requirement.area.clone())
+        {
+            errors.push(Finding {
+                file: requirement.doc.clone(),
+                line: requirement.line,
+                message: format!(
+                    "requirement area {} has no [areas.{}] policy in shallguard.toml",
+                    requirement.area, requirement.area
+                ),
+            });
+        }
+    }
+
+    let scan_roots = docs
+        .iter()
+        .flat_map(DocSpec::scan_roots)
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
 
     // Duplicate IDs across both documents.
     let mut by_id: HashMap<&str, &Requirement> = HashMap::new();
@@ -266,7 +287,7 @@ fn analyze(root: &Path, docs: &[DocSpec]) -> Result<Analysis> {
     // Every code path cited anywhere in a document must exist.
     let mut seen_spans = HashSet::new();
     for (doc, line, path) in &path_spans {
-        if KNOWN_REMOVED_PATHS.iter().any(|k| Path::new(k) == path) {
+        if config.allow_missing_paths.contains(path) {
             continue;
         }
         if !root.join(path).exists() && seen_spans.insert(path.clone()) {
@@ -487,7 +508,7 @@ fn analyze(root: &Path, docs: &[DocSpec]) -> Result<Analysis> {
 
     // Suspiciously broad test-evidence anchors.
     for anchor in &anchors.verification {
-        if anchor.ids.len() >= VERIFY_OUTLIER_THRESHOLD {
+        if anchor.ids.len() >= config.verify_outlier_threshold {
             warnings.push(Finding {
                 file: anchor.file.display().to_string(),
                 line: anchor.line,
@@ -531,6 +552,7 @@ fn apply_baseline(
     baseline: &Baseline,
     complete_scope: bool,
     stale_is_error: bool,
+    config: &RepositoryConfig,
 ) -> BaselineStats {
     let mut stats = BaselineStats::default();
     let requirements: HashMap<&str, &Requirement> = analysis
@@ -541,17 +563,20 @@ fn apply_baseline(
     let mut entries: BTreeMap<GapKey, &BaselineEntry> = BTreeMap::new();
 
     for duplicate in baseline.duplicate_keys() {
-        analysis.errors.push(baseline_finding(format!(
-            "duplicate baseline entry for {} ({})",
-            duplicate.requirement, duplicate.kind
-        )));
+        analysis.errors.push(baseline_finding(
+            config,
+            format!(
+                "duplicate baseline entry for {} ({})",
+                duplicate.requirement, duplicate.kind
+            ),
+        ));
     }
     for entry in &baseline.gaps {
         entries.entry(entry.key()).or_insert(entry);
     }
 
     for (key, gap) in &analysis.gaps {
-        if gap_is_hard(key.kind, &gap.area) {
+        if gap_is_hard(key.kind, &gap.area, config) {
             analysis.errors.extend(
                 gap.findings
                     .iter()
@@ -580,19 +605,25 @@ fn apply_baseline(
     for (key, entry) in entries {
         let Some(req) = requirements.get(entry.requirement.as_str()) else {
             if complete_scope {
-                analysis.errors.push(baseline_finding(format!(
-                    "baseline entry {} ({}) references a missing requirement",
-                    entry.requirement, entry.kind
-                )));
+                analysis.errors.push(baseline_finding(
+                    config,
+                    format!(
+                        "baseline entry {} ({}) references a missing requirement",
+                        entry.requirement, entry.kind
+                    ),
+                ));
             }
             continue;
         };
 
-        if gap_is_hard(entry.kind, &req.area) {
-            analysis.errors.push(baseline_finding(format!(
-                "baseline entry {} ({}) is forbidden because area {} is already hard",
-                entry.requirement, entry.kind, req.area
-            )));
+        if gap_is_hard(entry.kind, &req.area, config) {
+            analysis.errors.push(baseline_finding(
+                config,
+                format!(
+                    "baseline entry {} ({}) is forbidden because area {} is already hard",
+                    entry.requirement, entry.kind, req.area
+                ),
+            ));
             continue;
         }
 
@@ -606,11 +637,14 @@ fn apply_baseline(
         if let Some(reason) = stale_reason {
             stats.resolved += 1;
             if stale_is_error {
-                analysis.errors.push(baseline_finding(format!(
-                    "stale baseline entry {} ({}): {reason}; remove it with `cargo run -p \
-                     cargo req-cov baseline prune`",
-                    entry.requirement, entry.kind
-                )));
+                analysis.errors.push(baseline_finding(
+                    config,
+                    format!(
+                        "stale baseline entry {} ({}): {reason}; remove it with `cargo \
+                         shallguard baseline prune`",
+                        entry.requirement, entry.kind
+                    ),
+                ));
             }
         }
     }
@@ -623,32 +657,35 @@ fn annotate_gap(mut finding: Finding, status: &str, kind: GapKind) -> Finding {
     finding
 }
 
-fn baseline_finding(message: String) -> Finding {
+fn baseline_finding(config: &RepositoryConfig, message: String) -> Finding {
     Finding {
-        file: BASELINE_PATH.to_string(),
+        file: config.baseline.to_string_lossy().into_owned(),
         line: 1,
         message,
     }
 }
 
-fn gap_is_hard(kind: GapKind, area: &str) -> bool {
+fn gap_is_hard(kind: GapKind, area: &str, config: &RepositoryConfig) -> bool {
     match kind {
-        GapKind::EnforcementAnchor => HARD_CODE_ANCHOR_AREAS.contains(&area),
-        GapKind::VerificationAnchor | GapKind::EvidenceCitation => {
-            HARD_TEST_ANCHOR_AREAS.contains(&area)
-        }
+        GapKind::EnforcementAnchor => config.area_is_hard(area, false),
+        GapKind::VerificationAnchor | GapKind::EvidenceCitation => config.area_is_hard(area, true),
     }
 }
 
-fn covers_default_documents(docs: &[DocSpec]) -> bool {
+fn covers_configured_documents(docs: &[DocSpec], config: &RepositoryConfig) -> bool {
     let paths: HashSet<&str> = docs.iter().map(|doc| doc.path.as_str()).collect();
-    crate::default_docs()
+    config
+        .documents()
         .iter()
         .all(|doc| paths.contains(doc.path.as_str()))
 }
 
-fn require_complete_scope(docs: &[DocSpec], operation: &str) -> Result<()> {
-    if !covers_default_documents(docs) {
+fn require_complete_scope(
+    docs: &[DocSpec],
+    config: &RepositoryConfig,
+    operation: &str,
+) -> Result<()> {
+    if !covers_configured_documents(docs, config) {
         bail!(
             "cannot {operation} traceability baseline with a partial document set; use the \
              default workspace documents"
@@ -689,11 +726,12 @@ fn render_summary(
     stats: &BTreeMap<String, AreaStats>,
     anchors: &Anchors,
     baseline: &BaselineStats,
+    config: &RepositoryConfig,
 ) -> String {
     // Label column sized to the longest `Full Name (ACRONYM)` label.
     let label_width = stats
         .keys()
-        .map(|area| area_label(area).chars().count())
+        .map(|area| config.area_label(area).chars().count())
         .max()
         .unwrap_or(0)
         .max("area".len());
@@ -708,7 +746,7 @@ fn render_summary(
         let _ = writeln!(
             out,
             "{:<label_width$} {:>5} {:>5} {:>4} {:>7} {:>8} {:>13}/{:<3} {:>9}/{:<3}",
-            area_label(area),
+            config.area_label(area),
             s.total,
             s.automated,
             s.e2e,
@@ -761,6 +799,7 @@ fn render_summary(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{AreaConfig, ArtifactConfig, ReviewConfig};
 
     fn requirement(id: &str, area: &str, retired: bool) -> Requirement {
         Requirement {
@@ -820,11 +859,45 @@ mod tests {
         }])
     }
 
+    fn config(hard_area: Option<&str>) -> RepositoryConfig {
+        RepositoryConfig {
+            schema: 1,
+            minimum_requirements: 1,
+            baseline: PathBuf::from(".shallguard/baseline.toml"),
+            verify_outlier_threshold: 6,
+            documents: Vec::new(),
+            prefixes: BTreeMap::new(),
+            areas: hard_area
+                .map(|area| {
+                    BTreeMap::from([(
+                        area.to_string(),
+                        AreaConfig {
+                            label: "Test".to_string(),
+                            hard_enforcement: true,
+                            hard_verification: true,
+                        },
+                    )])
+                })
+                .unwrap_or_default(),
+            allow_missing_paths: Default::default(),
+            artifacts: ArtifactConfig {
+                root: PathBuf::from("target/shallguard"),
+            },
+            review: ReviewConfig::default(),
+        }
+    }
+
     #[test]
     fn exact_baseline_gap_is_known_warning() {
         let kind = GapKind::EnforcementAnchor;
         let mut analysis = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
-        let stats = apply_baseline(&mut analysis, &baseline("REQ-ZZ-001", kind), true, true);
+        let stats = apply_baseline(
+            &mut analysis,
+            &baseline("REQ-ZZ-001", kind),
+            true,
+            true,
+            &config(None),
+        );
         assert!(analysis.errors.is_empty());
         assert_eq!(analysis.warnings.len(), 1);
         assert!(analysis.warnings[0].message.contains("grandfathered"));
@@ -840,6 +913,7 @@ mod tests {
             &Baseline::from_entries(Vec::new()),
             true,
             true,
+            &config(None),
         );
         assert_eq!(analysis.errors.len(), 1);
         assert!(analysis.errors[0].message.contains("new regression"));
@@ -850,7 +924,13 @@ mod tests {
     fn fixed_gap_makes_entry_stale() {
         let kind = GapKind::EvidenceCitation;
         let mut analysis = analysis(requirement("REQ-ZZ-001", "ZZ", false), None);
-        let stats = apply_baseline(&mut analysis, &baseline("REQ-ZZ-001", kind), true, true);
+        let stats = apply_baseline(
+            &mut analysis,
+            &baseline("REQ-ZZ-001", kind),
+            true,
+            true,
+            &config(None),
+        );
         assert_eq!(analysis.errors.len(), 1);
         assert!(analysis.errors[0].message.contains("gap is resolved"));
         assert_eq!(stats.resolved, 1);
@@ -860,7 +940,13 @@ mod tests {
     fn prune_mode_accepts_resolved_entry_for_removal() {
         let kind = GapKind::EvidenceCitation;
         let mut analysis = analysis(requirement("REQ-ZZ-001", "ZZ", true), None);
-        let stats = apply_baseline(&mut analysis, &baseline("REQ-ZZ-001", kind), true, false);
+        let stats = apply_baseline(
+            &mut analysis,
+            &baseline("REQ-ZZ-001", kind),
+            true,
+            false,
+            &config(None),
+        );
         assert!(analysis.errors.is_empty());
         assert_eq!(stats.resolved, 1);
     }
@@ -868,11 +954,15 @@ mod tests {
     #[test]
     fn hard_area_cannot_be_baselined() {
         let kind = GapKind::EnforcementAnchor;
-        let area = HARD_CODE_ANCHOR_AREAS
-            .first()
-            .expect("at least one hard code area");
+        let area = "SAFE";
         let mut analysis = analysis(requirement("REQ-SAFE-999", area, false), Some(kind));
-        apply_baseline(&mut analysis, &baseline("REQ-SAFE-999", kind), true, true);
+        apply_baseline(
+            &mut analysis,
+            &baseline("REQ-SAFE-999", kind),
+            true,
+            true,
+            &config(Some(area)),
+        );
         assert!(analysis.errors.len() >= 2);
         assert!(
             analysis

@@ -1,8 +1,8 @@
-# Shallguard user guide
+# ShallGuard user guide
 
 ## Purpose
 
-`cargo req-cov` connects numbered Markdown requirements to Rust enforcement
+`cargo shallguard` connects numbered Markdown requirements to Rust enforcement
 sites and verification tests. It can check traceability, format requirement
 blocks, analyze Git change impact, enumerate exact Cargo tests, collect LLVM
 execution evidence, build review capsules, and run optional semantic review.
@@ -12,20 +12,22 @@ execution evidence, build review capsules, and run optional semantic review.
 ```bash
 git clone <repository-url> shallguard
 cd shallguard
-cargo install --path .
+cargo install --path cargo-shallguard
 ```
 
 Until a remote repository and registry release exist, use the local checkout
 directly. Re-run the installation after changing the executable.
 
-## Workspace usage
+## Repository setup and usage
 
-From the Cargo workspace root being analyzed:
+Create `shallguard.toml` using the
+[configuration reference](CONFIGURATION.md), then run from anywhere within the
+configured Cargo repository:
 
 ```bash
-cargo req-cov fmt --check
-cargo req-cov check
-cargo req-cov impact --target origin/master \
+cargo shallguard fmt --check
+cargo shallguard check
+cargo shallguard impact --target origin/main \
   --json requirement-impact.json \
   --markdown requirement-impact.md
 ```
@@ -34,9 +36,9 @@ cargo req-cov impact --target origin/master \
 selected provider CLI and may send bounded source capsules to that provider;
 provider authentication and data handling remain outside this tool.
 
-## Current portability status
+## Portability
 
 Workspace-root discovery works from single-package projects and virtual Cargo
-workspaces. Full document/package ownership and repository policy currently use
-illustrative defaults and will move to repository-local configuration in a
-later milestone.
+workspaces. Requirement documents, source ownership, path prefixes, area
+policies, baseline, artifact locations, and review defaults are all owned by
+the consuming repository's `shallguard.toml`.

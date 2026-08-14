@@ -576,9 +576,12 @@ fn enforcement_sites(
 ) -> Result<BTreeMap<String, RequirementAccumulator>> {
     let scan_roots = docs
         .iter()
-        .map(|doc| doc.default_crate.as_str())
+        .flat_map(DocSpec::scan_roots)
         .collect::<BTreeSet<_>>();
-    let anchors = scan(root, &scan_roots.into_iter().collect::<Vec<_>>())?;
+    let anchors = scan(
+        root,
+        &scan_roots.iter().map(String::as_str).collect::<Vec<_>>(),
+    )?;
     let mut requirements = selected
         .iter()
         .map(|id| {

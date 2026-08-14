@@ -12,13 +12,12 @@ pub(super) fn parse_review_args(args: &[String]) -> Result<ReviewArgs> {
     let mut provider = None;
     let mut base = None;
     let mut coverage = None;
-    let mut bundle = PathBuf::from(req_trace::bundle::DEFAULT_BUNDLE_DIR);
-    let mut bundle_explicit = false;
-    let mut output = PathBuf::from("target/requirement-local-review");
+    let mut bundle = None;
+    let mut output = None;
     let mut model = None;
     let mut local_provider = None;
     let mut requirements = BTreeSet::new();
-    let mut timeout = Duration::from_secs(300);
+    let mut timeout = None;
     let mut resume = false;
     let mut cache_dir = None;
     let mut index = 0usize;
@@ -71,10 +70,9 @@ pub(super) fn parse_review_args(args: &[String]) -> Result<ReviewArgs> {
                 base = Some(CliBase::Target(value.clone()));
             }
             "--bundle" => {
-                bundle = PathBuf::from(value);
-                bundle_explicit = true;
+                bundle = Some(PathBuf::from(value));
             }
-            "--output" => output = PathBuf::from(value),
+            "--output" => output = Some(PathBuf::from(value)),
             "--model" => model = Some(value.clone()),
             "--local-provider" => match value.as_str() {
                 "ollama" | "lmstudio" => local_provider = Some(value.clone()),
@@ -90,7 +88,7 @@ pub(super) fn parse_review_args(args: &[String]) -> Result<ReviewArgs> {
                 if seconds == 0 {
                     bail!("--timeout-seconds must be greater than zero");
                 }
-                timeout = Duration::from_secs(seconds);
+                timeout = Some(Duration::from_secs(seconds));
             }
             "--cache-dir" => {
                 if cache_dir.is_some() {
@@ -101,24 +99,15 @@ pub(super) fn parse_review_args(args: &[String]) -> Result<ReviewArgs> {
             _ => unreachable!("flag matched above"),
         }
     }
-    let provider = provider.unwrap_or(req_trace::review::ReviewProvider::Codex);
-    if local_provider.is_some() && provider != req_trace::review::ReviewProvider::Codex {
+    if local_provider.is_some()
+        && provider.is_some_and(|provider| provider != shallguard::review::ReviewProvider::Codex)
+    {
         bail!("--local-provider is supported only with --provider codex");
     }
-    if base.is_none() && !bundle_explicit && !resume {
-        base = Some(CliBase::Target("origin/master".to_string()));
-    }
-    let with_coverage = match (&base, coverage) {
-        (None, Some(true)) => {
-            bail!("--with-coverage requires --base <revision> or --target <branch>")
-        }
-        (None, _) => false,
-        (Some(_), selected) => selected.unwrap_or(true),
-    };
     Ok(ReviewArgs {
         provider,
         base,
-        with_coverage,
+        with_coverage: coverage,
         bundle,
         output,
         model,

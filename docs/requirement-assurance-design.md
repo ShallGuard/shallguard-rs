@@ -74,7 +74,7 @@ No coverage number or LLM verdict shall be presented as formal proof.
 - Sending the complete repository to a model.
 - Treating execution coverage as evidence that assertions are correct.
 - Building a complete Rust call graph using `syn` alone.
-- Making network access or an LLM a prerequisite for `req-trace`.
+- Making network access or an LLM a prerequisite for `shallguard`.
 - Automatically modifying requirements, code, tests, or MR approvals.
 
 ## 4. Assurance model
@@ -84,7 +84,7 @@ The system reports independent evidence dimensions instead of one aggregate
 
 | Dimension | Question | Primary mechanism |
 |-----------|----------|-------------------|
-| Specification | Is the requirement well-formed and current? | `req-trace` document parser |
+| Specification | Is the requirement well-formed and current? | `shallguard` document parser |
 | Traceability | Are implementation and evidence linked? | Existing anchors and checker |
 | Change ownership | Which requirements own the changed behavior? | Base/head AST comparison |
 | Static assurance | Do machine-expressible invariants hold? | AST rules, later HIR/MIR lints |
@@ -134,15 +134,15 @@ graph LR
 
 ### 5.1 Components
 
-The implementation remains in the internal `req-trace` crate and is exposed as
+The implementation remains in the internal `shallguard` crate and is exposed as
 one Cargo subcommand:
 
 ```text
-cargo req-cov check                    existing traceability gate
-cargo req-cov impact --base <sha>      MR impact analysis
-cargo req-cov bundle --impact <file>   deterministic review bundle
-cargo req-cov coverage                 verification-test enforcement reach
-cargo req-cov review                   orchestrated local review (Codex + coverage)
+cargo shallguard check                    existing traceability gate
+cargo shallguard impact --base <sha>      MR impact analysis
+cargo shallguard bundle --impact <file>   deterministic review bundle
+cargo shallguard coverage                 verification-test enforcement reach
+cargo shallguard review                   orchestrated local review (Codex + coverage)
 ```
 
 The exact CLI names are provisional. The stable interfaces are the versioned
@@ -207,7 +207,7 @@ crate, module path, item kind, symbol name, and normalized syntax.
 
 The following may fail CI without model involvement:
 
-- Existing `req-trace` hard findings.
+- Existing `shallguard` hard findings.
 - A changed or newly added requirement with missing mandatory anchors or
   evidence.
 - Loss or invalidation of a previously valid anchor.

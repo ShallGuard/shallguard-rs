@@ -38,12 +38,12 @@ state.
 The deterministic bundle generator is available:
 
 ```bash
-cargo req-cov bundle \
+cargo shallguard bundle \
   --impact requirement-impact.json \
   --coverage requirement-coverage.json \
   --output requirement-review
 
-cargo req-cov review \
+cargo shallguard review \
   --provider codex \
   --bundle requirement-review \
   --output requirement-local-review
@@ -52,17 +52,16 @@ cargo req-cov review \
 For normal local use, one command orchestrates the prerequisite stages:
 
 ```bash
-# Defaults: --target origin/master --with-coverage --provider codex,
-# target/requirement-review, and target/requirement-local-review
-cargo req-cov review
+# Repository defaults come from shallguard.toml; provider falls back to Codex.
+cargo shallguard review
 
-cargo req-cov review --base 2810dced --with-coverage --provider codex
+cargo shallguard review --base 2810dced --with-coverage --provider codex
 
 # Keep validated results across fresh output directories.
-cargo req-cov review --cache-dir .cache/req-cov-review
+cargo shallguard review --cache-dir .cache/shallguard-review
 
 # Continue an interrupted run without repeating completed capsules.
-cargo req-cov review --resume
+cargo shallguard review --resume
 ```
 
 The orchestrator writes the impact and coverage JSON/Markdown artifacts,
@@ -319,7 +318,7 @@ claiming complete evidence.
     "mutations": null
   },
   "provenance": {
-    "generator": "req-trace x.y.z",
+    "generator": "shallguard x.y.z",
     "protocol": "requirement-review/v2",
     "digest": "sha256:..."
   }

@@ -1,24 +1,20 @@
 [package]
-name = "req-trace"
+name = "shallguard"
 version = "0.1.0"
 authors = ["Tomas Siegl <tomas.siegl@gmail.com>"]
 edition = "2024"
 publish = false
-autobins = false
-description = "Shallguard requirement traceability, executable coverage, and review tooling"
+description = "ShallGuard requirement traceability, executable coverage, and review tooling"
 license = "MIT"
+repository = "https://github.com/sigi64/shallguard"
 
 [workspace]
-members = ["shallguard-macros"]
+members = ["cargo-shallguard", "shallguard-macros"]
 resolver = "3"
 
 [lib]
-name = "req_trace"
+name = "shallguard"
 path = "src/lib.rs"
-
-[[bin]]
-name = "cargo-req-cov"
-path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0"

@@ -31,9 +31,6 @@ const MAX_ENFORCEMENT_SOURCE_LINES_PER_CAPSULE: usize = 960;
 pub(crate) fn is_supported_capsule_schema(schema: &str) -> bool {
     matches!(schema, CAPSULE_SCHEMA | LEGACY_CAPSULE_SCHEMA)
 }
-/// Workspace-relative directory used when no bundle output is specified.
-pub const DEFAULT_BUNDLE_DIR: &str = "target/requirement-review";
-
 /// Inputs for deterministic capsule generation.
 pub struct BundleOptions<'a> {
     /// Previously generated impact artifact.
@@ -55,18 +52,18 @@ struct CleanManifest {
     schema: String,
 }
 
-/// Removes the generated bundle at [`DEFAULT_BUNDLE_DIR`].
+/// Removes a configured generated bundle.
 ///
 /// The path must be a real directory containing a manifest with the expected
-/// req-cov bundle schema. Missing output is treated as an idempotent no-op.
+/// ShallGuard bundle schema. Missing output is treated as an idempotent no-op.
 ///
 /// # Errors
 ///
 /// Returns an error when the path is a symlink, is not a directory, cannot be
-/// inspected, does not contain a valid req-cov bundle manifest, or cannot be
+/// inspected, does not contain a valid ShallGuard bundle manifest, or cannot be
 /// removed.
-pub fn clean_default_bundle(root: &Path) -> Result<Option<PathBuf>> {
-    let output_dir = root.join(DEFAULT_BUNDLE_DIR);
+pub fn clean_bundle(root: &Path, relative_output_dir: &Path) -> Result<Option<PathBuf>> {
+    let output_dir = root.join(relative_output_dir);
     let metadata = match std::fs::symlink_metadata(&output_dir) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -486,7 +483,7 @@ fn build_capsule(
             mutations: None,
         },
         provenance: CapsuleProvenance {
-            generator: format!("cargo-req-cov {}", env!("CARGO_PKG_VERSION")),
+            generator: format!("cargo-shallguard {}", env!("CARGO_PKG_VERSION")),
             protocol: REVIEW_PROTOCOL.to_string(),
             impact_schema: artifact.schema.clone(),
             digest: String::new(),
@@ -611,9 +608,12 @@ fn enforcement_contexts(
 ) -> Result<BTreeMap<String, EnforcementResolution>> {
     let scan_roots = docs
         .iter()
-        .map(|doc| doc.default_crate.as_str())
+        .flat_map(DocSpec::scan_roots)
         .collect::<BTreeSet<_>>();
-    let anchors = scan(root, &scan_roots.into_iter().collect::<Vec<_>>())?;
+    let anchors = scan(
+        root,
+        &scan_roots.iter().map(String::as_str).collect::<Vec<_>>(),
+    )?;
     let mut grouped = selected
         .iter()
         .map(|id| (id.clone(), BTreeMap::new()))
@@ -1039,7 +1039,7 @@ pub(crate) fn review_test_capsule_with_coverage() -> (String, String) {
             mutations: None,
         },
         provenance: CapsuleProvenance {
-            generator: "cargo-req-cov test".to_string(),
+            generator: "cargo-shallguard test".to_string(),
             protocol: REVIEW_PROTOCOL.to_string(),
             impact_schema: IMPACT_SCHEMA.to_string(),
             digest: String::new(),
@@ -1054,6 +1054,8 @@ pub(crate) fn review_test_capsule_with_coverage() -> (String, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TEST_BUNDLE_DIR: &str = "target/requirement-review";
 
     #[test]
     fn extracts_normative_clauses_and_keeps_complete_segments() {
@@ -1133,8 +1135,11 @@ mod tests {
             "#[enforces(\"REQ-ZZ-001\")]\nfn retain_state(input: bool) -> bool {\n    if input {\n        true\n    } else {\n        false\n    }\n}\n",
         )
         .expect("source fixture writes");
-        let docs =
-            vec![DocSpec::from_path("crate/docs/requirements.md").expect("document spec parses")];
+        let docs = vec![DocSpec::new(
+            "crate/docs/requirements.md",
+            "crate",
+            BTreeMap::new(),
+        )];
         let selected = BTreeSet::from(["REQ-ZZ-001".to_string()]);
         let mut enforcement =
             enforcement_contexts(root.path(), &docs, &selected).expect("anchors resolve");
@@ -1293,7 +1298,7 @@ mod tests {
     #[test]
     fn clean_removes_only_a_valid_default_bundle_and_is_idempotent() {
         let root = tempfile::tempdir().expect("temporary workspace");
-        let output = root.path().join(DEFAULT_BUNDLE_DIR);
+        let output = root.path().join(TEST_BUNDLE_DIR);
         std::fs::create_dir_all(&output).expect("bundle directory is created");
         std::fs::write(
             output.join("manifest.json"),
@@ -1304,20 +1309,21 @@ mod tests {
             .expect("capsule placeholder is written");
 
         assert_eq!(
-            clean_default_bundle(root.path()).expect("valid bundle cleans"),
+            clean_bundle(root.path(), Path::new(TEST_BUNDLE_DIR)).expect("valid bundle cleans"),
             Some(output.clone())
         );
         assert!(!output.exists());
         assert_eq!(
-            clean_default_bundle(root.path()).expect("missing bundle is a no-op"),
+            clean_bundle(root.path(), Path::new(TEST_BUNDLE_DIR))
+                .expect("missing bundle is a no-op"),
             None
         );
     }
 
     #[test]
-    fn clean_preserves_a_directory_without_a_req_cov_manifest() {
+    fn clean_preserves_a_directory_without_a_shallguard_manifest() {
         let root = tempfile::tempdir().expect("temporary workspace");
-        let output = root.path().join(DEFAULT_BUNDLE_DIR);
+        let output = root.path().join(TEST_BUNDLE_DIR);
         std::fs::create_dir_all(&output).expect("bundle directory is created");
         std::fs::write(
             output.join("manifest.json"),
@@ -1325,7 +1331,8 @@ mod tests {
         )
         .expect("unrelated manifest is written");
 
-        let error = clean_default_bundle(root.path()).expect_err("unrelated data is rejected");
+        let error = clean_bundle(root.path(), Path::new(TEST_BUNDLE_DIR))
+            .expect_err("unrelated data is rejected");
         assert!(error.to_string().contains("refusing to clean"));
         assert!(output.exists());
     }
@@ -1361,7 +1368,7 @@ mod tests {
                 mutations: None,
             },
             provenance: CapsuleProvenance {
-                generator: "cargo-req-cov test".to_string(),
+                generator: "cargo-shallguard test".to_string(),
                 protocol: REVIEW_PROTOCOL.to_string(),
                 impact_schema: IMPACT_SCHEMA.to_string(),
                 digest: String::new(),
