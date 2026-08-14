@@ -33,6 +33,7 @@ pub struct CoverageOptions<'a> {
 
 /// Complete requirement-level executable coverage artifact.
 #[derive(Debug, Serialize)]
+#[shallguard_macros::enforces("REQ-COV-006")]
 pub struct CoverageArtifact {
     pub schema: &'static str,
     pub repository: &'static str,
@@ -93,6 +94,7 @@ pub struct RequirementCoverage {
 /// Requirement-level interpretation of independent test and reach evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[shallguard_macros::enforces("REQ-COV-005")]
 pub enum CoverageStatus {
     Covered,
     PartiallyCovered,
@@ -162,6 +164,7 @@ impl CoverageArtifact {
 /// Returns an error when test identity resolution, tool setup, document/source
 /// parsing, or the initial coverage build cannot be performed reliably.
 /// Individual selected-test failures are retained in the returned artifact.
+#[shallguard_macros::enforces("REQ-COV-001", "REQ-SEC-001")]
 pub fn generate(
     root: &Path,
     docs: &[DocSpec],
@@ -631,6 +634,7 @@ fn enforcement_sites(
     Ok(requirements)
 }
 
+#[shallguard_macros::enforces("REQ-COV-004")]
 fn apply_regions(
     requirement: &mut RequirementAccumulator,
     regions: &RegionIndex,

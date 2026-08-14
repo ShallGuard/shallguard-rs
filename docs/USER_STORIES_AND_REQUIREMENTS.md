@@ -148,20 +148,15 @@ The areas are:
   compatibility commitment; whether CLI parsing remains manual or adopts a
   dedicated argument parser.
 
-## Bootstrap and Enrollment Policy
+## Enrollment and Ratchet Policy
 
-This document is selected by the repository-owned `shallguard.toml`. The
-committed baseline records pre-enrollment gaps so the deterministic CI gate
-rejects new debt immediately while existing areas are hardened incrementally.
-The remaining dogfooding migration is:
-
-1. add `#[enforces]`/`enforces_here!` and `#[verifies]` anchors for implemented
-   requirements;
-2. prune every resolved baseline entry in the same change;
-3. harden an area's enforcement and verification policies once its historical
-   gaps reach zero;
-4. complete an impact, coverage, capsule, and optional local review cycle for a
-   ShallGuard change.
+This document is selected by the repository-owned `shallguard.toml`. Every
+implemented requirement is anchored, every automated citation resolves to its
+exact test, the committed baseline is empty, and every area is hardened.
+Requirements explicitly marked `not implemented` remain pending without false
+anchors. Every subsequent behavior change must update its requirement,
+enforcement anchor, and honest evidence together; the deterministic CI gate
+rejects any traceability regression.
 
 ## CLI User Stories
 
@@ -291,7 +286,7 @@ The remaining dogfooding migration is:
   statement, item, match-arm, and nested macro positions and SHALL own the
   smallest enclosing executable block available to the syntax scanner.
   *Enforced:* `src/scan.rs` (`MacroVisitor`), `src/impact.rs`
-  (`ScopeCollector`) · *Verified:* ✅ `src/scan.rs`
+  (`EnforcementCollector`) · *Verified:* ✅ `src/scan.rs`
   (`enforces_here_macro_in_statement_and_item_position`,
   `enforces_here_nested_in_another_macro_body_is_found`), `src/impact.rs`
   (`branch_anchor_only_owns_its_enclosing_block`,
@@ -308,7 +303,9 @@ The remaining dogfooding migration is:
 - **REQ-TRACE-006** — An implemented requirement SHALL have its exact ID on an
   enforcement anchor in every documented enforcement file, and an automated
   requirement SHALL resolve to a test carrying its exact verification anchor.
-  *Enforced:* `src/check.rs` (`analyze`) · *Verified:* 👁 code review only
+  *Enforced:* `src/check.rs` (`analyze`, `enforced_path_has_anchor`) ·
+  *Verified:* ✅ `src/check.rs`
+  (`requires_an_anchor_in_every_documented_enforcement_file`)
 - **REQ-TRACE-007** — Anchor relations SHALL be many-to-many: one site MAY
   claim multiple requirements and one requirement MAY have multiple
   enforcement or verification sites without losing individual site identity.
@@ -534,7 +531,7 @@ The remaining dogfooding migration is:
 - **REQ-CAP-004** — Capsule and manifest schemas SHALL be versioned, and each
   manifest entry SHALL bind the serialized capsule bytes through a stable
   content digest. *Enforced:* `src/bundle.rs` (`ReviewCapsule`, `BundleManifest`,
-  `digest`) · *Verified:* ✅ `src/bundle.rs`
+  `capsule_digest`) · *Verified:* ✅ `src/bundle.rs`
   (`digest_is_stable_and_content_sensitive`,
   `verifies_serialized_capsule_content_against_manifest_digest`)
 - **REQ-CAP-005** — Imported impact and coverage evidence SHALL be accepted
@@ -719,8 +716,9 @@ The remaining dogfooding migration is:
   implemented requirements SHALL be fully anchored before the document enters
   the default CI gate, and every subsequent behavior change SHALL update the
   requirement, enforcement anchor, and honest evidence in the same merge
-  request. *Enforced:* not implemented — enrollment sequence in this document ·
-  *Verified:* ⏳ pending
+  request. *Enforced:* `src/check.rs` (`analyze`), `cli:src/main.rs` (`main`) ·
+  *Verified:* ✅ `cli:tests/external_subcommand.rs`
+  (`repository_configuration_has_zero_traceability_debt`)
 
 ## Safety and Trust User Stories
 

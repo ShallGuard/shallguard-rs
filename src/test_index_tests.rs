@@ -22,6 +22,7 @@ fn candidate(name: &str, syntactic_name: &str) -> SourceCandidate {
     }
 }
 
+#[shallguard_macros::verifies("REQ-TRACE-007")]
 #[test]
 fn merges_repeated_attributes_on_one_test() {
     let mut second = candidate("proves_it", "tests::proves_it");
@@ -33,6 +34,7 @@ fn merges_repeated_attributes_on_one_test() {
     assert_eq!(merged[0].requirements, ["REQ-ZZ-001", "REQ-ZZ-002"]);
 }
 
+#[shallguard_macros::verifies("REQ-TEST-002")]
 #[test]
 fn parses_only_tests_and_benchmarks_from_harness_output() {
     let tests =
@@ -40,6 +42,7 @@ fn parses_only_tests_and_benchmarks_from_harness_output() {
     assert_eq!(tests, ["module::bench", "module::one"]);
 }
 
+#[shallguard_macros::verifies("REQ-TEST-003")]
 #[test]
 fn exact_syntactic_name_resolves_before_suffix_matching() {
     let key = target("crate", TestTargetKind::Lib, "crate");
@@ -71,6 +74,7 @@ fn exact_syntactic_name_resolves_before_suffix_matching() {
     assert!(findings.is_empty());
 }
 
+#[shallguard_macros::verifies("REQ-TEST-003")]
 #[test]
 fn unique_function_suffix_is_accepted() {
     let key = target("crate", TestTargetKind::Lib, "crate");
@@ -89,6 +93,7 @@ fn unique_function_suffix_is_accepted() {
     assert!(findings.is_empty());
 }
 
+#[shallguard_macros::verifies("REQ-TEST-003")]
 #[test]
 fn ambiguous_function_suffix_is_a_finding() {
     let key = target("crate", TestTargetKind::Lib, "crate");
@@ -107,6 +112,7 @@ fn ambiguous_function_suffix_is_a_finding() {
     assert_eq!(findings[0].code, "harness-test-ambiguous");
 }
 
+#[shallguard_macros::verifies("REQ-TEST-001")]
 #[test]
 fn maps_library_and_integration_source_targets() {
     let package = MetadataPackage {
@@ -169,6 +175,7 @@ fn builds_module_name_from_library_file_and_inline_modules() {
     );
 }
 
+#[shallguard_macros::verifies("REQ-TEST-005")]
 #[test]
 fn validates_requested_package_names() {
     let metadata = CargoMetadata {

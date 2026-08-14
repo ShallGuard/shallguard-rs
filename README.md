@@ -36,9 +36,9 @@ and reads repository-owned policy from `shallguard.toml`. It supports ordinary
 single-package repositories and virtual Cargo workspaces.
 
 This repository defines `cargo shallguard-dev` as a local alias for its in-tree
-binary; CI uses the same command. Historical bootstrap gaps are committed in
-`.shallguard/baseline.toml`; newly introduced gaps fail immediately, and
-resolved entries must be pruned.
+binary; CI uses the same command. Its committed baseline is empty and every
+requirement area is hardened, so newly introduced traceability gaps fail
+immediately.
 
 Commands that collect executable coverage additionally require
 `cargo-llvm-cov`. Semantic review requires a supported provider CLI such as

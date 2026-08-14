@@ -18,6 +18,7 @@ fn removes_cargo_external_subcommand_argument() {
     );
 }
 
+#[verifies("REQ-SPEC-006")]
 #[test]
 fn parses_requirement_format_modes_and_documents() {
     let format = parse_format_args(
@@ -36,6 +37,7 @@ fn parses_requirement_format_modes_and_documents() {
     assert!(lint.docs.is_empty());
 }
 
+#[verifies("REQ-SPEC-006")]
 #[test]
 fn rejects_unknown_requirement_format_flags() {
     let error = parse_format_args(&strings(&["--write"]), false)

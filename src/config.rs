@@ -71,7 +71,7 @@ pub struct ReviewConfig {
 
 impl RepositoryConfig {
     /// Loads and validates the configuration owned by `root`.
-    #[enforces("REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
+    #[enforces("REQ-CLI-004", "REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
     pub fn load(root: &Path) -> Result<Self> {
         let path = root.join(CONFIG_PATH);
         let text = std::fs::read_to_string(&path)
@@ -128,6 +128,7 @@ impl RepositoryConfig {
     }
 
     /// Whether a historical gap is forbidden for this area and dimension.
+    #[enforces("REQ-BASE-003")]
     pub fn area_is_hard(&self, area: &str, verification: bool) -> bool {
         self.areas.get(area).is_some_and(|policy| {
             if verification {

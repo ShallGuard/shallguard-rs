@@ -36,6 +36,25 @@ fn installed_subcommand_checks_a_single_package_fixture() {
     );
 }
 
+#[verifies("REQ-PORT-008")]
+#[test]
+fn repository_configuration_has_zero_traceability_debt() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("BUG: CLI package must have a workspace parent");
+    let config = shallguard::config::RepositoryConfig::load(root)
+        .expect("repository ShallGuard configuration should load");
+    let report = shallguard::check::run(root, &config.documents(), &config)
+        .expect("repository traceability check should run");
+
+    assert!(report.errors.is_empty(), "errors: {:#?}", report.errors);
+    assert!(
+        report.warnings.is_empty(),
+        "warnings: {:#?}",
+        report.warnings
+    );
+}
+
 fn write_fixture(root: &Path) {
     fs::create_dir(root.join("src")).expect("create source directory");
     fs::create_dir(root.join("docs")).expect("create documentation directory");

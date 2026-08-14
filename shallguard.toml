@@ -18,43 +18,43 @@ hard_verification = true
 
 [areas.SPEC]
 label = "Specification"
-hard_enforcement = false
-hard_verification = false
+hard_enforcement = true
+hard_verification = true
 
 [areas.TRACE]
 label = "Traceability"
-hard_enforcement = false
-hard_verification = false
+hard_enforcement = true
+hard_verification = true
 
 [areas.BASE]
 label = "Baseline"
-hard_enforcement = false
-hard_verification = false
+hard_enforcement = true
+hard_verification = true
 
 [areas.IMP]
 label = "Change Impact"
-hard_enforcement = false
-hard_verification = false
+hard_enforcement = true
+hard_verification = true
 
 [areas.TEST]
 label = "Test Identity"
-hard_enforcement = false
-hard_verification = false
+hard_enforcement = true
+hard_verification = true
 
 [areas.COV]
 label = "Executable Coverage"
-hard_enforcement = false
-hard_verification = false
+hard_enforcement = true
+hard_verification = true
 
 [areas.CAP]
 label = "Review Capsule"
-hard_enforcement = false
-hard_verification = false
+hard_enforcement = true
+hard_verification = true
 
 [areas.REV]
 label = "Semantic Review"
-hard_enforcement = false
-hard_verification = false
+hard_enforcement = true
+hard_verification = true
 
 [areas.STATIC]
 label = "Static Checking"
@@ -68,8 +68,8 @@ hard_verification = true
 
 [areas.SEC]
 label = "Safety and Trust"
-hard_enforcement = false
-hard_verification = false
+hard_enforcement = true
+hard_verification = true
 
 [artifacts]
 root = "target/shallguard"

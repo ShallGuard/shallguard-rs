@@ -119,7 +119,7 @@ struct ReviewArgs {
     cache_dir: Option<PathBuf>,
 }
 
-#[enforces("REQ-CLI-001", "REQ-CLI-002")]
+#[enforces("REQ-CLI-001", "REQ-CLI-002", "REQ-PORT-008", "REQ-SEC-001")]
 fn main() -> ExitCode {
     let args = normalized_args(std::env::args().skip(1).collect());
     let command = match args.as_slice() {
@@ -317,6 +317,7 @@ fn normalized_args(mut args: Vec<String>) -> Vec<String> {
     args
 }
 
+#[enforces("REQ-SEC-004")]
 fn run_clean(root: &Path, config: &shallguard::config::RepositoryConfig) -> ExitCode {
     let bundle_dir = config.bundle_dir();
     match shallguard::bundle::clean_bundle(root, &bundle_dir) {
@@ -338,6 +339,7 @@ fn run_clean(root: &Path, config: &shallguard::config::RepositoryConfig) -> Exit
     }
 }
 
+#[enforces("REQ-SPEC-006")]
 fn run_format(root: &Path, docs: &[shallguard::DocSpec], args: &FormatArgs) -> ExitCode {
     let report = if args.check {
         shallguard::requirement_format::check(root, docs)
@@ -642,6 +644,7 @@ fn parse_coverage_args(args: &[String]) -> Result<CoverageArgs> {
     })
 }
 
+#[enforces("REQ-IMP-007")]
 fn run_impact(
     root: &Path,
     docs: &[shallguard::DocSpec],
@@ -790,7 +793,7 @@ fn run_test_index(root: &Path, docs: &[shallguard::DocSpec], args: &TestIndexArg
     }
 }
 
-#[enforces("REQ-CLI-004")]
+#[enforces("REQ-CLI-004", "REQ-COV-006")]
 fn run_coverage(
     root: &Path,
     docs: &[shallguard::DocSpec],

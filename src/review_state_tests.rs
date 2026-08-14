@@ -7,6 +7,7 @@ use super::super::{
 };
 use crate::bundle::MANIFEST_SCHEMA;
 
+#[shallguard_macros::verifies("REQ-SEC-002")]
 #[test]
 fn safe_output_path_rejects_parent_and_absolute_paths() {
     let root = Path::new("output");
@@ -19,6 +20,7 @@ fn safe_output_path_rejects_parent_and_absolute_paths() {
     assert!(safe_output_path(root, "/tmp/result.json").is_err());
 }
 
+#[shallguard_macros::verifies("REQ-REV-006")]
 #[test]
 fn atomic_json_replaces_complete_document() {
     let directory = tempfile::tempdir().expect("temporary directory");
@@ -31,6 +33,7 @@ fn atomic_json_replaces_complete_document() {
     assert_eq!(value["generation"], 2);
 }
 
+#[shallguard_macros::verifies("REQ-REV-007")]
 #[test]
 fn compatible_resume_reuses_only_revalidated_completed_checkpoint() {
     let directory = tempfile::tempdir().expect("temporary directory");
@@ -81,6 +84,7 @@ fn compatible_resume_reuses_only_revalidated_completed_checkpoint() {
     ));
 }
 
+#[shallguard_macros::verifies("REQ-REV-008", "REQ-SEC-005")]
 #[test]
 fn portable_cache_is_revalidated_before_reuse() {
     let directory = tempfile::tempdir().expect("temporary directory");
@@ -129,6 +133,7 @@ fn portable_cache_is_revalidated_before_reuse() {
     ));
 }
 
+#[shallguard_macros::verifies("REQ-REV-007")]
 #[test]
 fn incompatible_resume_is_rejected_before_work_starts() {
     let directory = tempfile::tempdir().expect("temporary directory");
@@ -153,6 +158,7 @@ fn incompatible_resume_is_rejected_before_work_starts() {
     assert!(error.to_string().contains("does not match"));
 }
 
+#[shallguard_macros::verifies("REQ-REV-007")]
 #[test]
 fn legacy_output_without_run_state_is_not_modified() {
     let directory = tempfile::tempdir().expect("temporary directory");

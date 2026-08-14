@@ -41,6 +41,7 @@ pub enum HarnessSource<'a> {
 
 /// Complete deterministic verification-test index.
 #[derive(Debug, Serialize)]
+#[shallguard_macros::enforces("REQ-TEST-004")]
 pub struct TestIndexArtifact {
     pub schema: &'static str,
     pub head_commit: String,
@@ -62,6 +63,7 @@ pub struct TestIndexConfiguration {
 
 /// One valid `#[verifies]` source anchor and its Cargo resolution.
 #[derive(Debug, Serialize)]
+#[shallguard_macros::enforces("REQ-TEST-004")]
 pub struct IndexedVerificationTest {
     pub file: String,
     pub line: usize,
@@ -178,6 +180,7 @@ impl TestTargetKind {
 /// Returns an error when Cargo metadata, Git state, source scanning, or a
 /// supplied catalog cannot be read reliably. Individual target enumeration
 /// failures are findings so the artifact can still be published.
+#[shallguard_macros::enforces("REQ-SEC-001")]
 pub fn generate(
     root: &Path,
     docs: &[DocSpec],
@@ -333,6 +336,7 @@ fn merge_candidates(mut candidates: Vec<SourceCandidate>) -> Vec<SourceCandidate
     merged
 }
 
+#[shallguard_macros::enforces("REQ-TEST-001")]
 fn load_metadata(root: &Path) -> Result<CargoMetadata> {
     let output = ProcessCommand::new("cargo")
         .args(["metadata", "--format-version", "1", "--no-deps", "--locked"])
@@ -611,6 +615,7 @@ fn file_modules(relative: &Path) -> Vec<String> {
         .collect()
 }
 
+#[shallguard_macros::enforces("REQ-TEST-005")]
 fn load_catalog(
     path: &Path,
     head_commit: &str,
@@ -703,6 +708,7 @@ fn write_catalog(
         .with_context(|| format!("writing harness catalog {}", path.display()))
 }
 
+#[shallguard_macros::enforces("REQ-TEST-002")]
 fn enumerate_targets(root: &Path, targets: &BTreeSet<CargoTargetIdentity>) -> LoadedCatalog {
     let mut loaded = LoadedCatalog::default();
     for target in targets {
@@ -768,6 +774,7 @@ fn parse_harness_list(output: &str) -> Vec<String> {
     tests
 }
 
+#[shallguard_macros::enforces("REQ-TEST-003")]
 fn resolve_candidate(
     candidate: SourceCandidate,
     catalog: &BTreeMap<CargoTargetIdentity, Vec<String>>,

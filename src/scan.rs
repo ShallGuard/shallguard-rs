@@ -101,6 +101,7 @@ pub struct InvalidAnchor {
 }
 
 /// Everything the scanner found.
+#[shallguard_macros::enforces("REQ-TRACE-007")]
 pub struct Anchors {
     /// Every requirement ID cited by an anchor: id -> (file, line).
     pub references: HashMap<String, Vec<(PathBuf, usize)>>,
@@ -118,6 +119,7 @@ impl Anchors {
     }
 }
 
+#[shallguard_macros::enforces("REQ-TRACE-001")]
 pub fn scan(root: &Path, roots: &[&str]) -> Result<Anchors> {
     let id_re = Regex::new(r"REQ-[A-Z]{2,}-\d{3}").expect("BUG: invalid ID regex");
 
@@ -178,6 +180,7 @@ pub fn scan(root: &Path, roots: &[&str]) -> Result<Anchors> {
 
 /// Collects `enforces_here!("REQ-...")` macro invocations anywhere in a
 /// file — statement position in function bodies, or item position.
+#[shallguard_macros::enforces("REQ-TRACE-003")]
 struct MacroVisitor<'a> {
     file: &'a Path,
     id_re: &'a Regex,
@@ -283,6 +286,7 @@ impl MacroVisitor<'_> {
 }
 
 /// Recursively walks items (modules, impls) collecting anchor attributes.
+#[shallguard_macros::enforces("REQ-TRACE-002")]
 fn walk_items(
     items: &[syn::Item],
     file: &Path,
@@ -464,6 +468,7 @@ fn collect_item_attrs(
 
 /// Handles attributes on a function (free or impl): `#[verifies]` is a
 /// verification anchor only when the function is a real, enabled test.
+#[shallguard_macros::enforces("REQ-TRACE-004")]
 fn collect_fn_attrs(
     attrs: &[syn::Attribute],
     ident: &syn::Ident,
@@ -611,6 +616,7 @@ mod tests {
         anchors
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-001")]
     #[test]
     fn comments_are_never_anchors() {
         let anchors = scan_text(
@@ -628,6 +634,7 @@ fn b() {}
         assert!(anchors.invalid.is_empty());
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-003")]
     #[test]
     fn enforces_here_macro_in_statement_and_item_position() {
         let anchors = scan_text(
@@ -692,6 +699,7 @@ fn a(configured: usize) -> usize {
         assert!(anchors.references.contains_key("REQ-CM-038"));
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-002")]
     #[test]
     fn attribute_anchors_record_executable_and_structural_scopes() {
         let anchors = scan_text(
@@ -734,6 +742,7 @@ const DEFAULT: usize = 1;
         assert_eq!(constant.scope_kind, EnforcementScopeKind::ConstInitializer);
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-003")]
     #[test]
     fn enforces_here_nested_in_another_macro_body_is_found() {
         let anchors = scan_text(
@@ -788,6 +797,7 @@ fn a() {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-002")]
     #[test]
     fn field_and_variant_attributes_are_anchors() {
         let anchors = scan_text(
@@ -820,6 +830,7 @@ enum Input {
         assert!(all.contains(&"REQ-CM-050"));
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-001")]
     #[test]
     fn anchor_text_inside_strings_is_invisible() {
         let anchors = scan_text(
@@ -835,6 +846,7 @@ fn a() {
         assert!(anchors.references.is_empty());
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-004")]
     #[test]
     fn verifies_attribute_needs_an_enabled_test() {
         let anchors = scan_text(
@@ -858,6 +870,7 @@ fn ignored_test() {}
         assert_eq!(anchors.invalid.len(), 2);
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-002")]
     #[test]
     fn enforces_attribute_on_items_and_impl_fns() {
         let anchors = scan_text(

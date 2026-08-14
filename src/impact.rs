@@ -48,6 +48,7 @@ pub enum BaseSelection<'a> {
 
 /// Complete, deterministic impact artifact.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[shallguard_macros::enforces("REQ-IMP-007")]
 pub struct ImpactArtifact {
     pub schema: String,
     pub repository: String,
@@ -288,6 +289,7 @@ struct RequirementImpactBuilder {
 ///
 /// Returns an error when the revision, Git diff, requirement documents,
 /// baseline, or changed source cannot be read reliably.
+#[shallguard_macros::enforces("REQ-IMP-001", "REQ-PORT-004", "REQ-SEC-001")]
 pub fn analyze(
     root: &Path,
     docs: &[DocSpec],
@@ -481,6 +483,7 @@ fn changed_files(root: &Path, base: &str) -> Result<Vec<ChangedFile>> {
     Ok(changed)
 }
 
+#[shallguard_macros::enforces("REQ-IMP-002")]
 fn parse_name_status(raw: &[u8]) -> Result<Vec<ChangedFile>> {
     let fields = nul_fields(raw);
     let mut changed = Vec::new();
@@ -592,6 +595,7 @@ fn load_requirements(
     Ok((base_requirements, head_requirements))
 }
 
+#[shallguard_macros::enforces("REQ-BASE-005", "REQ-IMP-005")]
 fn compare_requirement_documents(
     base: &BTreeMap<String, Requirement>,
     head: &BTreeMap<String, Requirement>,
@@ -1002,6 +1006,7 @@ fn parse_hunk_ranges(diff: &str) -> Result<ChangedLines> {
     Ok(changed)
 }
 
+#[shallguard_macros::enforces("REQ-IMP-004")]
 fn compare_scopes(
     file: &ChangedFile,
     before: &BTreeMap<String, SourceScope>,
@@ -1645,6 +1650,7 @@ fn trait_item_kind(item: &syn::TraitItem) -> &'static str {
     }
 }
 
+#[shallguard_macros::enforces("REQ-TRACE-003")]
 struct EnforcementCollector<'a> {
     id_re: &'a Regex,
     scopes: Vec<(usize, usize)>,
@@ -1774,6 +1780,7 @@ fn normalized_trait_item_tokens(item: &syn::TraitItem) -> String {
     item.to_token_stream().to_string()
 }
 
+#[shallguard_macros::enforces("REQ-IMP-003")]
 fn normalized_behavior_tokens(tokens: &str) -> String {
     static ATTRIBUTE_RE: OnceLock<Regex> = OnceLock::new();
     static STATEMENT_RE: OnceLock<Regex> = OnceLock::new();
@@ -1936,6 +1943,7 @@ mod tests {
         }
     }
 
+    #[shallguard_macros::verifies("REQ-IMP-002")]
     #[test]
     fn parses_nul_terminated_name_status_with_rename() {
         let raw = b"M\0src/a.rs\0R097\0src/old.rs\0src/new.rs\0A\0src/added.rs\0";
@@ -1948,6 +1956,7 @@ mod tests {
         assert_eq!(files[2].status, FileStatus::Added);
     }
 
+    #[shallguard_macros::verifies("REQ-IMP-003")]
     #[test]
     fn source_index_ignores_comments_but_finds_typed_anchors() {
         let before = r#"
@@ -1978,6 +1987,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-IMP-003")]
     #[test]
     fn behavior_tokens_exclude_trace_metadata() {
         let before = index_source("fn apply() { work(); }", Path::new("crate/src/lib.rs"))
@@ -2018,6 +2028,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-IMP-004")]
     #[test]
     fn changed_anchored_function_is_direct_impact() {
         let base = index_source(
@@ -2056,6 +2067,7 @@ mod tests {
         assert!(state.unclaimed.is_empty());
     }
 
+    #[shallguard_macros::verifies("REQ-IMP-004")]
     #[test]
     fn changed_unanchored_function_records_dependency_candidate() {
         let base = index_source("fn helper() { old(); }", Path::new("crate/src/lib.rs"))
@@ -2118,6 +2130,7 @@ mod tests {
         assert!(state.unclaimed.is_empty());
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-003")]
     #[test]
     fn branch_anchor_only_owns_its_enclosing_block() {
         let base = index_source(
@@ -2165,6 +2178,7 @@ mod tests {
         assert_eq!(state.unclaimed.len(), 1);
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-003")]
     #[test]
     fn branch_anchor_without_braces_owns_its_match_arm() {
         let source = "fn apply(value: u8) {\n\
@@ -2211,6 +2225,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-BASE-005")]
     #[test]
     fn changed_requirement_with_baseline_debt_is_policy_error() {
         let before = requirement("REQ-ZZ-001");
@@ -2232,6 +2247,7 @@ mod tests {
         assert_eq!(state.findings[0].severity, FindingSeverity::Error);
     }
 
+    #[shallguard_macros::verifies("REQ-IMP-005")]
     #[test]
     fn requirement_change_classifies_each_segment() {
         let before = requirement("REQ-ZZ-001");
@@ -2247,7 +2263,7 @@ mod tests {
         );
     }
 
-    #[shallguard_macros::verifies("REQ-CLI-005")]
+    #[shallguard_macros::verifies("REQ-CLI-005", "REQ-IMP-007")]
     #[test]
     fn json_artifact_uses_versioned_schema_and_configuration() {
         let artifact = ImpactArtifact {

@@ -61,6 +61,7 @@ struct FormattedText {
 ///
 /// Returns an error when a document cannot be read or when semantic-equivalence
 /// verification of the formatted representation fails.
+#[shallguard_macros::enforces("REQ-SPEC-006")]
 pub fn check(root: &Path, specs: &[DocSpec]) -> Result<FormatReport> {
     run(root, specs, false)
 }
@@ -74,6 +75,7 @@ pub fn check(root: &Path, specs: &[DocSpec]) -> Result<FormatReport> {
 ///
 /// Returns an error when a document cannot be read or written, or when formatting
 /// would change the parsed requirement meaning.
+#[shallguard_macros::enforces("REQ-SPEC-005")]
 pub fn format(root: &Path, specs: &[DocSpec]) -> Result<FormatReport> {
     run(root, specs, true)
 }
@@ -167,6 +169,7 @@ fn format_text(text: &str, spec: &DocSpec) -> FormattedText {
     }
 }
 
+#[shallguard_macros::enforces("REQ-SPEC-001", "REQ-SPEC-002", "REQ-SPEC-004")]
 fn lint_block(block: &[&str], spec: &DocSpec, line: usize) -> Vec<FormatDiagnostic> {
     let header_re = Regex::new(r"^- \*\*(REQ-([A-Z]{2,})-\d{3})\*\* — \S")
         .expect("BUG: invalid requirement header regex");
@@ -330,6 +333,7 @@ mod tests {
         )
     }
 
+    #[shallguard_macros::verifies("REQ-SPEC-005")]
     #[test]
     fn formats_requirement_blocks_without_touching_surrounding_markdown() {
         let input = "# Story\n\n- **REQ-AA-001** — The service SHALL retain a deliberately long value across every ordinary processing pass so the formatter has to wrap it.\n    *Enforced:* `src/lib.rs` (`apply`) · *Verified:* ✅ `src/lib.rs` (`test_apply`)\n\n| prose | stays |\n";
@@ -355,6 +359,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-SPEC-005")]
     #[test]
     fn formatting_is_idempotent_and_semantically_equivalent() {
         let input = "- **REQ-AA-001** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs` (`apply`) · *Verified:* ✅ `src/lib.rs` (`test_apply`)\n";
@@ -367,6 +372,7 @@ mod tests {
             .expect("formatting preserves requirement meaning");
     }
 
+    #[shallguard_macros::verifies("REQ-SPEC-001", "REQ-SPEC-002")]
     #[test]
     fn rejects_missing_segments_and_evidence_status() {
         let missing_verified =
@@ -390,6 +396,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-SPEC-004")]
     #[test]
     fn permits_retired_requirements_without_evidence_segments() {
         let input = "- **REQ-AA-001** — *(retired into REQ-AA-002.)*\n";
@@ -426,6 +433,7 @@ mod tests {
         assert!(checked.is_clean());
     }
 
+    #[shallguard_macros::verifies("REQ-SPEC-005")]
     #[test]
     fn lint_failures_prevent_formatter_writes() {
         let directory = tempfile::tempdir().expect("temporary directory");

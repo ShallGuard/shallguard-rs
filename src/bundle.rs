@@ -65,6 +65,7 @@ struct CleanManifest {
 /// Returns an error when the path is a symlink, is not a directory, cannot be
 /// inspected, does not contain a valid ShallGuard bundle manifest, or cannot be
 /// removed.
+#[shallguard_macros::enforces("REQ-SEC-004")]
 pub fn clean_bundle(root: &Path, relative_output_dir: &Path) -> Result<Option<PathBuf>> {
     let output_dir = root.join(relative_output_dir);
     let metadata = match std::fs::symlink_metadata(&output_dir) {
@@ -106,6 +107,7 @@ pub fn clean_bundle(root: &Path, relative_output_dir: &Path) -> Result<Option<Pa
 /// Returns an error for an incompatible impact schema, missing
 /// requirement, unreadable source, serialization failure, or existing
 /// output path.
+#[shallguard_macros::enforces("REQ-CAP-001", "REQ-CAP-006", "REQ-SEC-001")]
 pub fn generate(
     root: &Path,
     docs: &[DocSpec],
@@ -202,6 +204,7 @@ fn create_parent(path: &Path) -> Result<()> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[shallguard_macros::enforces("REQ-CAP-004")]
 struct ReviewCapsule {
     schema: String,
     repository: String,
@@ -289,6 +292,7 @@ struct SourceContext {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[shallguard_macros::enforces("REQ-CAP-003")]
 struct SourceExcerpt {
     start_line: usize,
     end_line: usize,
@@ -352,6 +356,7 @@ struct ManifestEntry {
     context_complete: bool,
 }
 
+#[shallguard_macros::enforces("REQ-CAP-005", "REQ-SEC-002")]
 fn read_impact(path: &Path) -> Result<ImpactArtifact> {
     let text = std::fs::read_to_string(path)
         .with_context(|| format!("reading impact artifact {}", path.display()))?;
@@ -431,6 +436,7 @@ fn load_requirements(root: &Path, docs: &[DocSpec]) -> Result<BTreeMap<String, R
     Ok(requirements)
 }
 
+#[shallguard_macros::enforces("REQ-CAP-002")]
 fn build_capsule(
     root: &Path,
     artifact: &ImpactArtifact,
@@ -898,6 +904,7 @@ fn read_optional(path: PathBuf) -> Result<Option<String>> {
     }
 }
 
+#[shallguard_macros::enforces("REQ-CAP-004")]
 fn capsule_digest(capsule: &impl Serialize) -> Result<String> {
     let encoded = serde_json::to_vec(capsule).context("serializing capsule for digest")?;
     let digest = Sha256::digest(encoded);
@@ -905,6 +912,7 @@ fn capsule_digest(capsule: &impl Serialize) -> Result<String> {
 }
 
 /// Verifies that a serialized capsule still matches its manifest digest.
+#[shallguard_macros::enforces("REQ-SEC-005")]
 pub(crate) fn verify_capsule_digest(text: &str, manifest_digest: &str) -> Result<()> {
     let schema: CapsuleSchemaProbe =
         serde_json::from_str(text).context("parsing capsule schema for digest verification")?;
@@ -1060,6 +1068,7 @@ mod tests {
 
     const TEST_BUNDLE_DIR: &str = "target/requirement-review";
 
+    #[shallguard_macros::verifies("REQ-CAP-002")]
     #[test]
     fn extracts_normative_clauses_and_keeps_complete_segments() {
         let clauses = extract_clauses(
@@ -1127,6 +1136,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-CAP-002")]
     #[test]
     fn capsule_includes_unchanged_anchored_enforcement_source() {
         let root = tempfile::tempdir().expect("temporary workspace");
@@ -1211,6 +1221,7 @@ mod tests {
         assert!(head.source.contains("false"));
     }
 
+    #[shallguard_macros::verifies("REQ-CAP-003")]
     #[test]
     fn oversized_enforcement_scope_is_bounded_and_marked_incomplete() {
         let text = (1..=400)
@@ -1243,6 +1254,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-CAP-004")]
     #[test]
     fn digest_is_stable_and_content_sensitive() {
         let capsule = sample_capsule("statement one");
@@ -1258,6 +1270,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-CAP-004", "REQ-SEC-005")]
     #[test]
     fn verifies_serialized_capsule_content_against_manifest_digest() {
         let mut capsule = sample_capsule("statement one");
@@ -1281,6 +1294,7 @@ mod tests {
             .expect("legacy capsule remains replayable");
     }
 
+    #[shallguard_macros::verifies("REQ-CAP-005")]
     #[test]
     fn selects_requirement_coverage_and_checks_head_identity() {
         let artifact = serde_json::json!({
@@ -1298,6 +1312,7 @@ mod tests {
         assert!(coverage_by_requirement(&artifact, "other-head").is_err());
     }
 
+    #[shallguard_macros::verifies("REQ-SEC-004")]
     #[test]
     fn clean_removes_only_a_valid_default_bundle_and_is_idempotent() {
         let root = tempfile::tempdir().expect("temporary workspace");
@@ -1323,6 +1338,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-SEC-004")]
     #[test]
     fn clean_preserves_a_directory_without_a_shallguard_manifest() {
         let root = tempfile::tempdir().expect("temporary workspace");

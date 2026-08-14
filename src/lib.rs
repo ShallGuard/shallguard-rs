@@ -91,6 +91,7 @@ pub(crate) fn clear_live_progress(progress: Option<ProgressCallback>) {
 /// A requirements document and the source tree that unprefixed `src/` and
 /// `tests/` references inside it resolve to.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[shallguard_macros::enforces("REQ-PORT-002")]
 pub struct DocSpec {
     /// Workspace-relative document path.
     pub path: String,

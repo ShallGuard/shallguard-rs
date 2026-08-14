@@ -218,6 +218,16 @@ pub fn prune_baseline(
 
 /// Detects invariant failures and traceability gaps without deciding
 /// whether historical debt is allowed.
+#[shallguard_macros::enforces(
+    "REQ-SPEC-001",
+    "REQ-SPEC-003",
+    "REQ-SPEC-004",
+    "REQ-TRACE-005",
+    "REQ-TRACE-006",
+    "REQ-TRACE-007",
+    "REQ-PORT-004",
+    "REQ-PORT-008"
+)]
 fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<Analysis> {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
@@ -397,18 +407,14 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
 
         if !req.not_implemented && !req.enforced_paths.is_empty() {
             stat.anchorable += 1;
-            let anchored = enforcing_files.get(req.id.as_str()).is_some_and(|files| {
-                req.enforced_paths.iter().any(|enforced| {
-                    files.iter().any(|file| {
-                        if enforced.to_string_lossy().ends_with('/') {
-                            file.starts_with(enforced)
-                        } else {
-                            *file == enforced.as_path()
-                        }
-                    })
-                })
-            });
-            if anchored {
+            let files = enforcing_files.get(req.id.as_str());
+            let missing = req
+                .enforced_paths
+                .iter()
+                .filter(|enforced| !enforced_path_has_anchor(enforced, files))
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>();
+            if missing.is_empty() {
                 stat.anchored += 1;
             } else {
                 let finding = Finding {
@@ -416,8 +422,10 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
                     line: req.line,
                     message: format!(
                         "{} \"{}\" - no enforcement anchor (#[enforces] or \
-                         enforces_here!) in its Enforced file(s)",
-                        req.id, req.title
+                         enforces_here!) in documented file(s): {}",
+                        req.id,
+                        req.title,
+                        missing.join(", ")
                     ),
                 };
                 record_gap(&mut gaps, req, GapKind::EnforcementAnchor, finding);
@@ -532,6 +540,19 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
     })
 }
 
+fn enforced_path_has_anchor(enforced: &Path, files: Option<&HashSet<&Path>>) -> bool {
+    files.is_some_and(|files| {
+        files.iter().any(|file| {
+            if enforced.to_string_lossy().ends_with('/') {
+                file.starts_with(enforced)
+            } else {
+                *file == enforced
+            }
+        })
+    })
+}
+
+#[shallguard_macros::enforces("REQ-BASE-002")]
 fn record_gap(
     gaps: &mut BTreeMap<GapKey, TraceabilityGap>,
     req: &Requirement,
@@ -547,6 +568,7 @@ fn record_gap(
         .push(finding);
 }
 
+#[shallguard_macros::enforces("REQ-BASE-002", "REQ-BASE-004")]
 fn apply_baseline(
     analysis: &mut Analysis,
     baseline: &Baseline,
@@ -665,6 +687,7 @@ fn baseline_finding(config: &RepositoryConfig, message: String) -> Finding {
     }
 }
 
+#[shallguard_macros::enforces("REQ-BASE-003")]
 fn gap_is_hard(kind: GapKind, area: &str, config: &RepositoryConfig) -> bool {
     match kind {
         GapKind::EnforcementAnchor => config.area_is_hard(area, false),
@@ -887,6 +910,19 @@ mod tests {
         }
     }
 
+    #[shallguard_macros::verifies("REQ-TRACE-006")]
+    #[test]
+    fn requires_an_anchor_in_every_documented_enforcement_file() {
+        let anchored = Path::new("src/anchored.rs");
+        let missing = Path::new("src/missing.rs");
+        let files = HashSet::from([anchored]);
+
+        assert!(enforced_path_has_anchor(anchored, Some(&files)));
+        assert!(!enforced_path_has_anchor(missing, Some(&files)));
+        assert!(!enforced_path_has_anchor(anchored, None));
+    }
+
+    #[shallguard_macros::verifies("REQ-BASE-002")]
     #[test]
     fn exact_baseline_gap_is_known_warning() {
         let kind = GapKind::EnforcementAnchor;
@@ -904,6 +940,7 @@ mod tests {
         assert_eq!(stats.known, 1);
     }
 
+    #[shallguard_macros::verifies("REQ-BASE-002")]
     #[test]
     fn unbaselined_gap_is_a_regression() {
         let kind = GapKind::VerificationAnchor;
@@ -920,6 +957,7 @@ mod tests {
         assert_eq!(stats.new, 1);
     }
 
+    #[shallguard_macros::verifies("REQ-BASE-004")]
     #[test]
     fn fixed_gap_makes_entry_stale() {
         let kind = GapKind::EvidenceCitation;
@@ -936,6 +974,7 @@ mod tests {
         assert_eq!(stats.resolved, 1);
     }
 
+    #[shallguard_macros::verifies("REQ-BASE-004")]
     #[test]
     fn prune_mode_accepts_resolved_entry_for_removal() {
         let kind = GapKind::EvidenceCitation;
@@ -951,6 +990,7 @@ mod tests {
         assert_eq!(stats.resolved, 1);
     }
 
+    #[shallguard_macros::verifies("REQ-BASE-003")]
     #[test]
     fn hard_area_cannot_be_baselined() {
         let kind = GapKind::EnforcementAnchor;

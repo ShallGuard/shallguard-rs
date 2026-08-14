@@ -25,6 +25,7 @@ fn changed_function(name: &str) -> ChangedDefinition {
     }
 }
 
+#[shallguard_macros::verifies("REQ-IMP-006")]
 #[test]
 fn propagates_changed_helper_to_anchored_caller() {
     let index = index_fixture(
@@ -45,6 +46,7 @@ fn propagates_changed_helper_to_anchored_caller() {
     assert!(analysis.claimed_changes.contains("change-0001"));
 }
 
+#[shallguard_macros::verifies("REQ-IMP-006")]
 #[test]
 fn classifies_changed_type_dependency_as_structural() {
     let index = index_fixture(
