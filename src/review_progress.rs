@@ -101,6 +101,7 @@ impl Drop for ProviderProgress<'_> {
     }
 }
 
+#[shallguard_macros::enforces("REQ-CLI-003")]
 fn provider_status_message(
     provider: &str,
     unit: ReviewUnitProgress<'_>,
@@ -466,6 +467,7 @@ fn failure_kind_name(kind: ReviewFailureKind) -> &'static str {
 mod tests {
     use super::*;
 
+    #[shallguard_macros::verifies("REQ-CLI-003")]
     #[test]
     fn provider_status_includes_position_description_and_elapsed_time() {
         let entry = BundleEntry {

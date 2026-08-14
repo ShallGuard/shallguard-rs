@@ -1,0 +1,592 @@
+# Historical traceability debt. Do not add or refresh entries.
+# `cargo shallguard baseline prune` only removes resolved debt.
+
+schema = 1
+
+[[gap]]
+requirement = "REQ-BASE-001"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-BASE-001"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-BASE-001"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-BASE-002"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-BASE-002"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-BASE-002"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-BASE-003"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-BASE-003"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-BASE-003"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-BASE-004"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-BASE-004"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-BASE-004"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-BASE-005"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-BASE-005"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-BASE-005"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-CAP-001"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-CAP-002"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-CAP-002"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-CAP-002"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-CAP-003"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-CAP-003"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-CAP-003"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-CAP-004"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-CAP-004"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-CAP-004"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-CAP-005"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-CAP-005"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-CAP-005"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-CAP-006"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-COV-001"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-COV-001"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-COV-001"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-COV-002"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-COV-003"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-COV-003"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-COV-003"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-COV-004"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-COV-004"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-COV-004"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-COV-005"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-COV-005"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-COV-005"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-COV-006"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-001"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-002"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-002"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-002"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-IMP-003"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-003"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-003"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-IMP-004"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-004"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-004"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-IMP-005"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-005"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-005"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-IMP-006"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-006"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-006"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-IMP-007"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-007"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-IMP-007"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-REV-001"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-REV-001"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-REV-001"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-REV-002"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-REV-002"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-REV-002"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-REV-003"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-REV-003"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-REV-003"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-REV-004"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-REV-004"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-REV-004"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-REV-005"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-REV-005"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-REV-005"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-REV-006"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-REV-006"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-REV-006"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-REV-007"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-REV-007"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-REV-007"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-REV-008"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-REV-008"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-REV-008"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-SEC-001"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SEC-002"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SEC-002"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-SEC-002"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-SEC-003"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SEC-003"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-SEC-003"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-SEC-004"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SEC-004"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-SEC-004"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-SEC-005"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SEC-005"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-SEC-005"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-SPEC-001"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-001"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-001"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-SPEC-002"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-002"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-002"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-SPEC-003"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-003"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-003"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-SPEC-004"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-004"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-004"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-SPEC-005"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-005"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-005"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-SPEC-006"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-006"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-SPEC-006"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-TEST-001"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TEST-001"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-TEST-001"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-TEST-002"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TEST-002"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-TEST-002"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-TEST-003"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TEST-003"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-TEST-003"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-TEST-004"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TEST-005"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TEST-005"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-TEST-005"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-TRACE-001"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-001"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-001"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-TRACE-002"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-002"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-002"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-TRACE-003"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-003"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-003"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-TRACE-004"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-004"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-004"
+kind = "evidence-citation"
+
+[[gap]]
+requirement = "REQ-TRACE-005"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-006"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-007"
+kind = "enforcement-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-007"
+kind = "verification-anchor"
+
+[[gap]]
+requirement = "REQ-TRACE-007"
+kind = "evidence-citation"

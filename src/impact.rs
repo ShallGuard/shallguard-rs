@@ -26,6 +26,7 @@ use crate::impact_dependency::{
 };
 
 /// Version of the public impact artifact.
+#[shallguard_macros::enforces("REQ-CLI-005")]
 pub const IMPACT_SCHEMA: &str = "shallguard.requirement-impact/v1";
 
 /// Inputs controlling one impact analysis.
@@ -2246,6 +2247,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-CLI-005")]
     #[test]
     fn json_artifact_uses_versioned_schema_and_configuration() {
         let artifact = ImpactArtifact {

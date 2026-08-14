@@ -306,8 +306,8 @@ fn main() -> ExitCode {
 #[enforces("REQ-CLI-001")]
 fn normalized_args(mut args: Vec<String>) -> Vec<String> {
     // Cargo passes the external subcommand name as argv[1] when it invokes an
-    // installed `cargo-shallguard` executable. The workspace alias invokes this
-    // binary through `cargo run` and therefore does not add that argument.
+    // installed `cargo-shallguard` executable. The repository's development
+    // alias invokes this binary through `cargo run` and omits that argument.
     if args
         .first()
         .is_some_and(|argument| argument == "shallguard")

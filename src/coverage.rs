@@ -16,6 +16,7 @@ use crate::test_index::{
 use crate::{DocSpec, ProgressCallback, report_progress};
 
 /// Version of the requirement coverage artifact.
+#[shallguard_macros::enforces("REQ-CLI-005")]
 pub const COVERAGE_SCHEMA: &str = "shallguard.requirement-coverage/v1";
 
 /// Inputs controlling a full or filtered executable-coverage run.

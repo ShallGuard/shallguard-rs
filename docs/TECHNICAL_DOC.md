@@ -24,6 +24,8 @@ The detailed architecture preflight and dependency contract live in
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+cargo shallguard-dev fmt --check
+cargo shallguard-dev check
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 cargo package --allow-dirty -p shallguard-macros
 ```

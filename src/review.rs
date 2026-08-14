@@ -41,8 +41,10 @@ use state::{Attempt, CachedUnit, Reuse, ReviewStore};
 use validation::{CapsuleMetadata, ReviewValidationError, capsule_metadata, validate_response};
 
 /// Version of an individual validated semantic-review response.
+#[shallguard_macros::enforces("REQ-CLI-005")]
 pub const REVIEW_RESULT_SCHEMA: &str = "shallguard.requirement-review-result/v1";
 /// Version of the aggregate local-review run artifact.
+#[shallguard_macros::enforces("REQ-CLI-005")]
 pub const REVIEW_RUN_SCHEMA: &str = "shallguard.requirement-local-review/v1";
 
 /// Locally installed model CLI used to review capsules.

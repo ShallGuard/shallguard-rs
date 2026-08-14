@@ -50,3 +50,24 @@ Prefix mappings may point to other package roots. ShallGuard scans `src/` and
 The configuration loader rejects unknown fields, unsupported schemas,
 absolute or parent-traversing paths, duplicate documents, missing documents or
 source roots, invalid area identifiers, and unsupported review-provider names.
+
+## Baseline lifecycle
+
+Repositories adopting ShallGuard around existing code may create the baseline
+once and commit it:
+
+```bash
+cargo shallguard baseline init
+```
+
+The baseline is a ratchet, not an allowlist to extend. New gaps fail checking.
+After adding honest enforcement or verification anchors, remove only resolved
+entries and commit the result with the anchors:
+
+```bash
+cargo shallguard baseline prune
+cargo shallguard check
+```
+
+Set an area's `hard_enforcement` or `hard_verification` policy to `true` once
+that dimension has no historical gaps. Hardened areas cannot be baselined.

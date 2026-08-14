@@ -313,7 +313,7 @@ root = "target/shallguard"
         .expect("write fixture configuration");
     }
 
-    #[verifies("REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
+    #[verifies("REQ-CLI-004", "REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
     #[test]
     fn loads_single_package_repository_configuration() {
         let fixture = tempdir().expect("create fixture");
@@ -347,6 +347,7 @@ root = "target/shallguard"
         assert_eq!(document.prefixes["core"], "crates/core");
     }
 
+    #[verifies("REQ-PORT-003")]
     #[test]
     fn rejects_paths_that_escape_repository() {
         let fixture = tempdir().expect("create fixture");

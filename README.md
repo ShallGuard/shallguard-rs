@@ -12,6 +12,8 @@ The project is licensed under the [MIT License](LICENSE).
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+cargo shallguard-dev fmt --check
+cargo shallguard-dev check
 ```
 
 ## Install the Cargo subcommand
@@ -32,6 +34,11 @@ cargo shallguard fmt --check
 The executable discovers the invoked Cargo repository through `cargo metadata`
 and reads repository-owned policy from `shallguard.toml`. It supports ordinary
 single-package repositories and virtual Cargo workspaces.
+
+This repository defines `cargo shallguard-dev` as a local alias for its in-tree
+binary; CI uses the same command. Historical bootstrap gaps are committed in
+`.shallguard/baseline.toml`; newly introduced gaps fail immediately, and
+resolved entries must be pruned.
 
 Commands that collect executable coverage additionally require
 `cargo-llvm-cov`. Semantic review requires a supported provider CLI such as

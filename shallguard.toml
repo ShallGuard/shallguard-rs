@@ -1,0 +1,81 @@
+schema = 1
+minimum_requirements = 73
+baseline = ".shallguard/baseline.toml"
+verify_outlier_threshold = 6
+allow_missing_paths = []
+
+[[documents]]
+path = "docs/USER_STORIES_AND_REQUIREMENTS.md"
+source_root = "."
+
+[prefixes]
+cli = "cargo-shallguard"
+
+[areas.CLI]
+label = "Command Line"
+hard_enforcement = true
+hard_verification = true
+
+[areas.SPEC]
+label = "Specification"
+hard_enforcement = false
+hard_verification = false
+
+[areas.TRACE]
+label = "Traceability"
+hard_enforcement = false
+hard_verification = false
+
+[areas.BASE]
+label = "Baseline"
+hard_enforcement = false
+hard_verification = false
+
+[areas.IMP]
+label = "Change Impact"
+hard_enforcement = false
+hard_verification = false
+
+[areas.TEST]
+label = "Test Identity"
+hard_enforcement = false
+hard_verification = false
+
+[areas.COV]
+label = "Executable Coverage"
+hard_enforcement = false
+hard_verification = false
+
+[areas.CAP]
+label = "Review Capsule"
+hard_enforcement = false
+hard_verification = false
+
+[areas.REV]
+label = "Semantic Review"
+hard_enforcement = false
+hard_verification = false
+
+[areas.STATIC]
+label = "Static Checking"
+hard_enforcement = true
+hard_verification = true
+
+[areas.PORT]
+label = "Portability"
+hard_enforcement = true
+hard_verification = true
+
+[areas.SEC]
+label = "Safety and Trust"
+hard_enforcement = false
+hard_verification = false
+
+[artifacts]
+root = "target/shallguard"
+
+[review]
+target = "origin/master"
+provider = "codex"
+with_coverage = true
+timeout_seconds = 300

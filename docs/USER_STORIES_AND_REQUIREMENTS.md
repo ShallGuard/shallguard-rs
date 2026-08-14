@@ -150,23 +150,24 @@ The areas are:
 
 ## Bootstrap and Enrollment Policy
 
-This document is deliberately not yet included in `default_docs()`. Adding a
-new document to the hard gate before anchoring its implemented requirements
-would create new traceability debt, which the ratchet correctly rejects. The
-dogfooding migration is:
+This document is selected by the repository-owned `shallguard.toml`. The
+committed baseline records pre-enrollment gaps so the deterministic CI gate
+rejects new debt immediately while existing areas are hardened incrementally.
+The remaining dogfooding migration is:
 
-1. stabilize this specification and its area ownership;
-2. make repository/document discovery configurable;
-3. add `#[enforces]`/`enforces_here!` and `#[verifies]` anchors for implemented
+1. add `#[enforces]`/`enforces_here!` and `#[verifies]` anchors for implemented
    requirements;
-4. run the explicit check against this document with zero new gaps;
-5. enroll it in the standalone repository's default CI gate.
+2. prune every resolved baseline entry in the same change;
+3. harden an area's enforcement and verification policies once its historical
+   gaps reach zero;
+4. complete an impact, coverage, capsule, and optional local review cycle for a
+   ShallGuard change.
 
 ## CLI User Stories
 
 ### US-CLI-001: One Requirement-Assurance Command
 
-**Status:** Implemented locally; portability work planned
+**Status:** Implemented
 
 **As a** Rust developer or CI author  
 **I want** one discoverable Cargo subcommand for requirement assurance  
@@ -257,8 +258,8 @@ dogfooding migration is:
 - **REQ-SPEC-006** — `cargo shallguard fmt --check` and `cargo shallguard lint` SHALL
   perform non-mutating structural and canonical-format validation and SHALL
   return nonzero for malformed or non-canonical selected documents.
-  *Enforced:* `src/main.rs` (`parse_format_args`, `run_format`),
-  `src/requirement_format.rs` (`check`) · *Verified:* ✅ `src/main.rs`
+  *Enforced:* `cli:src/main.rs` (`parse_format_args`, `run_format`),
+  `src/requirement_format.rs` (`check`) · *Verified:* ✅ `cli:src/cli_tests.rs`
   (`parses_requirement_format_modes_and_documents`,
   `rejects_unknown_requirement_format_flags`)
 
@@ -403,7 +404,7 @@ dogfooding migration is:
 - **REQ-IMP-007** — Impact output SHALL be emitted as a versioned artifact with
   base/head identity, configuration, impact class, reason, confidence, source
   location, unclaimed changes, and policy findings even when policy causes a
-  nonzero exit. *Enforced:* `src/impact.rs` (`ImpactArtifact`), `src/main.rs`
+  nonzero exit. *Enforced:* `src/impact.rs` (`ImpactArtifact`), `cli:src/main.rs`
   (`run_impact`) · *Verified:* ✅ `src/impact.rs`
   (`json_artifact_uses_versioned_schema_and_configuration`)
 
@@ -493,7 +494,7 @@ dogfooding migration is:
 - **REQ-COV-006** — Coverage JSON SHALL bind source revision, exact test
   identities, test outcomes, LLVM evidence, enforcement sites, and requirement
   status, and SHALL remain available when one or more selected tests fail.
-  *Enforced:* `src/coverage.rs` (`CoverageArtifact`), `src/main.rs`
+  *Enforced:* `src/coverage.rs` (`CoverageArtifact`), `cli:src/main.rs`
   (`run_coverage`) · *Verified:* 👁 code review only
 - **REQ-COV-007** — A future patch-exercise result SHALL report whether cited
   tests execute changed executable regions inside impacted enforcement scopes
@@ -703,7 +704,7 @@ dogfooding migration is:
   that accept explicit repository/configuration inputs and return typed results
   without exiting the process or writing terminal output; the CLI SHALL remain
   a thin adapter. *Enforced:* not implemented — extract process and presentation
-  concerns from `src/main.rs` · *Verified:* ⏳ pending
+  concerns from `cli:src/main.rs` · *Verified:* ⏳ pending
 - **REQ-PORT-006** — Git, Cargo, LLVM, filesystem, and model-provider process
   execution SHALL be represented by replaceable adapters so core behavior can
   be fixture-tested and alternative implementations can be added without

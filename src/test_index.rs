@@ -14,8 +14,10 @@ use crate::DocSpec;
 use crate::scan::{VerificationAnchor, scan};
 
 /// Version of the exact verification-test index artifact.
+#[shallguard_macros::enforces("REQ-CLI-005")]
 pub const TEST_INDEX_SCHEMA: &str = "shallguard.requirement-test-index/v1";
 /// Version of the reusable Cargo harness-list input.
+#[shallguard_macros::enforces("REQ-CLI-005")]
 pub const HARNESS_CATALOG_SCHEMA: &str = "shallguard.test-harness-catalog/v1";
 
 /// Inputs controlling exact test identity resolution.

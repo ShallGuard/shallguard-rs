@@ -21,9 +21,12 @@ use crate::impact::{
 };
 use crate::scan::{EnforcementScopeKind, SourceRange, scan};
 
+#[shallguard_macros::enforces("REQ-CLI-005")]
 pub const CAPSULE_SCHEMA: &str = "shallguard.requirement-review-capsule/v2";
 const LEGACY_CAPSULE_SCHEMA: &str = "shallguard.requirement-review-capsule/v1";
+#[shallguard_macros::enforces("REQ-CLI-005")]
 pub const MANIFEST_SCHEMA: &str = "shallguard.requirement-review-manifest/v1";
+#[shallguard_macros::enforces("REQ-CLI-005")]
 pub const REVIEW_PROTOCOL: &str = "requirement-review/v2";
 const MAX_ENFORCEMENT_SOURCE_LINES_PER_SITE: usize = 240;
 const MAX_ENFORCEMENT_SOURCE_LINES_PER_CAPSULE: usize = 960;

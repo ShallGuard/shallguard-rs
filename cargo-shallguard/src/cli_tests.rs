@@ -44,6 +44,7 @@ fn rejects_unknown_requirement_format_flags() {
     assert!(error.to_string().contains("unknown argument"));
 }
 
+#[verifies("REQ-CLI-004")]
 #[test]
 fn parses_local_review_options() {
     let args = parse_review_args(&strings(&[

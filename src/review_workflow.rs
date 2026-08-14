@@ -300,6 +300,7 @@ fn report_coverage_requirements(
     }
 }
 
+#[shallguard_macros::enforces("REQ-CLI-003")]
 fn coverage_requirement_progress_lines(
     requirements: &BTreeSet<String>,
     descriptions: &BTreeMap<String, String>,
@@ -389,6 +390,7 @@ mod tests {
         );
     }
 
+    #[shallguard_macros::verifies("REQ-CLI-003")]
     #[test]
     fn coverage_requirement_progress_is_sorted_one_per_line_with_descriptions() {
         let requirements = BTreeSet::from(["REQ-AA-002".to_string(), "REQ-AA-001".to_string()]);
