@@ -166,7 +166,7 @@ Areas with no remaining gaps can be hardened (`hard_enforcement`,
 | `cargo shallguard fmt [--check]` | Format (or verify formatting of) requirement blocks. |
 | `cargo shallguard lint` | Lint requirement documents without writing. |
 | `cargo shallguard baseline <check\|init\|prune>` | Manage the ratcheted gap baseline. |
-| `cargo shallguard impact --base <rev>` | Map a Git diff to impacted requirements and their tests (JSON/Markdown). |
+| `cargo shallguard impact --base <rev>\|--target <branch>` | Map a Git diff to impacted requirements and their tests (JSON/Markdown). |
 | `cargo shallguard test-index` | Enumerate the exact Cargo tests behind verification anchors. |
 | `cargo shallguard coverage` | Collect LLVM execution evidence for verification tests (needs `cargo-llvm-cov`). |
 | `cargo shallguard bundle` | Build a bounded, auditable source capsule for review. |

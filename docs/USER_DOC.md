@@ -15,8 +15,9 @@ cd shallguard
 cargo install --path cargo-shallguard
 ```
 
-Until a remote repository and registry release exist, use the local checkout
-directly. Re-run the installation after changing the executable.
+Until a registry release exists, install from a local checkout as above or pin
+the GitHub repository at an immutable commit as shown in the top-level
+[README](../README.md). Re-run the installation after changing the executable.
 
 ## Repository setup and usage
 
