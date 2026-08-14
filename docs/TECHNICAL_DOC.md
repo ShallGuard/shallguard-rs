@@ -25,16 +25,19 @@ The detailed architecture preflight and dependency contract live in
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+cargo +1.89.0 check --workspace --all-targets --locked
 cargo shallguard-dev fmt --check
 cargo shallguard-dev check
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
-cargo package --allow-dirty -p shallguard-macros
+cargo package --locked -p shallguard-macros
+cargo package --locked --list -p shallguard
+cargo package --locked --list -p cargo-shallguard
 ```
 
 Package verification for `shallguard` and `cargo-shallguard` additionally
 requires their version-matched dependencies to exist in the target registry;
 release them in dependency order: macros, library, then CLI.
-
+The complete manual procedure is documented in [RELEASING.md](RELEASING.md).
 An installed-binary smoke test must run `cargo shallguard` from a separate
 fixture workspace so compile-time source paths cannot accidentally become
 repository discovery inputs.
@@ -47,6 +50,5 @@ results to revisions, configuration, schema versions, and content digests.
 
 ## Release status
 
-The packages are currently `publish = false` and licensed under MIT. Their
-public names and GitHub metadata are final; MSRV and registry automation remain
-to be resolved before crates.io publication.
+The packages are licensed under MIT and explicitly allow publication only to
+crates.io. Rust 1.89 is the tested minimum supported Rust version.

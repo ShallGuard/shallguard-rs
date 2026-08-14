@@ -31,3 +31,18 @@ jobs:
       env:
         RUSTDOCFLAGS: -D warnings
       run: cargo doc --workspace --no-deps --locked
+    - name: Package readiness
+      run: |
+        cargo package --locked -p shallguard-macros
+        cargo package --locked --list -p shallguard > /dev/null
+        cargo package --locked --list -p cargo-shallguard > /dev/null
+
+  msrv:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust 1.89.0
+      run: rustup toolchain install 1.89.0 --profile minimal
+    - name: Check minimum supported Rust version
+      run: cargo +1.89.0 check --workspace --all-targets --locked

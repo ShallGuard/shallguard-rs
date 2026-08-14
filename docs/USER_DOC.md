@@ -7,7 +7,15 @@ sites and verification tests. It can check traceability, format requirement
 blocks, analyze Git change impact, enumerate exact Cargo tests, collect LLVM
 execution evidence, build review capsules, and run optional semantic review.
 
-## Local installation
+## Installation
+
+Install the published Cargo subcommand:
+
+```bash
+cargo install cargo-shallguard --version 0.1.0 --locked
+```
+
+To install from a local checkout instead:
 
 ```bash
 git clone <repository-url> shallguard
@@ -15,9 +23,8 @@ cd shallguard
 cargo install --path cargo-shallguard
 ```
 
-Until a registry release exists, install from a local checkout as above or pin
-the GitHub repository at an immutable commit as shown in the top-level
-[README](../README.md). Re-run the installation after changing the executable.
+The top-level [README](../README.md) also shows how to pin an immutable Git
+revision. Re-run a source installation after changing the executable.
 
 ## Repository setup and usage
 

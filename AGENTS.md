@@ -11,6 +11,7 @@ cargo build --workspace
 cargo test --workspace
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
+cargo +1.89.0 check --workspace --all-targets --locked
 cargo shallguard-dev fmt --check
 cargo shallguard-dev check
 cargo install --path cargo-shallguard

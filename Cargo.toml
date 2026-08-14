@@ -3,10 +3,16 @@ name = "shallguard"
 version = "0.1.0"
 authors = ["Tomas Siegl <tomas.siegl@gmail.com>"]
 edition = "2024"
-publish = false
+rust-version = "1.89"
+publish = ["crates-io"]
 description = "ShallGuard requirement traceability, executable coverage, and review tooling"
 license = "MIT"
 repository = "https://github.com/sigi64/shallguard"
+documentation = "https://docs.rs/shallguard"
+readme = "README.md"
+keywords = ["requirements", "traceability", "verification", "testing", "cargo"]
+categories = ["development-tools", "development-tools::testing"]
+include = ["src/**", "tests/**", "docs/**", "CHANGELOG.md", "LICENSE", "README.md"]
 
 [workspace]
 members = ["cargo-shallguard", "shallguard-macros"]

@@ -56,7 +56,13 @@ change-impact analysis, and local LLM-assisted semantic review.
 
 ## Installation
 
-From this repository:
+Install the published Cargo subcommand:
+
+```bash
+cargo install cargo-shallguard --version 0.1.0 --locked
+```
+
+Or install from a local checkout:
 
 ```bash
 cargo install --path cargo-shallguard
@@ -82,7 +88,7 @@ checking does not require a model provider.
 
 ```toml
 [dependencies]
-shallguard = { git = "https://github.com/sigi64/shallguard.git", rev = "<published-sha>" }
+shallguard = "0.1.0"
 ```
 
 **2. Create `shallguard.toml`** at the repository root — copy and adapt the
@@ -225,7 +231,7 @@ GitHub Actions example:
 ```yaml
 - name: Requirement assurance
   run: |
-    cargo install --path cargo-shallguard --locked   # or --git ... --rev ...
+    cargo install cargo-shallguard --version 0.1.0 --locked
     cargo shallguard fmt --check
     cargo shallguard check
 ```
@@ -273,6 +279,7 @@ return nonzero, but a human decision merges the MR.
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+cargo +1.89.0 check --workspace --all-targets --locked
 cargo shallguard-dev fmt --check
 cargo shallguard-dev check
 ```
@@ -284,6 +291,7 @@ introduced traceability gaps fail immediately.
 
 See the [user documentation](docs/USER_DOC.md),
 [technical documentation](docs/TECHNICAL_DOC.md),
+[release documentation](docs/RELEASING.md),
 [configuration reference](docs/CONFIGURATION.md),
 [glossary](docs/GLOSSARY.md), and the
 [requirements specification](docs/USER_STORIES_AND_REQUIREMENTS.md).

@@ -3,10 +3,16 @@ name = "shallguard-macros"
 version = "0.1.0"
 authors = ["Tomas Siegl <tomas.siegl@gmail.com>"]
 edition = "2024"
-publish = false
+rust-version = "1.89"
+publish = ["crates-io"]
 description = "Compile-time requirement traceability anchors for ShallGuard"
 license = "MIT"
 repository = "https://github.com/sigi64/shallguard"
+documentation = "https://docs.rs/shallguard-macros"
+readme = "README.md"
+keywords = ["shallguard", "requirements", "traceability", "proc-macro", "verification"]
+categories = ["development-tools"]
+include = ["src/**", "LICENSE", "README.md"]
 
 [lib]
 proc-macro = true
