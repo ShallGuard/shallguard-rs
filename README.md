@@ -166,8 +166,12 @@ Areas with no remaining gaps can be hardened (`hard_enforcement`,
 
 ## Command reference
 
+From a ShallGuard source checkout, `cargo run -- <arguments>` runs the
+`cargo-shallguard` binary by default; for example, `cargo run -- --version`.
+
 | Command | Purpose |
 |---|---|
+| `cargo shallguard version` / `--version` | Print the installed CLI version without requiring a configured repository. |
 | `cargo shallguard check` | Cross-check requirements against code and test anchors (the CI gate). |
 | `cargo shallguard fmt [--check]` | Format (or verify formatting of) requirement blocks. |
 | `cargo shallguard lint` | Lint requirement documents without writing. |
@@ -273,6 +277,52 @@ contracts does this diff touch, and which tests prove they still hold?*
 Model verdicts from `review` are advisory only; provider or schema failures
 return nonzero, but a human decision merges the MR.
 
+## AI agent skill
+
+Coding agents are heavy users of ShallGuard-enabled repositories — and also
+the ones most tempted to satisfy the checker the wrong way (fabricated
+evidence citations, anchors deleted to silence failures, requirements
+reworded to match the code). [`docs/skill/SKILL.md`](docs/skill/SKILL.md) is
+a standalone, self-contained operating manual for agents: the
+requirements-first workflow, anchor placement rules, evidence-honesty rules,
+the commands that form the gate, and a failure-to-correct-response table.
+
+It is a single file with no external references, so installing it is one
+copy.
+
+**Claude Code** discovers skills automatically and loads this one when the
+agent works in a repository with a `shallguard.toml`:
+
+```bash
+# For all your projects (personal skill):
+mkdir -p ~/.claude/skills/shallguard
+cp docs/skill/SKILL.md ~/.claude/skills/shallguard/
+
+# Or committed into one consuming repository (project skill):
+mkdir -p .claude/skills/shallguard
+cp <shallguard-checkout>/docs/skill/SKILL.md .claude/skills/shallguard/
+```
+
+**Codex** has no skill auto-discovery; wire the file in through `AGENTS.md`.
+Copy it somewhere stable (e.g. `~/.codex/shallguard-skill.md`, or commit it
+into the consuming repository as `docs/SHALLGUARD_SKILL.md`) and add a
+pointer to your global `~/.codex/AGENTS.md` or the repository's `AGENTS.md`:
+
+```markdown
+## ShallGuard repositories
+When the repository contains `shallguard.toml`, read and follow
+docs/SHALLGUARD_SKILL.md before changing behavior, editing a requirement
+document, anchoring tests, or responding to `cargo shallguard` failures.
+```
+
+The pointer form keeps `AGENTS.md` small; the agent reads the full rules
+only when they apply. The same pointer pattern works for any other agent
+that honors `AGENTS.md`-style instruction files.
+
+The skill is versioned with this repository — when the consuming repo bumps
+its pinned `shallguard` release, refresh the installed copy from the
+matching tag.
+
 ## Developing ShallGuard itself
 
 ```bash
@@ -293,5 +343,6 @@ See the [user documentation](docs/USER_DOC.md),
 [technical documentation](docs/TECHNICAL_DOC.md),
 [release documentation](docs/RELEASING.md),
 [configuration reference](docs/CONFIGURATION.md),
-[glossary](docs/GLOSSARY.md), and the
+[glossary](docs/GLOSSARY.md), the
+[AI agent skill](docs/skill/SKILL.md), and the
 [requirements specification](docs/USER_STORIES_AND_REQUIREMENTS.md).
