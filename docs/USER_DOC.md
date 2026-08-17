@@ -12,7 +12,7 @@ execution evidence, build review capsules, and run optional semantic review.
 Install the published Cargo subcommand:
 
 ```bash
-cargo install cargo-shallguard --version 0.1.0 --locked
+cargo install cargo-shallguard --version 0.1.1 --locked
 ```
 
 To install from a local checkout instead:
