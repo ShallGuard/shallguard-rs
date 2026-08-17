@@ -16,6 +16,7 @@ include = ["src/**", "tests/**", "docs/**", "CHANGELOG.md", "LICENSE", "README.m
 
 [workspace]
 members = ["cargo-shallguard", "shallguard-macros"]
+default-members = ["cargo-shallguard"]
 resolver = "3"
 
 [lib]
