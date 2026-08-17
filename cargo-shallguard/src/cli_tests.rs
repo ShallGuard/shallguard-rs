@@ -99,6 +99,27 @@ fn leaves_repository_review_defaults_for_configuration() {
     assert_eq!(args.timeout, None);
 }
 
+#[shallguard::verifies("REQ-REV-005")]
+#[test]
+fn review_summary_separates_verdicts_from_unavailable_responses() {
+    let review = shallguard::review::ReviewRun {
+        output_dir: PathBuf::from("review-output"),
+        reviews: 5,
+        verdicts: shallguard::review::ReviewVerdictCounts {
+            satisfied: 1,
+            violated: 1,
+            insufficient_evidence: 2,
+            not_impacted: 1,
+        },
+        failures: 0,
+    };
+
+    assert_eq!(
+        review_outcome_summary(&review, false),
+        "1 satisfied, 1 violated, 2 insufficient evidence, 1 not impacted; 0 unavailable or invalid"
+    );
+}
+
 #[test]
 fn resume_replays_the_frozen_default_bundle() {
     let args = parse_review_args(&strings(&["--resume"])).expect("resume review arguments parse");

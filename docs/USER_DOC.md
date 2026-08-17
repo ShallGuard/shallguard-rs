@@ -23,6 +23,12 @@ cd shallguard
 cargo install --path cargo-shallguard
 ```
 
+Confirm the installed release from any directory:
+
+```bash
+cargo shallguard --version
+```
+
 The top-level [README](../README.md) also shows how to pin an immutable Git
 revision. Re-run a source installation after changing the executable.
 

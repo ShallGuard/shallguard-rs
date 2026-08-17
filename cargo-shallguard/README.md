@@ -10,7 +10,13 @@ Install the command from crates.io:
 cargo install cargo-shallguard --locked
 ```
 
-Then run it from a repository containing `shallguard.toml`:
+Confirm the installed version from any directory:
+
+```bash
+cargo shallguard --version
+```
+
+Then run checks from a repository containing `shallguard.toml`:
 
 ```bash
 cargo shallguard fmt --check
