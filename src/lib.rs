@@ -1,27 +1,107 @@
 //! Requirement traceability, executable coverage, and review tooling for Rust.
 //!
-//! Cross-checks numbered system requirements in selected
-//! `USER_STORIES_AND_REQUIREMENTS.md` documents against the code and test
-//! anchors in the source tree (`#[shallguard::enforces]` /
-//! `#[shallguard::verifies]` attributes and `shallguard::enforces_here!`
-//! branch anchors).
+//! ShallGuard keeps numbered system requirements written in Markdown
+//! (`REQ-<AREA>-<NNN>` entries with RFC 2119 **SHALL** statements) connected
+//! to the Rust code that enforces them and the tests that verify them — and
+//! fails CI the moment that connection breaks.
 //!
-//! Hard errors (always fail):
-//! - a document fails to parse or yields fewer configured requirements;
-//! - duplicate requirement IDs across the documents;
-//! - a `src/` or `tests/` path cited anywhere in a document that does not
-//!   exist (except repository-configured historical removals);
-//! - a requirement ID referenced in code that no document defines.
+//! This crate is what consuming repositories depend on. It provides:
 //!
-//! Ratcheted checks (warning only for exact committed baseline entries,
-//! otherwise a hard error; already-hard areas cannot be baselined):
-//! - a requirement whose *Enforced:* files carry no anchor of its ID;
-//! - a requirement with automated-test evidence (`✅`) that no test
-//!   anchor claims to verify;
-//! - automated evidence that does not resolve to its cited test.
+//! - the **anchor macros** ([`enforces`], [`enforces_here!`](enforces_here),
+//!   [`verifies`]) that mark enforcement sites and verification tests, and
+//! - the **deterministic analysis library** behind the
+//!   [`cargo-shallguard`](https://crates.io/crates/cargo-shallguard) CLI,
+//!   for embedding requirement assurance into your own tooling.
 //!
-//! The binary prints a per-area coverage report; the repo-wide check also
-//! runs as this crate's integration test, which is the CI gate.
+//! # Anchoring requirements
+//!
+//! A requirement lives in a configured Markdown document:
+//!
+//! ```markdown
+//! - **REQ-HRS-002** — The scheduler SHALL never emit a zero worker floor.
+//!   *Enforced:* `src/floor.rs` (`floor`) · *Verified:* ✅ `src/floor.rs`
+//!   (`floor_never_returns_zero`)
+//! ```
+//!
+//! Code and tests anchor it. All anchor forms expand to the item unchanged
+//! (or to nothing) — zero runtime cost — while malformed requirement IDs are
+//! compile errors:
+//!
+//! ```no_run
+//! /// Item-level enforcement: this function exists because the contract
+//! /// exists.
+//! #[shallguard::enforces("REQ-HRS-002")]
+//! fn floor(configured: usize) -> usize {
+//!     configured.max(1)
+//! }
+//!
+//! /// Branch-level enforcement: anchors the exact statement, arm, or block.
+//! fn resolve(fixed: Option<usize>) -> usize {
+//!     match fixed {
+//!         Some(n) => {
+//!             shallguard::enforces_here!("REQ-HRS-002");
+//!             n.max(1)
+//!         }
+//!         None => 4,
+//!     }
+//! }
+//!
+//! /// Verification evidence: valid only on a real, non-`#[ignore]`d test.
+//! #[shallguard::verifies("REQ-HRS-002")]
+//! #[test]
+//! fn floor_never_returns_zero() {
+//!     assert_eq!(floor(0), 1);
+//! }
+//! # fn main() { assert_eq!(resolve(Some(0)), 1); }
+//! ```
+//!
+//! `cargo shallguard check` then cross-checks documents against anchors.
+//! Hard errors (always fail): an unparseable document, duplicate requirement
+//! IDs, a cited `src/` or `tests/` path that does not exist, or an ID
+//! referenced in code that no document defines. Ratcheted checks (tolerated
+//! only for exact committed baseline entries): a requirement whose
+//! *Enforced:* files carry no anchor of its ID, and automated `✅` evidence
+//! that does not resolve to an anchored test.
+//!
+//! # Library API
+//!
+//! The CLI is a thin presentation layer over these modules:
+//!
+//! - [`config`] — repository-owned `shallguard.toml` policy.
+//! - [`docs`] — parsing of the requirement documents.
+//! - [`scan`] — syntactic anchor scanning of Rust sources.
+//! - [`check`] — the cross-checks and the per-area report (the CI gate).
+//! - [`requirement_format`] — deterministic document formatting and linting.
+//! - [`baseline`] — the ratcheted historical-gap baseline.
+//! - [`impact`] — Git base/head requirement impact analysis.
+//! - [`test_index`] — exact Cargo test identities behind verification anchors.
+//! - [`coverage`] — LLVM coverage projected onto enforcement scopes.
+//! - [`bundle`], [`review`], [`review_workflow`] — bounded source capsules
+//!   and optional LLM-assisted semantic review (advisory only).
+//!
+//! Library behavior is deterministic and needs no network access or model;
+//! long-running operations report progress through an optional
+//! [`ProgressCallback`] instead of printing.
+//!
+//! ```no_run
+//! use shallguard::config::RepositoryConfig;
+//!
+//! fn main() -> anyhow::Result<()> {
+//!     let root = shallguard::workspace_root()?;
+//!     let config = RepositoryConfig::load(&root)?;
+//!     let report = shallguard::check::run(&root, &config.documents(), &config)?;
+//!     if !report.print(10) {
+//!         std::process::exit(1);
+//!     }
+//!     Ok(())
+//! }
+//! ```
+//!
+//! # More documentation
+//!
+//! The [repository](https://github.com/sigi64/shallguard) hosts the complete
+//! guide: configuration reference, command reference, CI recipes, and the
+//! design documents.
 
 extern crate self as shallguard;
 

@@ -14,6 +14,9 @@ keywords = ["shallguard", "requirements", "traceability", "cargo", "ci"]
 categories = ["command-line-utilities", "development-tools::cargo-plugins"]
 include = ["src/**", "LICENSE", "README.md"]
 
+[package.metadata.docs.rs]
+rustdoc-args = ["--generate-link-to-definition"]
+
 [[bin]]
 name = "cargo-shallguard"
 path = "src/main.rs"

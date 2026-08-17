@@ -14,6 +14,9 @@ keywords = ["requirements", "traceability", "verification", "testing", "cargo"]
 categories = ["development-tools", "development-tools::testing"]
 include = ["src/**", "tests/**", "docs/**", "CHANGELOG.md", "LICENSE", "README.md"]
 
+[package.metadata.docs.rs]
+rustdoc-args = ["--generate-link-to-definition"]
+
 [workspace]
 members = ["cargo-shallguard", "shallguard-macros"]
 default-members = ["cargo-shallguard"]

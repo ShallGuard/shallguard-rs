@@ -1,5 +1,16 @@
-//! Runs the requirement traceability check and prints the report.
-//! Exits nonzero when any hard check fails.
+//! The Cargo subcommand for [ShallGuard](https://github.com/sigi64/shallguard)
+//! requirement assurance: it cross-checks numbered Markdown requirements
+//! against the `#[shallguard::enforces]` / `#[shallguard::verifies]` anchors
+//! in a repository's Rust sources, prints a per-area report, and exits
+//! nonzero when any hard check fails — the deterministic CI gate.
+//!
+//! ```bash
+//! cargo install cargo-shallguard --locked
+//! ```
+//!
+//! The binary is a thin presentation layer; the analysis lives in the
+//! [`shallguard`](https://docs.rs/shallguard) library crate, which also
+//! provides the anchor macros consuming repositories depend on.
 //!
 //! Usage:
 //!

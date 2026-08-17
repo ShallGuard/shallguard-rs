@@ -1,5 +1,12 @@
 # ShallGuard
 
+[![CI](https://github.com/sigi64/shallguard/actions/workflows/rust.yml/badge.svg)](https://github.com/sigi64/shallguard/actions/workflows/rust.yml)
+[![crates.io](https://img.shields.io/crates/v/shallguard.svg?label=shallguard)](https://crates.io/crates/shallguard)
+[![crates.io](https://img.shields.io/crates/v/cargo-shallguard.svg?label=cargo-shallguard)](https://crates.io/crates/cargo-shallguard)
+[![docs.rs](https://img.shields.io/docsrs/shallguard)](https://docs.rs/shallguard)
+[![MSRV](https://img.shields.io/crates/msrv/shallguard.svg)](https://github.com/sigi64/shallguard/blob/master/Cargo.toml)
+[![license](https://img.shields.io/crates/l/shallguard.svg)](LICENSE)
+
 ShallGuard is requirement-assurance tooling for Cargo projects. It keeps
 numbered system requirements written in Markdown connected to the Rust code
 that enforces them and the tests that verify them — and fails CI the moment
