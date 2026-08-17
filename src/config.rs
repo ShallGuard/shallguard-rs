@@ -222,9 +222,9 @@ impl RepositoryConfig {
             }
         }
         if let Some(provider) = &self.review.provider
-            && !matches!(provider.as_str(), "codex" | "claude")
+            && !matches!(provider.as_str(), "codex" | "claude" | "copilot")
         {
-            bail!("review.provider must be codex or claude");
+            bail!("review.provider must be codex, claude, or copilot");
         }
         if let Some(local) = &self.review.local_provider
             && !matches!(local.as_str(), "ollama" | "lmstudio")

@@ -76,7 +76,54 @@ fn parses_show_filters_and_rejects_run_options() {
     .expect("show arguments parse");
     assert_eq!(args.output, Some(PathBuf::from("stored-review")));
     assert!(args.requirements.contains("REQ-ZZ-001"));
+    assert_eq!(args.format, ReviewShowFormat::Text);
     assert!(parse_review_show_args(&["--resume".to_string()]).is_err());
+}
+
+#[shallguard::verifies("REQ-CLI-012")]
+#[test]
+fn parses_and_renders_markdown_without_terminal_sequences() {
+    let args = parse_review_show_args(&[
+        "--format".to_string(),
+        "markdown".to_string(),
+        "REQ-ZZ-001".to_string(),
+    ])
+    .expect("Markdown show arguments parse");
+    assert_eq!(args.format, ReviewShowFormat::Markdown);
+    assert!(args.requirements.contains("REQ-ZZ-001"));
+    assert!(parse_review_show_args(&["--format".to_string(), "html".to_string()]).is_err());
+
+    let markdown = render_stored_review_markdown(&completed_review(), false);
+    assert!(markdown.starts_with("<!-- shallguard-review -->\n# ShallGuard semantic review\n\n"));
+    assert!(markdown.contains("| Progress | 1/1 processed |"));
+    assert!(markdown.contains("| `REQ-ZZ-001` | violated | 0.95 |"));
+    assert!(!markdown.contains('\u{1b}'));
+}
+
+#[shallguard::verifies("REQ-CLI-012")]
+#[test]
+fn markdown_details_escape_provider_controlled_content() {
+    let mut review = completed_review();
+    let details = review.requirements[0]
+        .details
+        .as_mut()
+        .expect("review fixture contains details");
+    details.clause_reviews[0].reason =
+        "<script>alert('x')</script> @octocat *untrusted*".to_string();
+    details.findings[0].title = "[link](https://example.invalid) @team".to_string();
+    details.missing_evidence = vec!["# heading\n@reviewers".to_string()];
+
+    let markdown = render_stored_review_markdown(&review, true);
+
+    assert!(markdown.contains("## Requirement `REQ-ZZ-001`\n\n"));
+    assert!(markdown.contains("### Clauses\n\n#### `REQ-ZZ-001/C1` — violated\n\n"));
+    assert!(markdown.contains("&lt;script&gt;alert\\('x'\\)&lt;/script&gt; &#64;octocat"));
+    assert!(markdown.contains("\\[link\\]\\(https://example.invalid\\) &#64;team"));
+    assert!(markdown.contains("- \\# heading &#64;reviewers"));
+    assert!(!markdown.contains("<script>"));
+    assert!(!markdown.contains("@octocat"));
+    assert!(!markdown.contains("@team"));
+    assert!(!markdown.contains('\u{1b}'));
 }
 
 #[shallguard::verifies("REQ-CLI-008", "REQ-CLI-011")]

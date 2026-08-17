@@ -2,7 +2,7 @@
 //!
 //! The deterministic checker and LLVM coverage collector remain independent of
 //! this module. A review consumes an already generated bundle, gives one capsule
-//! at a time to a locally installed Codex or Claude CLI, and validates the
+//! at a time to a locally installed Codex, Claude, or Copilot CLI, and validates the
 //! structured response before retaining it as advisory evidence.
 
 use std::collections::BTreeSet;
@@ -39,7 +39,7 @@ use progress::{
 };
 use provider::{ProviderInvocation, invoke_provider, parse_provider_response, provider_version};
 #[cfg(test)]
-use provider::{command_spec, provider_environment_allowed};
+use provider::{command_spec, copilot_input, provider_environment_allowed};
 use schema::{response_schema, review_prompt};
 use state::{Attempt, CachedUnit, Reuse, ReviewStore};
 use validation::{CapsuleMetadata, ReviewValidationError, capsule_metadata, validate_response};
@@ -60,12 +60,14 @@ pub const REVIEW_RUN_SCHEMA: &str = "shallguard.requirement-local-review/v1";
 /// Locally installed model CLI used to review capsules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[shallguard::enforces("REQ-REV-001")]
+#[shallguard::enforces("REQ-REV-001", "REQ-REV-009")]
 pub enum ReviewProvider {
     /// OpenAI Codex CLI in ephemeral, read-only, non-interactive mode.
     Codex,
     /// Anthropic Claude CLI in non-interactive mode with tools disabled.
     Claude,
+    /// GitHub Copilot CLI in non-interactive mode with tools disabled.
+    Copilot,
 }
 
 impl ReviewProvider {
@@ -73,6 +75,7 @@ impl ReviewProvider {
         match self {
             Self::Codex => "codex",
             Self::Claude => "claude",
+            Self::Copilot => "copilot",
         }
     }
 
@@ -80,6 +83,7 @@ impl ReviewProvider {
         match self {
             Self::Codex => "codex",
             Self::Claude => "claude",
+            Self::Copilot => "copilot",
         }
     }
 }
@@ -91,7 +95,8 @@ impl FromStr for ReviewProvider {
         match value {
             "codex" => Ok(Self::Codex),
             "claude" => Ok(Self::Claude),
-            _ => bail!("unknown provider {value:?}; expected codex or claude"),
+            "copilot" => Ok(Self::Copilot),
+            _ => bail!("unknown provider {value:?}; expected codex, claude, or copilot"),
         }
     }
 }

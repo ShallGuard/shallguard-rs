@@ -2,6 +2,7 @@
 
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
+use std::io::Write as _;
 use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
@@ -44,8 +45,13 @@ pub(super) fn invoke_provider(options: &ProviderInvocation<'_>) -> Result<Invoca
     let stderr_path = options.review_dir.join("provider.stderr");
     let stdout = File::create(&stdout_path).context("creating provider stdout log")?;
     let stderr = File::create(&stderr_path).context("creating provider stderr log")?;
-    let stdin =
-        File::open(options.review_dir.join("prompt.txt")).context("opening provider prompt")?;
+    let prompt_path = options.review_dir.join("prompt.txt");
+    let copilot_stdin = if options.provider == ReviewProvider::Copilot {
+        let prompt = std::fs::read_to_string(&prompt_path).context("reading provider prompt")?;
+        Some(copilot_input(&prompt, options.schema))
+    } else {
+        None
+    };
     let spec = command_spec(
         options.provider,
         options.model,
@@ -54,14 +60,31 @@ pub(super) fn invoke_provider(options: &ProviderInvocation<'_>) -> Result<Invoca
     );
     let mut command = Command::new(spec.executable);
     sanitize_provider_environment(&mut command);
-    let mut child = command
+    command
         .args(spec.arguments)
         .current_dir(options.review_dir)
-        .stdin(Stdio::from(stdin))
         .stdout(Stdio::from(stdout))
-        .stderr(Stdio::from(stderr))
+        .stderr(Stdio::from(stderr));
+    if options.provider == ReviewProvider::Copilot {
+        command.stdin(Stdio::piped());
+    } else {
+        let stdin = File::open(&prompt_path).context("opening provider prompt")?;
+        command.stdin(Stdio::from(stdin));
+    }
+    let mut child = command
         .spawn()
         .with_context(|| format!("starting {} CLI", options.provider.as_str()))?;
+    if let Some(input) = copilot_stdin {
+        let mut stdin = child
+            .stdin
+            .take()
+            .context("opening Copilot standard input")?;
+        if let Err(error) = stdin.write_all(input.as_bytes()) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error).context("writing Copilot prompt and response schema");
+        }
+    }
     let started = Instant::now();
     let mut provider_progress =
         ProviderProgress::new(options.progress, options.provider.as_str(), options.unit);
@@ -86,7 +109,9 @@ pub(super) fn invoke_provider(options: &ProviderInvocation<'_>) -> Result<Invoca
                 .ok()
                 .or_else(|| (!stdout.trim().is_empty()).then(|| stdout.clone()))
         }
-        ReviewProvider::Claude => (!stdout.trim().is_empty()).then(|| stdout.clone()),
+        ReviewProvider::Claude | ReviewProvider::Copilot => {
+            (!stdout.trim().is_empty()).then(|| stdout.clone())
+        }
     };
     Ok(Invocation {
         status,
@@ -98,7 +123,11 @@ pub(super) fn invoke_provider(options: &ProviderInvocation<'_>) -> Result<Invoca
     })
 }
 
-#[shallguard::enforces("REQ-REV-002", "REQ-SEC-003")]
+pub(super) fn copilot_input(prompt: &str, schema: &str) -> String {
+    format!("{prompt}\n\nExact response JSON Schema:\n{schema}")
+}
+
+#[shallguard::enforces("REQ-REV-002", "REQ-REV-009", "REQ-SEC-003")]
 fn sanitize_provider_environment(command: &mut Command) {
     command.env_clear();
     for (name, value) in std::env::vars_os() {
@@ -137,6 +166,7 @@ pub(super) fn provider_environment_allowed(name: &OsStr) -> bool {
         "CODEX_",
         "ANTHROPIC_",
         "CLAUDE_",
+        "COPILOT_",
         "OLLAMA_",
         "LMSTUDIO_",
         "LM_STUDIO_",
@@ -145,7 +175,7 @@ pub(super) fn provider_environment_allowed(name: &OsStr) -> bool {
     .any(|prefix| name.starts_with(prefix))
 }
 
-#[shallguard::enforces("REQ-REV-001", "REQ-REV-002", "REQ-SEC-003")]
+#[shallguard::enforces("REQ-REV-001", "REQ-REV-002", "REQ-REV-009", "REQ-SEC-003")]
 pub(super) fn command_spec(
     provider: ReviewProvider,
     model: Option<&str>,
@@ -206,6 +236,29 @@ pub(super) fn command_spec(
                 arguments.extend([OsString::from("--model"), OsString::from(model)]);
             }
         }
+        ReviewProvider::Copilot => {
+            arguments.extend(
+                [
+                    "--silent",
+                    "--no-ask-user",
+                    "--no-color",
+                    "--no-custom-instructions",
+                    "--no-remote",
+                    "--no-remote-export",
+                    "--disable-builtin-mcps",
+                    "--deny-tool=shell",
+                    "--deny-tool=write",
+                    "--deny-tool=read",
+                    "--deny-tool=url",
+                    "--deny-tool=memory",
+                ]
+                .into_iter()
+                .map(OsString::from),
+            );
+            if let Some(model) = model {
+                arguments.extend([OsString::from("--model"), OsString::from(model)]);
+            }
+        }
     }
     CommandSpec {
         executable: provider.executable(),
@@ -249,7 +302,7 @@ pub(super) fn parse_provider_response(
 ) -> Result<ReviewResult> {
     let value: Value = serde_json::from_str(text).context("parsing provider JSON")?;
     let structured = match provider {
-        ReviewProvider::Codex => value,
+        ReviewProvider::Codex | ReviewProvider::Copilot => value,
         ReviewProvider::Claude => {
             if let Some(value) = value.get("structured_output") {
                 value.clone()

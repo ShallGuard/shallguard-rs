@@ -40,7 +40,7 @@ fn valid_result() -> ReviewResult {
     }
 }
 
-#[shallguard::verifies("REQ-REV-001")]
+#[shallguard::verifies("REQ-REV-001", "REQ-REV-009")]
 #[test]
 fn parses_provider_names() {
     assert_eq!(
@@ -50,6 +50,10 @@ fn parses_provider_names() {
     assert_eq!(
         "claude".parse::<ReviewProvider>().expect("claude parses"),
         ReviewProvider::Claude
+    );
+    assert_eq!(
+        "copilot".parse::<ReviewProvider>().expect("copilot parses"),
+        ReviewProvider::Copilot
     );
     assert!("other".parse::<ReviewProvider>().is_err());
 }
@@ -98,7 +102,44 @@ fn claude_command_disables_tools_and_sessions() {
     assert!(args.iter().any(|argument| argument == "--safe-mode"));
 }
 
-#[shallguard::verifies("REQ-REV-002", "REQ-SEC-003")]
+#[shallguard::verifies("REQ-REV-009")]
+#[test]
+fn copilot_command_is_headless_and_toolless() {
+    let spec = command_spec(ReviewProvider::Copilot, Some("gpt-test"), None, "{}");
+    let args = spec
+        .arguments
+        .iter()
+        .map(|argument| argument.to_string_lossy())
+        .collect::<Vec<_>>();
+
+    assert_eq!(spec.executable, "copilot");
+    for expected in [
+        "--silent",
+        "--no-ask-user",
+        "--no-color",
+        "--no-custom-instructions",
+        "--no-remote",
+        "--no-remote-export",
+        "--disable-builtin-mcps",
+        "--deny-tool=shell",
+        "--deny-tool=write",
+        "--deny-tool=read",
+        "--deny-tool=url",
+        "--deny-tool=memory",
+    ] {
+        assert!(
+            args.iter().any(|argument| argument == expected),
+            "missing Copilot argument {expected}"
+        );
+    }
+    assert!(args.windows(2).any(|pair| pair == ["--model", "gpt-test"]));
+
+    let input = copilot_input("Frozen capsule prompt", "{\"type\":\"object\"}");
+    assert!(input.starts_with("Frozen capsule prompt\n\n"));
+    assert!(input.ends_with("Exact response JSON Schema:\n{\"type\":\"object\"}"));
+}
+
+#[shallguard::verifies("REQ-REV-002", "REQ-REV-009", "REQ-SEC-003")]
 #[test]
 fn provider_environment_excludes_unrelated_ci_secrets() {
     assert!(provider_environment_allowed(OsStr::new("PATH")));
@@ -106,6 +147,10 @@ fn provider_environment_excludes_unrelated_ci_secrets() {
     assert!(provider_environment_allowed(OsStr::new(
         "ANTHROPIC_API_KEY"
     )));
+    assert!(provider_environment_allowed(OsStr::new(
+        "COPILOT_GITHUB_TOKEN"
+    )));
+    assert!(!provider_environment_allowed(OsStr::new("GITHUB_TOKEN")));
     assert!(!provider_environment_allowed(OsStr::new("CI_JOB_TOKEN")));
     assert!(!provider_environment_allowed(OsStr::new(
         "PROD_REGISTRY_TOKEN"
@@ -215,6 +260,19 @@ fn extracts_claude_structured_output() {
     let parsed = parse_provider_response(ReviewProvider::Claude, &envelope.to_string())
         .expect("Claude envelope parses");
     assert_eq!(parsed.requirement_id, "REQ-ZZ-001");
+}
+
+#[shallguard::verifies("REQ-REV-009")]
+#[test]
+fn extracts_copilot_structured_output() {
+    let result = valid_result();
+    let parsed = parse_provider_response(ReviewProvider::Copilot, &result_to_json(&result))
+        .expect("Copilot response parses");
+    assert_eq!(parsed.requirement_id, "REQ-ZZ-001");
+}
+
+fn result_to_json(result: &ReviewResult) -> String {
+    serde_json::to_string(result).expect("BUG: review result fixture serializes")
 }
 
 #[test]

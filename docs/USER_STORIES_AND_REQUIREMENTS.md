@@ -307,6 +307,53 @@ rejects any traceability regression.
   `treats_positional_requirement_ids_as_filters`,
   `renders_summary_and_requested_evidence_details`)
 
+### US-CLI-004: Publish an Advisory Pull Request Review
+
+**Status:** Implemented
+
+**As a** pull request author or reviewer  
+**I want** a bounded Copilot review summarized as Markdown on the pull request  
+**So that** semantic feedback is easy to consume without replacing deterministic merge checks
+
+**System Requirements:**
+
+- **REQ-CLI-012** — `cargo shallguard review show --format markdown` SHALL
+  render the same validated stored-review selection as the terminal format as
+  deterministic, ANSI-free GitHub-flavored Markdown; it SHALL include a stable
+  report marker, run metadata, progress, semantic-verdict counts, and selected
+  requirement outcomes, SHALL include evidence details when requirement filters
+  are supplied, and SHALL escape provider-controlled content so it cannot create
+  active HTML or user mentions. *Enforced:*
+  `cli:src/cli_review_show.rs` (`ReviewShowFormat`,
+  `render_stored_review_markdown`) · *Verified:* ✅
+  `cli:src/cli_review_show_tests.rs`
+  (`parses_and_renders_markdown_without_terminal_sequences`,
+  `markdown_details_escape_provider_controlled_content`)
+- **REQ-REV-009** — Semantic review SHALL support a `copilot` provider adapter
+  that submits the frozen prompt and response schema through standard input,
+  runs the Copilot CLI non-interactively with tools, remote delegation, custom
+  instructions, and color disabled, accepts an optional model, exposes only the
+  provider environment allowlist including `COPILOT_` variables, and validates
+  the response through the same strict schema and citation rules as other
+  providers. *Enforced:* `src/review.rs` (`ReviewProvider`),
+  `src/review_provider.rs` (`invoke_provider`, `command_spec`,
+  `provider_environment_allowed`, `parse_provider_response`) · *Verified:* ✅
+  `src/review_tests.rs` (`parses_provider_names`,
+  `copilot_command_is_headless_and_toolless`,
+  `provider_environment_excludes_unrelated_ci_secrets`,
+  `extracts_copilot_structured_output`)
+- **REQ-PORT-009** — The repository SHALL provide a separate GitHub Actions
+  pull-request workflow that prepares deterministic impact and bundle artifacts
+  without secrets, invokes Copilot only for same-repository pull requests from
+  trusted base-revision code, uploads the Markdown report, and upserts an
+  advisory pull-request comment; provider absence, semantic verdicts, or review
+  failure SHALL NOT fail the workflow, while the existing deterministic
+  `shallguard-dev fmt --check` and `shallguard-dev check` validation steps SHALL
+  remain in the required Rust workflow. *Enforced:*
+  `.github/workflows/shallguard-review.yml`, `.github/workflows/rust.yml` ·
+  *Verified:* ✅ `cli:tests/github_advisory_workflow.rs`
+  (`advisory_review_is_isolated_from_the_required_deterministic_gate`)
+
 ## Specification User Stories
 
 ### US-SPEC-001: Maintainable Requirement Documents
