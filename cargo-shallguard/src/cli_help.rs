@@ -19,8 +19,9 @@ Review workflow:
   2. Run cargo shallguard review --target <branch> for the end-to-end workflow:
      impact analysis, configured executable coverage, bounded review capsules,
      and semantic verdicts from the configured provider.
-  3. Inspect the versioned artifacts and resolve deterministic failures. Semantic
-     verdicts are advisory and remain a human review input.
+  3. Run cargo shallguard review show to inspect the preserved run, or add
+     --requirement <REQ-ID> for clause reviews, findings, and evidence gaps.
+     Resolve deterministic failures; semantic verdicts remain human review input.
 
 Usage:
   cargo shallguard [check] [<doc.md> ...]
@@ -35,6 +36,7 @@ Usage:
   cargo shallguard test-index <--enumerate|--catalog <path>> [options]
   cargo shallguard coverage [--package <crate>] [--requirement <REQ-ID>] [options]
   cargo shallguard review [--base <revision>|--target <branch>] [options]
+  cargo shallguard review show [--output <directory>] [--requirement <REQ-ID>]...
 
 Review options:
   --provider <name>          Local model CLI [default: shallguard.toml, then codex]
@@ -52,6 +54,11 @@ Review options:
   --local-provider <name>    Codex on-device inference: ollama or lmstudio
   --requirement <REQ-ID>     Review only this requirement; repeatable
   --timeout-seconds <n>      Per-requirement timeout [default: shallguard.toml, then 300]
+
+Review show options:
+  --output <directory>       Existing auditable result directory
+                             [default: shallguard.toml artifact root]
+  --requirement <REQ-ID>     Show clause and finding details; repeatable
 
 `fmt` lints and formats requirement blocks; `fmt --check` and `lint` never write.
 `clean` removes only the validated bundle at the configured artifact location.
