@@ -231,6 +231,48 @@ rejects any traceability regression.
   `cli:tests/external_subcommand.rs`
   (`installed_informational_commands_work_without_repository`)
 
+### US-CLI-003: Inspect a Stored Review Run
+
+**Status:** Planned
+
+**As a** developer or reviewer  
+**I want** to inspect a preserved local review from the CLI  
+**So that** I can understand its verdicts and evidence without navigating artifact files manually
+
+**System Requirements:**
+
+- **REQ-CLI-007** — `cargo shallguard review show` SHALL read the existing local
+  review at the configured review-output path, while `--output <directory>`
+  SHALL select an explicit review-output directory, and SHALL print run status,
+  provider, model, processed-response counts, separate semantic-verdict counts,
+  unavailable-or-invalid count, and the artifact path. *Enforced:* not
+  implemented — review-show argument parsing and summary presentation ·
+  *Verified:* ⏳ pending
+- **REQ-CLI-008** — Without a requirement filter, `review show` SHALL list every
+  selected requirement with its verdict and confidence; repeatable
+  `--requirement <REQ-ID>` filters SHALL instead print each requested
+  requirement's clause reviews, findings with severity and citations, missing
+  evidence, context limitations, failure information, and retained result path.
+  *Enforced:* not implemented — stored-review detail presentation · *Verified:*
+  ⏳ pending
+- **REQ-CLI-009** — `review show` SHALL support completed and partial runs,
+  SHALL distinguish completed semantic verdicts from unavailable or invalid
+  attempts, and SHALL use the manifest-selected current attempt rather than
+  silently choosing an older attempt. *Enforced:* not implemented — partial-run
+  and current-attempt inspection · *Verified:* ⏳ pending
+- **REQ-CLI-010** — `review show` SHALL be strictly read-only, SHALL NOT invoke a
+  model provider or any impact, coverage, or bundle stage, and SHALL validate
+  artifact schema versions, manifest/result identity, digests, and contained
+  paths before presenting stored content. *Enforced:* not implemented —
+  validated read-only review artifact reader · *Verified:* ⏳ pending
+- **REQ-CLI-011** — Advisory `violated`, `insufficient_evidence`, and
+  `not_impacted` verdicts SHALL NOT make `review show` fail; unreadable or
+  invalid artifacts and absent requested requirement IDs SHALL return nonzero
+  with actionable diagnostics, and `cargo shallguard review` SHALL direct users
+  encountering an existing output directory to `review show` for inspection or
+  `review --resume` for continuation. *Enforced:* not implemented — review-show
+  exit policy and existing-output guidance · *Verified:* ⏳ pending
+
 ## Specification User Stories
 
 ### US-SPEC-001: Maintainable Requirement Documents
