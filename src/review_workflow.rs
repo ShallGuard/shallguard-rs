@@ -114,7 +114,7 @@ pub fn run(
         bail!("--with-coverage requires --base <revision> or --target <branch>");
     }
     if !options.resume {
-        require_absent(options.artifacts.review_output_dir, "review output")?;
+        require_new_review_output(options.artifacts.review_output_dir)?;
     }
     if base.is_some() {
         require_absent(options.artifacts.bundle_dir, "generated bundle")?;
@@ -347,6 +347,24 @@ fn require_absent(path: &Path, description: &str) -> Result<()> {
     Ok(())
 }
 
+#[shallguard::enforces("REQ-CLI-011")]
+fn require_new_review_output(path: &Path) -> Result<()> {
+    if path
+        .try_exists()
+        .with_context(|| format!("checking review output {}", path.display()))?
+    {
+        bail!(
+            "review output {} already exists; inspect it with `cargo shallguard review show \
+             --output {}`, continue it with `cargo shallguard review --resume --output {}`, or \
+             choose another --output path",
+            path.display(),
+            path.display(),
+            path.display()
+        );
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,6 +382,17 @@ mod tests {
             impact_policy_failed: false,
             coverage_execution_failed: false,
         }
+    }
+
+    #[shallguard::verifies("REQ-CLI-011")]
+    #[test]
+    fn existing_review_output_points_to_show_and_resume() {
+        let directory = tempfile::tempdir().expect("temporary review output creates");
+        let error = require_new_review_output(directory.path())
+            .expect_err("existing review output is rejected");
+        let message = error.to_string();
+        assert!(message.contains("cargo shallguard review show --output"));
+        assert!(message.contains("cargo shallguard review --resume --output"));
     }
 
     #[shallguard::verifies("REQ-COV-001")]

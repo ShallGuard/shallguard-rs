@@ -12,7 +12,7 @@ use super::{
     ReviewProvider, ReviewResult, ReviewStatus, digest, unix_timestamp,
 };
 
-const RUN_STATE_SCHEMA: &str = "shallguard.requirement-review-run-state/v1";
+pub(super) const RUN_STATE_SCHEMA: &str = "shallguard.requirement-review-run-state/v1";
 const CHECKPOINT_SCHEMA: &str = "shallguard.requirement-review-checkpoint/v1";
 const CACHE_SCHEMA: &str = "shallguard.requirement-review-cache/v1";
 
@@ -123,7 +123,11 @@ impl<'a> ReviewStore<'a> {
             .with_context(|| format!("checking review output {}", options.output_dir.display()))?;
         if existed && !options.resume {
             bail!(
-                "review output {} already exists; pass --resume for a compatible run or choose another path",
+                "review output {} already exists; inspect it with `cargo shallguard review show \
+                 --output {}`, continue it with `cargo shallguard review --resume --output {}`, or \
+                 choose another --output path",
+                options.output_dir.display(),
+                options.output_dir.display(),
                 options.output_dir.display()
             );
         }
@@ -385,7 +389,7 @@ impl<'a> ReviewStore<'a> {
     }
 }
 
-fn validate_result_summary(review: &ReviewEntry, result: &ReviewResult) -> Result<()> {
+pub(super) fn validate_result_summary(review: &ReviewEntry, result: &ReviewResult) -> Result<()> {
     let response_digest =
         digest(&serde_json::to_vec(result).context("serializing stored response digest")?);
     if review.response_digest.as_deref() != Some(response_digest.as_str()) {

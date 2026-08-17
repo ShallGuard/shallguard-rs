@@ -233,7 +233,7 @@ rejects any traceability regression.
 
 ### US-CLI-003: Inspect a Stored Review Run
 
-**Status:** Planned
+**Status:** Implemented
 
 **As a** developer or reviewer  
 **I want** to inspect a preserved local review from the CLI  
@@ -245,33 +245,56 @@ rejects any traceability regression.
   review at the configured review-output path, while `--output <directory>`
   SHALL select an explicit review-output directory, and SHALL print run status,
   provider, model, processed-response counts, separate semantic-verdict counts,
-  unavailable-or-invalid count, and the artifact path. *Enforced:* not
-  implemented — review-show argument parsing and summary presentation ·
-  *Verified:* ⏳ pending
+  unavailable-or-invalid count, and the artifact path. *Enforced:*
+  `src/review_show.rs` (`inspect_stored_review`),
+  `cli:src/cli_review_show.rs` (`parse_review_show_args`,
+  `render_stored_review`) · *Verified:* ✅ `src/review_show_tests.rs`
+  (`reads_completed_current_attempt_and_preserves_the_artifact`),
+  `cli:src/cli_review_show.rs` (`renders_summary_and_requested_evidence_details`)
 - **REQ-CLI-008** — Without a requirement filter, `review show` SHALL list every
   selected requirement with its verdict and confidence; repeatable
   `--requirement <REQ-ID>` filters SHALL instead print each requested
   requirement's clause reviews, findings with severity and citations, missing
   evidence, context limitations, failure information, and retained result path.
-  *Enforced:* not implemented — stored-review detail presentation · *Verified:*
-  ⏳ pending
+  *Enforced:* `cli:src/cli_review_show.rs` (`parse_review_show_args`,
+  `render_stored_review`) · *Verified:* ✅ `src/review_show_tests.rs`
+  (`reads_completed_current_attempt_and_preserves_the_artifact`,
+  `partial_run_lists_pending_units_and_checks_requested_ids`),
+  `cli:src/cli_review_show.rs` (`parses_show_filters_and_rejects_run_options`,
+  `renders_summary_and_requested_evidence_details`)
 - **REQ-CLI-009** — `review show` SHALL support completed and partial runs,
   SHALL distinguish completed semantic verdicts from unavailable or invalid
   attempts, and SHALL use the manifest-selected current attempt rather than
-  silently choosing an older attempt. *Enforced:* not implemented — partial-run
-  and current-attempt inspection · *Verified:* ⏳ pending
+  silently choosing an older attempt. *Enforced:* `src/review_show.rs`
+  (`inspect_stored_review`), `cli:src/cli_review_show.rs`
+  (`render_stored_review`) · *Verified:* ✅ `src/review_show_tests.rs`
+  (`reads_completed_current_attempt_and_preserves_the_artifact`,
+  `partial_run_lists_pending_units_and_checks_requested_ids`,
+  `distinguishes_unavailable_and_invalid_attempts`)
 - **REQ-CLI-010** — `review show` SHALL be strictly read-only, SHALL NOT invoke a
   model provider or any impact, coverage, or bundle stage, and SHALL validate
   artifact schema versions, manifest/result identity, digests, and contained
-  paths before presenting stored content. *Enforced:* not implemented —
-  validated read-only review artifact reader · *Verified:* ⏳ pending
+  paths before presenting stored content. *Enforced:* `src/review_show.rs`
+  (`inspect_stored_review`), `cli:src/cli_review_show.rs` (`run`) · *Verified:*
+  ✅ `src/review_show_tests.rs`
+  (`reads_completed_current_attempt_and_preserves_the_artifact`,
+  `rejects_tampered_result_digest`)
 - **REQ-CLI-011** — Advisory `violated`, `insufficient_evidence`, and
   `not_impacted` verdicts SHALL NOT make `review show` fail; unreadable or
   invalid artifacts and absent requested requirement IDs SHALL return nonzero
   with actionable diagnostics, and `cargo shallguard review` SHALL direct users
   encountering an existing output directory to `review show` for inspection or
-  `review --resume` for continuation. *Enforced:* not implemented — review-show
-  exit policy and existing-output guidance · *Verified:* ⏳ pending
+  `review --resume` for continuation. *Enforced:* `src/review_show.rs`
+  (`inspect_stored_review`), `src/review_workflow.rs`
+  (`require_new_review_output`), `cli:src/cli_review_show.rs`
+  (`parse_review_show_args`, `run`, `render_stored_review`) · *Verified:* ✅
+  `src/review_show_tests.rs`
+  (`partial_run_lists_pending_units_and_checks_requested_ids`,
+  `distinguishes_unavailable_and_invalid_attempts`,
+  `rejects_tampered_result_digest`), `src/review_workflow.rs`
+  (`existing_review_output_points_to_show_and_resume`),
+  `cli:src/cli_review_show.rs` (`parses_show_filters_and_rejects_run_options`,
+  `renders_summary_and_requested_evidence_details`)
 
 ## Specification User Stories
 
@@ -637,14 +660,15 @@ rejects any traceability regression.
 - **REQ-REV-001** — Review SHALL support Codex and Claude-compatible local CLI
   providers, SHALL submit one frozen capsule per invocation, and MAY select a
   provider-specific model or supported local inference endpoint. *Enforced:*
-  `src/review.rs` (`ReviewProvider`, `command_spec`, `review_capsule`) ·
+  `src/review.rs` (`ReviewProvider`, `review_capsule`),
+  `src/review_provider.rs` (`command_spec`) ·
   *Verified:* ✅ `src/review_tests.rs` (`parses_provider_names`,
   `codex_command_is_ephemeral_and_read_only`,
   `claude_command_disables_tools_and_sessions`)
 - **REQ-REV-002** — Provider execution SHALL be ephemeral and non-interactive,
   SHALL disable provider tools or filesystem mutation where supported, and
   SHALL pass only an allowlisted environment that excludes unrelated CI
-  secrets. *Enforced:* `src/review.rs` (`command_spec`,
+  secrets. *Enforced:* `src/review_provider.rs` (`command_spec`,
   `sanitize_provider_environment`) · *Verified:* ✅ `src/review_tests.rs`
   (`codex_command_is_ephemeral_and_read_only`,
   `claude_command_disables_tools_and_sessions`,
@@ -669,7 +693,8 @@ rejects any traceability regression.
   and provider-availability failures. *Enforced:* `src/review.rs`
   (`ReviewVerdict`, `ReviewVerdictCounts`, `ReviewFailureKind`),
   `src/review_progress.rs` (`review_completion_message`),
-  `src/review_workflow.rs` (`ReviewWorkflowRun`), `cli:src/main.rs`
+  `src/review_workflow.rs` (`ReviewWorkflowRun`),
+  `cli:src/cli_review_show.rs`
   (`review_outcome_summary`) · *Verified:* ✅
   `src/review_progress.rs`
   (`completion_distinguishes_verdicts_from_unavailable_reviews`),
@@ -832,8 +857,9 @@ rejects any traceability regression.
 - **REQ-SEC-003** — A model provider SHALL receive only the selected capsule,
   review protocol, and allowlisted configuration; unrelated source, environment
   variables, credentials, and prior interactive session state SHALL NOT be
-  included. *Enforced:* `src/review.rs` (`prepare_review`, `command_spec`,
-  `sanitize_provider_environment`) · *Verified:* ✅ `src/review_tests.rs`
+  included. *Enforced:* `src/review.rs` (`prepare_review`),
+  `src/review_provider.rs` (`command_spec`, `sanitize_provider_environment`) ·
+  *Verified:* ✅ `src/review_tests.rs`
   (`provider_environment_excludes_unrelated_ci_secrets`,
   `codex_command_is_ephemeral_and_read_only`,
   `claude_command_disables_tools_and_sessions`)
