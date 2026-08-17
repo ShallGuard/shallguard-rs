@@ -4,6 +4,69 @@ use std::process::Command;
 
 use tempfile::tempdir;
 
+#[shallguard::verifies("REQ-CLI-001", "REQ-CLI-006")]
+#[test]
+fn installed_informational_commands_work_without_repository() {
+    let outside_repository = tempdir().expect("create directory outside a repository");
+    let binary = Path::new(env!("CARGO_BIN_EXE_cargo-shallguard"));
+    let binary_dir = binary.parent().expect("binary has a parent directory");
+    let current_path = std::env::var_os("PATH").unwrap_or_default();
+    let mut paths = vec![binary_dir.to_path_buf()];
+    paths.extend(std::env::split_paths(&current_path));
+    let search_path = std::env::join_paths(paths).expect("build subprocess search path");
+
+    for version_argument in ["version", "--version"] {
+        let version_output = Command::new("cargo")
+            .args(["shallguard", version_argument])
+            .current_dir(outside_repository.path())
+            .env("PATH", &search_path)
+            .output()
+            .expect("invoke Cargo external subcommand");
+
+        assert!(
+            version_output.status.success(),
+            "{version_argument} should succeed"
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&version_output.stdout),
+            format!("cargo-shallguard {}\n", env!("CARGO_PKG_VERSION"))
+        );
+        assert!(
+            version_output.stderr.is_empty(),
+            "{version_argument} should be quiet"
+        );
+    }
+
+    let help_output = Command::new("cargo")
+        .args(["shallguard", "help"])
+        .current_dir(outside_repository.path())
+        .env("PATH", search_path)
+        .output()
+        .expect("invoke Cargo external subcommand help");
+
+    assert!(help_output.status.success(), "help command should succeed");
+    let help = String::from_utf8_lossy(&help_output.stdout);
+    for expected in [
+        "Development workflow:",
+        "#[shallguard::enforces(...)]",
+        "#[shallguard::verifies(...)]",
+        "cargo shallguard fmt --check",
+        "Review workflow:",
+        "cargo shallguard impact --target <branch>",
+        "cargo shallguard review --target <branch>",
+        "cargo shallguard version",
+    ] {
+        assert!(
+            help.contains(expected),
+            "help output should contain {expected:?}"
+        );
+    }
+    assert!(
+        help_output.stderr.is_empty(),
+        "help command should be quiet"
+    );
+}
+
 #[shallguard::verifies("REQ-PORT-002", "REQ-PORT-003", "REQ-PORT-004")]
 #[test]
 fn installed_subcommand_checks_a_single_package_fixture() {

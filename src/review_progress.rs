@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use super::{
     BundleEntry, FindingSeverity, ReviewEntry, ReviewFailureKind, ReviewOptions, ReviewOrigin,
-    ReviewResult, ReviewRunArtifact, ReviewStatus,
+    ReviewResult, ReviewRunArtifact, ReviewStatus, ReviewVerdictCounts,
 };
 use crate::{ProgressCallback, clear_live_progress, report_live_progress, report_progress};
 
@@ -360,11 +360,32 @@ fn concise_model_text(value: &str) -> String {
     output
 }
 
-pub(super) fn review_complete(options: &ReviewOptions<'_>, completed: usize, failures: usize) {
+pub(super) fn review_complete(
+    options: &ReviewOptions<'_>,
+    completed: usize,
+    verdicts: ReviewVerdictCounts,
+    failures: usize,
+) {
     report_progress(
         options.progress,
-        format!("review: completed {completed} response(s); {failures} unavailable or invalid"),
+        review_completion_message(completed, verdicts, failures),
     );
+}
+
+#[shallguard::enforces("REQ-REV-005")]
+fn review_completion_message(
+    completed: usize,
+    verdicts: ReviewVerdictCounts,
+    failures: usize,
+) -> String {
+    format!(
+        "review: completed {completed} response(s): {} satisfied, {} violated, {} insufficient \
+         evidence, {} not impacted; {failures} unavailable or invalid",
+        verdicts.satisfied,
+        verdicts.violated,
+        verdicts.insufficient_evidence,
+        verdicts.not_impacted,
+    )
 }
 
 pub(super) fn render_summary(artifact: &ReviewRunArtifact) -> String {
@@ -481,6 +502,23 @@ mod tests {
         assert_eq!(
             provider_status_message("codex", unit, Duration::from_secs(15), "/"),
             "review: [1/10] [/] codex 15s: REQ-DYN-009 - Every controller pass emits a sink split"
+        );
+    }
+
+    #[shallguard::verifies("REQ-REV-005")]
+    #[test]
+    fn completion_distinguishes_verdicts_from_unavailable_reviews() {
+        let verdicts = ReviewVerdictCounts {
+            satisfied: 1,
+            violated: 1,
+            insufficient_evidence: 2,
+            not_impacted: 1,
+        };
+
+        assert_eq!(
+            review_completion_message(5, verdicts, 0),
+            "review: completed 5 response(s): 1 satisfied, 1 violated, 2 insufficient evidence, \
+             1 not impacted; 0 unavailable or invalid"
         );
     }
 }

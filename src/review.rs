@@ -117,8 +117,24 @@ pub struct ReviewRun {
     pub output_dir: PathBuf,
     /// Number of successfully validated model responses.
     pub reviews: usize,
+    /// Advisory semantic verdict totals for successfully validated responses.
+    pub verdicts: ReviewVerdictCounts,
     /// Number of unavailable, failed, or invalid model responses.
     pub failures: usize,
+}
+
+/// Advisory semantic verdict totals for a local review run.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[shallguard::enforces("REQ-REV-005")]
+pub struct ReviewVerdictCounts {
+    /// Requirements whose supplied context supports every normative clause.
+    pub satisfied: usize,
+    /// Requirements with a concrete counterexample to at least one clause.
+    pub violated: usize,
+    /// Requirements whose supplied context cannot support a conclusion.
+    pub insufficient_evidence: usize,
+    /// Requirements judged unrelated to the reviewed change.
+    pub not_impacted: usize,
 }
 
 /// Reviews every selected bundle capsule with an isolated local model CLI.
@@ -188,12 +204,33 @@ pub fn generate(options: &ReviewOptions<'_>) -> Result<ReviewRun> {
         .iter()
         .filter(|review| review.status == ReviewStatus::Failed)
         .count();
-    review_complete(options, artifact.reviews.len() - failures, failures);
+    let verdicts = review_verdict_counts(&artifact.reviews);
+    review_complete(
+        options,
+        artifact.reviews.len() - failures,
+        verdicts,
+        failures,
+    );
     Ok(ReviewRun {
         output_dir: options.output_dir.to_path_buf(),
         reviews: artifact.reviews.len() - failures,
+        verdicts,
         failures,
     })
+}
+
+#[shallguard::enforces("REQ-REV-005")]
+fn review_verdict_counts(reviews: &[ReviewEntry]) -> ReviewVerdictCounts {
+    let mut counts = ReviewVerdictCounts::default();
+    for verdict in reviews.iter().filter_map(|review| review.verdict) {
+        match verdict {
+            ReviewVerdict::Satisfied => counts.satisfied += 1,
+            ReviewVerdict::Violated => counts.violated += 1,
+            ReviewVerdict::InsufficientEvidence => counts.insufficient_evidence += 1,
+            ReviewVerdict::NotImpacted => counts.not_impacted += 1,
+        }
+    }
+    counts
 }
 
 fn validate_local_provider(provider: ReviewProvider, local_provider: Option<&str>) -> Result<()> {

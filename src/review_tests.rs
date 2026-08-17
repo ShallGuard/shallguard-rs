@@ -348,3 +348,34 @@ fn completed_review_entry() -> ReviewEntry {
         error: None,
     }
 }
+
+#[shallguard::verifies("REQ-REV-005")]
+#[test]
+fn semantic_verdict_counts_exclude_unavailable_reviews() {
+    let mut reviews = Vec::new();
+    for verdict in [
+        ReviewVerdict::Satisfied,
+        ReviewVerdict::Violated,
+        ReviewVerdict::InsufficientEvidence,
+        ReviewVerdict::InsufficientEvidence,
+        ReviewVerdict::NotImpacted,
+    ] {
+        let mut review = completed_review_entry();
+        review.verdict = Some(verdict);
+        reviews.push(review);
+    }
+    let mut unavailable = completed_review_entry();
+    unavailable.status = ReviewStatus::Failed;
+    unavailable.verdict = None;
+    reviews.push(unavailable);
+
+    assert_eq!(
+        review_verdict_counts(&reviews),
+        ReviewVerdictCounts {
+            satisfied: 1,
+            violated: 1,
+            insufficient_evidence: 2,
+            not_impacted: 1,
+        }
+    );
+}

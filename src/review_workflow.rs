@@ -356,6 +356,7 @@ mod tests {
             review: ReviewRun {
                 output_dir: Path::new("review-output").to_path_buf(),
                 reviews: 1,
+                verdicts: shallguard::review::ReviewVerdictCounts::default(),
                 failures: 0,
             },
             impacted_requirements: 1,

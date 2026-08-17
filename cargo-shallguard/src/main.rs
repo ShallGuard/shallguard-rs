@@ -5,6 +5,8 @@
 //!
 //! ```text
 //! cargo shallguard [check] [<doc.md> ...]
+//! cargo shallguard version
+//! cargo shallguard --version
 //! cargo shallguard fmt [--check] [<doc.md> ...]
 //! cargo shallguard lint [<doc.md> ...]
 //! cargo shallguard clean
@@ -36,6 +38,10 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 
+#[path = "cli_color.rs"]
+mod cli_color;
+#[path = "cli_help.rs"]
+mod cli_help;
 #[path = "cli_progress.rs"]
 mod cli_progress;
 #[path = "cli_review.rs"]
@@ -49,6 +55,7 @@ const COMMAND_NAME: &str = "cargo shallguard";
 
 enum Command {
     Help,
+    Version,
     Clean,
     Check(Vec<String>),
     Format(FormatArgs),
@@ -118,11 +125,18 @@ struct ReviewArgs {
     cache_dir: Option<PathBuf>,
 }
 
-#[shallguard::enforces("REQ-CLI-001", "REQ-CLI-002", "REQ-PORT-008", "REQ-SEC-001")]
+#[shallguard::enforces(
+    "REQ-CLI-001",
+    "REQ-CLI-002",
+    "REQ-CLI-006",
+    "REQ-PORT-008",
+    "REQ-SEC-001"
+)]
 fn main() -> ExitCode {
     let args = normalized_args(std::env::args().skip(1).collect());
     let command = match args.as_slice() {
         [help] if help == "help" || help == "--help" || help == "-h" => Command::Help,
+        [version] if version == "version" || version == "--version" => Command::Version,
         [clean] if clean == "clean" => Command::Clean,
         [format, rest @ ..] if format == "fmt" => match parse_format_args(rest, false) {
             Ok(args) => Command::Format(args),
@@ -191,7 +205,11 @@ fn main() -> ExitCode {
     };
 
     if matches!(&command, Command::Help) {
-        print_help();
+        cli_help::print();
+        return ExitCode::SUCCESS;
+    }
+    if matches!(&command, Command::Version) {
+        println!("cargo-shallguard {}", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;
     }
 
@@ -199,6 +217,7 @@ fn main() -> ExitCode {
         Command::Check(args) => args.as_slice(),
         Command::Format(args) => args.docs.as_slice(),
         Command::Help
+        | Command::Version
         | Command::Clean
         | Command::BaselineInit
         | Command::BaselinePrune
@@ -231,6 +250,7 @@ fn main() -> ExitCode {
     };
     match command {
         Command::Help => unreachable!("help returned before workspace discovery"),
+        Command::Version => unreachable!("version returned before workspace discovery"),
         Command::Clean => {
             return run_clean(&root, &config);
         }
@@ -397,45 +417,6 @@ fn run_format(root: &Path, docs: &[shallguard::DocSpec], args: &FormatArgs) -> E
         );
     }
     ExitCode::SUCCESS
-}
-
-fn print_help() {
-    println!(
-        r#"Requirement traceability, executable coverage, and local semantic review.
-
-Usage:
-  cargo shallguard [check] [<doc.md> ...]
-  cargo shallguard fmt [--check] [<doc.md> ...]
-  cargo shallguard lint [<doc.md> ...]
-  cargo shallguard clean
-  cargo shallguard baseline <check|init|prune>
-  cargo shallguard impact <--base <revision>|--target <branch>> [--json <path>] [--markdown <path>]
-  cargo shallguard bundle --impact <impact.json> [--coverage <coverage.json>] [options]
-  cargo shallguard test-index <--enumerate|--catalog <path>> [options]
-  cargo shallguard coverage [--package <crate>] [--requirement <REQ-ID>] [options]
-  cargo shallguard review [--base <revision>|--target <branch>] [options]
-
-Review options:
-  --provider <name>          Local model CLI [default: shallguard.toml, then codex]
-  --base <revision>          Compare against an exact revision
-  --target <branch>          Compare against its merge base [default: shallguard.toml]
-  --with-coverage            Run impacted verification tests [configured default]
-  --without-coverage         Skip executable coverage collection
-  --bundle <directory>       Generated bundle, or existing bundle in replay mode
-                             [default: shallguard.toml artifact root]
-  --output <directory>       New auditable result directory
-                             [default: shallguard.toml artifact root]
-  --resume                   Continue the compatible run in --output
-  --cache-dir <directory>    Reuse validated responses across run directories
-  --model <identifier>       Provider-specific model override
-  --local-provider <name>    Codex on-device inference: ollama or lmstudio
-  --requirement <REQ-ID>     Review only this requirement; repeatable
-  --timeout-seconds <n>      Per-requirement timeout [default: shallguard.toml, then 300]
-
-`fmt` lints and formats requirement blocks; `fmt --check` and `lint` never write.
-`clean` removes only the validated bundle at the configured artifact location.
-Model verdicts are advisory. Provider or schema failures return nonzero."#
-    );
 }
 
 fn parse_format_args(args: &[String], check_by_default: bool) -> Result<FormatArgs> {
@@ -951,6 +932,10 @@ fn run_review(
                     run.review.output_dir.display()
                 );
             }
+            println!(
+                "semantic review: {}",
+                review_outcome_summary(&run.review, cli_color::stdout_enabled())
+            );
             ExitCode::SUCCESS
         }
         Ok(run) => {
@@ -963,6 +948,10 @@ fn run_review(
                 run.coverage_execution_failed,
                 run.review.output_dir.display()
             );
+            eprintln!(
+                "{COMMAND_NAME} review: semantic verdicts: {}",
+                review_outcome_summary(&run.review, cli_color::stderr_enabled())
+            );
             ExitCode::FAILURE
         }
         Err(err) => {
@@ -970,6 +959,19 @@ fn run_review(
             ExitCode::FAILURE
         }
     }
+}
+
+#[shallguard::enforces("REQ-REV-005")]
+fn review_outcome_summary(review: &shallguard::review::ReviewRun, color: bool) -> String {
+    let summary = format!(
+        "{} satisfied, {} violated, {} insufficient evidence, {} not impacted; {} unavailable or invalid",
+        review.verdicts.satisfied,
+        review.verdicts.violated,
+        review.verdicts.insufficient_evidence,
+        review.verdicts.not_impacted,
+        review.failures,
+    );
+    cli_color::review_outcomes(&summary, color).into_owned()
 }
 
 #[cfg(test)]

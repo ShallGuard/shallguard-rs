@@ -172,9 +172,12 @@ rejects any traceability regression.
 
 - **REQ-CLI-001** — The executable SHALL support Cargo external-subcommand
   invocation as `cargo shallguard` and direct binary invocation without changing
-  command semantics. *Enforced:* `cli:src/main.rs`
-  (`normalized_args`) · *Verified:* ✅ `cli:src/cli_tests.rs`
-  (`removes_cargo_external_subcommand_argument`)
+  command semantics, and its help output SHALL summarize the basic anchored
+  development workflow and change-review workflow. *Enforced:*
+  `cli:src/main.rs` (`normalized_args`), `cli:src/cli_help.rs` (`print`) · *Verified:* ✅
+  `cli:src/cli_tests.rs` (`removes_cargo_external_subcommand_argument`),
+  `cli:tests/external_subcommand.rs`
+  (`installed_informational_commands_work_without_repository`)
 - **REQ-CLI-002** — With no command, `cargo shallguard` SHALL run the deterministic
   traceability check, while `cargo shallguard review` SHALL default to Codex,
   the configured target branch, executable coverage, and configured artifact
@@ -185,10 +188,14 @@ rejects any traceability regression.
 - **REQ-CLI-003** — Long-running coverage and review commands SHALL report the
   active requirement ID, concise requirement description, position, and
   elapsed time; interactive status MAY update one terminal line while
-  redirected output SHALL retain durable progress heartbeats. *Enforced:*
-  `cli:src/cli_progress.rs`, `src/review_progress.rs`,
+  redirected output SHALL retain durable progress heartbeats. Interactive
+  terminal output SHALL use color for semantic outcomes when supported, while
+  CI, redirected output, `NO_COLOR`, and `TERM=dumb` SHALL remain ANSI-free.
+  *Enforced:* `cli:src/cli_color.rs`, `cli:src/cli_progress.rs`,
+  `src/review_progress.rs`,
   `src/review_workflow.rs` · *Verified:* ✅ `src/review_progress.rs`
   (`provider_status_includes_position_description_and_elapsed_time`),
+  `cli:src/cli_color.rs` (`color_requires_an_interactive_non_ci_terminal`),
   `src/review_workflow.rs`
   (`coverage_requirement_progress_is_sorted_one_per_line_with_descriptions`)
 - **REQ-CLI-004** — Generated bundles, coverage work, and local review output
@@ -205,6 +212,24 @@ rejects any traceability regression.
   `src/test_index.rs`, `src/coverage.rs`, `src/bundle.rs`, `src/review.rs` ·
   *Verified:* ✅ `src/impact.rs`
   (`json_artifact_uses_versioned_schema_and_configuration`)
+
+### US-CLI-002: Discover the Installed Version
+
+**Status:** Implemented
+
+**As a** ShallGuard user or support engineer  
+**I want** a command that prints the installed CLI version  
+**So that** I can identify the exact release without needing a configured repository
+
+**System Requirements:**
+
+- **REQ-CLI-006** — `cargo shallguard version` and `cargo shallguard --version`
+  SHALL print `cargo-shallguard <version>` using the binary package version and
+  exit successfully, and the `version`, `--version`, and `help` forms SHALL NOT
+  require ShallGuard repository discovery or configuration. *Enforced:*
+  `cli:src/main.rs` (`main`) · *Verified:* ✅
+  `cli:tests/external_subcommand.rs`
+  (`installed_informational_commands_work_without_repository`)
 
 ## Specification User Stories
 
@@ -597,10 +622,18 @@ rejects any traceability regression.
   `coverage_anchor_and_scope_are_citable_protocol_locations`,
   `rejects_citation_outside_capsule`)
 - **REQ-REV-005** — Model verdicts SHALL remain advisory and SHALL be reported
-  separately from deterministic impact-policy, test-execution, protocol, and
-  provider-availability failures. *Enforced:* `src/review.rs`
-  (`ReviewVerdict`, `ReviewFailureKind`), `src/review_workflow.rs`
-  (`ReviewWorkflowRun`) · *Verified:* ✅ `src/review_workflow.rs`
+  as separate satisfied, violated, insufficient-evidence, and not-impacted
+  counts, distinct from deterministic impact-policy, test-execution, protocol,
+  and provider-availability failures. *Enforced:* `src/review.rs`
+  (`ReviewVerdict`, `ReviewVerdictCounts`, `ReviewFailureKind`),
+  `src/review_progress.rs` (`review_completion_message`),
+  `src/review_workflow.rs` (`ReviewWorkflowRun`), `cli:src/main.rs`
+  (`review_outcome_summary`) · *Verified:* ✅
+  `src/review_progress.rs`
+  (`completion_distinguishes_verdicts_from_unavailable_reviews`),
+  `cli:src/cli_tests.rs`
+  (`review_summary_separates_verdicts_from_unavailable_responses`),
+  `src/review_workflow.rs`
   (`deterministic_or_provider_failure_fails_the_workflow`)
 - **REQ-REV-006** — Each completed or failed requirement attempt SHALL be
   checkpointed atomically before the aggregate manifest and summary are
