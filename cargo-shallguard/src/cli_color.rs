@@ -7,6 +7,10 @@ const GREEN: &str = "\x1b[32m";
 const RED: &str = "\x1b[31m";
 const YELLOW: &str = "\x1b[33m";
 const CYAN: &str = "\x1b[36m";
+const MAGENTA: &str = "\x1b[35m";
+const BOLD: &str = "\x1b[1m";
+const BOLD_BLUE: &str = "\x1b[1;34m";
+const DIM: &str = "\x1b[2m";
 const RESET: &str = "\x1b[0m";
 
 pub(crate) fn stdout_enabled() -> bool {
@@ -49,6 +53,53 @@ pub(crate) fn review_outcomes(message: &str, enabled: bool) -> Cow<'_, str> {
         styled = styled.replace(outcome, &format!("{color}{outcome}{RESET}"));
     }
     Cow::Owned(styled)
+}
+
+pub(crate) fn section(message: &str, enabled: bool) -> Cow<'_, str> {
+    style(message, BOLD_BLUE, enabled)
+}
+
+pub(crate) fn label(message: &str, enabled: bool) -> Cow<'_, str> {
+    style(message, BOLD, enabled)
+}
+
+pub(crate) fn identifier(message: &str, enabled: bool) -> Cow<'_, str> {
+    style(message, MAGENTA, enabled)
+}
+
+pub(crate) fn path(message: &str, enabled: bool) -> Cow<'_, str> {
+    style(message, CYAN, enabled)
+}
+
+pub(crate) fn review_status(message: &str, enabled: bool) -> Cow<'_, str> {
+    let color = match message {
+        "completed" => GREEN,
+        "running" | "pending" | "insufficient_evidence" => YELLOW,
+        "violated" | "unavailable" | "invalid" => RED,
+        "satisfied" => GREEN,
+        "not_impacted" => CYAN,
+        _ => BOLD,
+    };
+    style(message, color, enabled)
+}
+
+pub(crate) fn severity(message: &str, enabled: bool) -> Cow<'_, str> {
+    let color = match message {
+        "critical" | "high" => RED,
+        "medium" => YELLOW,
+        "low" => CYAN,
+        "note" => DIM,
+        _ => BOLD,
+    };
+    style(message, color, enabled)
+}
+
+fn style<'a>(message: &'a str, color: &str, enabled: bool) -> Cow<'a, str> {
+    if enabled {
+        Cow::Owned(format!("{color}{message}{RESET}"))
+    } else {
+        Cow::Borrowed(message)
+    }
 }
 
 #[cfg(test)]

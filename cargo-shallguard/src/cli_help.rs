@@ -36,7 +36,7 @@ Usage:
   cargo shallguard test-index <--enumerate|--catalog <path>> [options]
   cargo shallguard coverage [--package <crate>] [--requirement <REQ-ID>] [options]
   cargo shallguard review [--base <revision>|--target <branch>] [options]
-  cargo shallguard review show [--output <directory>] [--requirement <REQ-ID>]...
+  cargo shallguard review show [--output <directory>] [<REQ-ID> ...]
 
 Review options:
   --provider <name>          Local model CLI [default: shallguard.toml, then codex]
@@ -58,7 +58,8 @@ Review options:
 Review show options:
   --output <directory>       Existing auditable result directory
                              [default: shallguard.toml artifact root]
-  --requirement <REQ-ID>     Show clause and finding details; repeatable
+  <REQ-ID>                   Show clause and finding details; repeatable
+  --requirement <REQ-ID>     Explicit form of the positional filter
 
 `fmt` lints and formats requirement blocks; `fmt --check` and `lint` never write.
 `clean` removes only the validated bundle at the configured artifact location.
