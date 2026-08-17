@@ -59,7 +59,7 @@ change-impact analysis, and local LLM-assisted semantic review.
 Install the published Cargo subcommand:
 
 ```bash
-cargo install cargo-shallguard --version 0.1.0 --locked
+cargo install cargo-shallguard --version 0.1.1 --locked
 ```
 
 Or install from a local checkout:
@@ -88,7 +88,7 @@ checking does not require a model provider.
 
 ```toml
 [dependencies]
-shallguard = "0.1.0"
+shallguard = "0.1.1"
 ```
 
 **2. Create `shallguard.toml`** at the repository root — copy and adapt the
@@ -236,7 +236,7 @@ GitHub Actions example:
 ```yaml
 - name: Requirement assurance
   run: |
-    cargo install cargo-shallguard --version 0.1.0 --locked
+    cargo install cargo-shallguard --version 0.1.1 --locked
     cargo shallguard fmt --check
     cargo shallguard check
 ```
