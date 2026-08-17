@@ -1,0 +1,274 @@
+name: ShallGuard advisory review
+
+on:
+  pull_request_target:
+    branches: [ "master" ]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shallguard-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Prepare bounded review input
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      state: ${{ steps.prepare.outputs.state }}
+      requirements: ${{ steps.prepare.outputs.requirements }}
+
+    steps:
+    - name: Check out trusted base revision
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.event.pull_request.base.sha }}
+        fetch-depth: 1
+        path: trusted-reviewer
+        persist-credentials: false
+    - name: Build trusted ShallGuard
+      working-directory: trusted-reviewer
+      run: cargo build --locked -p cargo-shallguard
+    - name: Check out pull request merge for read-only analysis
+      uses: actions/checkout@v7
+      with:
+        ref: refs/pull/${{ github.event.pull_request.number }}/merge
+        fetch-depth: 0
+        path: pull-request
+        persist-credentials: false
+    - name: Prepare deterministic impact and bundle artifacts
+      id: prepare
+      working-directory: pull-request
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        TRUSTED_SHALLGUARD: ${{ github.workspace }}/trusted-reviewer/target/debug/cargo-shallguard
+      run: |
+        mkdir -p target/shallguard
+        state=failed
+        requirements=0
+
+        set +e
+        "$TRUSTED_SHALLGUARD" impact \
+          --base "$BASE_SHA" \
+          --json target/shallguard/requirement-impact.json \
+          --markdown target/shallguard/requirement-impact.md
+        impact_status=$?
+        set -e
+
+        if test -s target/shallguard/requirement-impact.json && \
+           jq -e '.requirements | type == "array"' \
+             target/shallguard/requirement-impact.json > /dev/null; then
+          requirements=$(jq -r '.requirements | length' \
+            target/shallguard/requirement-impact.json)
+          if test "$requirements" -eq 0; then
+            state=no-impact
+          else
+            set +e
+            "$TRUSTED_SHALLGUARD" bundle \
+              --impact target/shallguard/requirement-impact.json \
+              --output target/shallguard/requirement-review
+            bundle_status=$?
+            set -e
+            if test "$bundle_status" -eq 0; then
+              state=ready
+            fi
+          fi
+        fi
+
+        {
+          echo "state=$state"
+          echo "requirements=$requirements"
+        } >> "$GITHUB_OUTPUT"
+
+        if test "$state" = failed; then
+          echo "Advisory preparation failed (impact exit: $impact_status)." >&2
+        fi
+    - name: Upload bounded review input
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: shallguard-review-input
+        path: pull-request/target/shallguard
+        if-no-files-found: warn
+        retention-days: 7
+
+  review:
+    name: Copilot semantic review (advisory)
+    needs: prepare
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      copilot-requests: write
+
+    steps:
+    - name: Initialize advisory report
+      env:
+        PREPARE_STATE: ${{ needs.prepare.outputs.state }}
+        REQUIREMENTS: ${{ needs.prepare.outputs.requirements }}
+      run: |
+        mkdir -p report
+        case "$PREPARE_STATE" in
+          no-impact)
+            message="No requirements were impacted by this pull request."
+            ;;
+          failed)
+            message="The bounded review input could not be prepared. See the workflow log."
+            ;;
+          ready)
+            message="The Copilot review could not be completed. See the workflow log."
+            ;;
+          *)
+            message="The advisory review did not receive a valid preparation status."
+            ;;
+        esac
+        {
+          echo '<!-- shallguard-review -->'
+          echo '# ShallGuard semantic review'
+          echo
+          echo "$message"
+          echo
+          echo "Impacted requirements: $REQUIREMENTS"
+        } > report/review.md
+    - name: Check out trusted base revision
+      if: needs.prepare.outputs.state == 'ready'
+      id: checkout
+      continue-on-error: true
+      uses: actions/checkout@v7
+      with:
+        ref: ${{ github.event.pull_request.base.sha }}
+        fetch-depth: 1
+        path: trusted-reviewer
+        persist-credentials: false
+    - name: Download bounded review input
+      if: needs.prepare.outputs.state == 'ready'
+      id: download
+      continue-on-error: true
+      uses: actions/download-artifact@v8
+      with:
+        name: shallguard-review-input
+        path: advisory-input
+    - name: Set up Node.js for Copilot CLI
+      if: steps.checkout.outcome == 'success' && steps.download.outcome == 'success'
+      id: node
+      continue-on-error: true
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+    - name: Install Copilot CLI
+      if: steps.node.outcome == 'success'
+      id: install
+      continue-on-error: true
+      run: npm install --global @github/copilot
+    - name: Run bounded Copilot review and render Markdown
+      if: steps.install.outcome == 'success'
+      continue-on-error: true
+      working-directory: trusted-reviewer
+      env:
+        COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN || github.token }}
+        REVIEW_BUNDLE: ${{ github.workspace }}/advisory-input/requirement-review
+        REVIEW_OUTPUT: ${{ github.workspace }}/trusted-reviewer/target/shallguard/local-review
+        REVIEW_REPORT: ${{ github.workspace }}/report/review.md
+      run: |
+        set +e
+        cargo run --locked -- review \
+          --provider copilot \
+          --without-coverage \
+          --bundle "$REVIEW_BUNDLE" \
+          --output "$REVIEW_OUTPUT"
+        review_status=$?
+        cargo run --locked -- review show \
+          --output "$REVIEW_OUTPUT" \
+          --format markdown > "$REVIEW_REPORT.tmp"
+        show_status=$?
+        set -e
+
+        if test "$show_status" -eq 0; then
+          mv "$REVIEW_REPORT.tmp" "$REVIEW_REPORT"
+        else
+          rm -f "$REVIEW_REPORT.tmp"
+          echo "Stored review rendering failed (review exit: $review_status)." >&2
+        fi
+        if test -d "$REVIEW_OUTPUT"; then
+          cp -R "$REVIEW_OUTPUT" "${REVIEW_REPORT%/*}/local-review"
+        fi
+        exit 0
+    - name: Add workflow link to report
+      if: always()
+      env:
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        {
+          echo
+          echo '---'
+          echo
+          echo "[Advisory workflow run]($RUN_URL)"
+        } >> report/review.md
+    - name: Upload advisory report
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@v7
+      with:
+        name: shallguard-advisory-review
+        path: report
+        if-no-files-found: warn
+        retention-days: 14
+
+  publish:
+    name: Publish pull request comment
+    needs: [prepare, review]
+    if: always() && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+    - name: Download advisory report
+      continue-on-error: true
+      uses: actions/download-artifact@v8
+      with:
+        name: shallguard-advisory-review
+        path: report
+    - name: Upsert ShallGuard comment
+      continue-on-error: true
+      uses: actions/github-script@v9
+      env:
+        REPORT_PATH: report/review.md
+      with:
+        script: |
+          const fs = require('fs');
+          const marker = '<!-- shallguard-review -->';
+          const fallback = `${marker}\n# ShallGuard semantic review\n\nThe advisory report artifact was unavailable.`;
+          const body = fs.existsSync(process.env.REPORT_PATH)
+            ? fs.readFileSync(process.env.REPORT_PATH, 'utf8')
+            : fallback;
+          const issue_number = context.payload.pull_request.number;
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number,
+            per_page: 100,
+          });
+          const previous = comments.find(comment =>
+            comment.user?.type === 'Bot' && comment.body?.includes(marker)
+          );
+          if (previous) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: previous.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              body,
+            });
+          }

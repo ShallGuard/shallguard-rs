@@ -616,6 +616,7 @@ fn provider_label(provider: ReviewProvider) -> &'static str {
     match provider {
         ReviewProvider::Codex => "codex",
         ReviewProvider::Claude => "claude",
+        ReviewProvider::Copilot => "copilot",
     }
 }
 

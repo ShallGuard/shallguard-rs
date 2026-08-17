@@ -35,7 +35,7 @@ root = "target/shallguard"
 # Every review setting is optional. CLI flags take precedence.
 [review]
 target = "origin/main"
-provider = "codex" # codex or claude
+provider = "codex" # codex, claude, or copilot
 with_coverage = true
 timeout_seconds = 300
 # model = "provider-specific-model"

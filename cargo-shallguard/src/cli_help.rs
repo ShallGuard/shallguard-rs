@@ -36,10 +36,11 @@ Usage:
   cargo shallguard test-index <--enumerate|--catalog <path>> [options]
   cargo shallguard coverage [--package <crate>] [--requirement <REQ-ID>] [options]
   cargo shallguard review [--base <revision>|--target <branch>] [options]
-  cargo shallguard review show [--output <directory>] [<REQ-ID> ...]
+  cargo shallguard review show [--output <directory>] [--format <format>] [<REQ-ID> ...]
 
 Review options:
-  --provider <name>          Local model CLI [default: shallguard.toml, then codex]
+  --provider <name>          Model CLI: codex, claude, or copilot
+                             [default: shallguard.toml, then codex]
   --base <revision>          Compare against an exact revision
   --target <branch>          Compare against its merge base [default: shallguard.toml]
   --with-coverage            Run impacted verification tests [configured default]
@@ -58,6 +59,7 @@ Review options:
 Review show options:
   --output <directory>       Existing auditable result directory
                              [default: shallguard.toml artifact root]
+  --format <format>          Output format: text or markdown [default: text]
   <REQ-ID>                   Show clause and finding details; repeatable
   --requirement <REQ-ID>     Explicit form of the positional filter
 
