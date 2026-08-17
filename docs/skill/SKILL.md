@@ -221,7 +221,7 @@ cargo shallguard coverage --requirement REQ-<AREA>-NNN \
 # One-command local semantic review: impact -> impacted-test selection ->
 # coverage -> capsule bundle -> LLM review. Defaults: --target
 # origin/master (falls back per repo config), --with-coverage,
-# --provider codex; "claude" is the other provider. May send bounded
+# --provider codex; "claude" and "copilot" are the other providers. May send bounded
 # source capsules to a hosted model service — confirm that is acceptable
 # for the repository before running; use --local-provider
 # ollama|lmstudio for on-device Codex inference.
