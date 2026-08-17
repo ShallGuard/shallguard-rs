@@ -181,6 +181,7 @@ From a ShallGuard source checkout, `cargo run -- <arguments>` runs the
 | `cargo shallguard coverage` | Collect LLVM execution evidence for verification tests (needs `cargo-llvm-cov`). |
 | `cargo shallguard bundle` | Build a bounded, auditable source capsule for review. |
 | `cargo shallguard review` | Optional local LLM semantic review of impacted requirements (advisory verdicts). |
+| `cargo shallguard review show` | Inspect a stored review as terminal text or GitHub-flavored Markdown. |
 | `cargo shallguard clean` | Remove the validated bundle at the configured artifact location. |
 
 The executable discovers the invoked Cargo repository through
@@ -243,6 +244,41 @@ GitHub Actions example:
 Because the baseline is committed and ratcheted, the gate is monotone: a
 branch can only keep the gap count equal or lower. Deleting a test, dropping
 an anchor, or renaming a cited file fails the pipeline immediately.
+
+### Advisory Copilot pull-request review
+
+The repository also contains
+`.github/workflows/shallguard-review.yml`. It publishes an optional semantic
+review as an updated pull-request comment and retains the Markdown report plus
+the auditable local-review directory as a workflow artifact. For organization
+repositories it uses the built-in job token with `copilot-requests: write`;
+the organization must permit Copilot CLI requests from Actions. Where built-in
+Copilot requests are unavailable, add an optional repository Actions secret
+named `COPILOT_GITHUB_TOKEN` containing a user-owned fine-grained token with
+the Copilot Requests account permission. The workflow prefers that secret and
+otherwise falls back to the job token.
+
+The advisory workflow deliberately has a different trust boundary from the
+required `Rust` workflow:
+
+- A no-secret, read-only preparation job builds ShallGuard from the trusted
+  base revision, then uses that binary to analyze the pull-request merge and
+  create a bounded bundle. It does not execute pull-request Rust code.
+- A separate same-repository-only job checks out the trusted base revision,
+  gives Copilot only the frozen bundle prompt and schema, and disables Copilot
+  tools, remote delegation, custom instructions, and interactive prompts.
+- A publisher job upserts the comment. Missing credentials, unavailable
+  providers, invalid responses, and semantic verdicts remain advisory and do
+  not replace or weaken `cargo shallguard-dev fmt --check` or
+  `cargo shallguard-dev check` in `.github/workflows/rust.yml`.
+
+For any stored run, the same report can be rendered locally without invoking a
+provider:
+
+```bash
+cargo shallguard review show --format markdown
+cargo shallguard review show REQ-CLI-001 --format markdown
+```
 
 ## Merge-request workflow
 
