@@ -19,6 +19,7 @@
 //! cargo shallguard test-index --catalog harness-tests.json --json requirement-tests.json
 //! cargo shallguard coverage --requirement REQ-HRS-001 --json requirement-coverage.json
 //! cargo shallguard review --provider codex --bundle requirement-review
+//! cargo shallguard review show [--requirement REQ-HRS-001]
 //! cargo run -p cargo-shallguard -- shallguard check
 //! ```
 //!
@@ -46,8 +47,11 @@ mod cli_help;
 mod cli_progress;
 #[path = "cli_review.rs"]
 mod cli_review;
+#[path = "cli_review_show.rs"]
+mod cli_review_show;
 use cli_progress::print_progress;
 use cli_review::parse_review_args;
+use cli_review_show::{ReviewShowArgs, parse_review_show_args, review_outcome_summary};
 
 /// Warnings printed in full detail before the rest is summarized.
 const WARNING_DETAIL_LIMIT: usize = 15;
@@ -66,6 +70,7 @@ enum Command {
     TestIndex(TestIndexArgs),
     Coverage(CoverageArgs),
     Review(ReviewArgs),
+    ReviewShow(ReviewShowArgs),
 }
 
 struct FormatArgs {
@@ -152,6 +157,15 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         },
+        [review, show, rest @ ..] if review == "review" && show == "show" => {
+            match parse_review_show_args(rest) {
+                Ok(args) => Command::ReviewShow(args),
+                Err(err) => {
+                    eprintln!("{COMMAND_NAME} review show: {err:#}");
+                    return ExitCode::FAILURE;
+                }
+            }
+        }
         [review, rest @ ..] if review == "review" => match parse_review_args(rest) {
             Ok(args) => Command::Review(args),
             Err(err) => {
@@ -225,7 +239,8 @@ fn main() -> ExitCode {
         | Command::Bundle(_)
         | Command::TestIndex(_)
         | Command::Coverage(_)
-        | Command::Review(_) => &[],
+        | Command::Review(_)
+        | Command::ReviewShow(_) => &[],
     };
     let root = match shallguard::workspace_root() {
         Ok(root) => root,
@@ -304,6 +319,9 @@ fn main() -> ExitCode {
         }
         Command::Review(args) => {
             return run_review(&root, &docs, &config, &args);
+        }
+        Command::ReviewShow(args) => {
+            return cli_review_show::run(&root, &config, &args);
         }
         Command::Check(_) => {}
     }
@@ -959,19 +977,6 @@ fn run_review(
             ExitCode::FAILURE
         }
     }
-}
-
-#[shallguard::enforces("REQ-REV-005")]
-fn review_outcome_summary(review: &shallguard::review::ReviewRun, color: bool) -> String {
-    let summary = format!(
-        "{} satisfied, {} violated, {} insufficient evidence, {} not impacted; {} unavailable or invalid",
-        review.verdicts.satisfied,
-        review.verdicts.violated,
-        review.verdicts.insufficient_evidence,
-        review.verdicts.not_impacted,
-        review.failures,
-    );
-    cli_color::review_outcomes(&summary, color).into_owned()
 }
 
 #[cfg(test)]

@@ -6,17 +6,14 @@
 //! structured response before retaining it as advisory evidence.
 
 use std::collections::BTreeSet;
-use std::ffi::{OsStr, OsString};
-use std::fs::File;
+#[cfg(test)]
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
 use std::str::FromStr;
-use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::bundle::{MANIFEST_SCHEMA, REVIEW_PROTOCOL};
@@ -24,21 +21,34 @@ use crate::{ProgressCallback, report_progress};
 
 #[path = "review_progress.rs"]
 mod progress;
+#[path = "review_provider.rs"]
+mod provider;
 #[path = "review_schema.rs"]
 mod schema;
+#[path = "review_show.rs"]
+mod show;
 #[path = "review_state.rs"]
 mod state;
 #[path = "review_validation.rs"]
 mod validation;
 
 use progress::{
-    ProviderProgress, ReviewUnitProgress, concise_provider_error, render_summary, review_complete,
+    ReviewUnitProgress, concise_provider_error, render_summary, review_complete,
     review_reuse_invalid, review_started, review_unit_complete, review_unit_result,
     review_unit_retrying, review_unit_started,
 };
+use provider::{ProviderInvocation, invoke_provider, parse_provider_response, provider_version};
+#[cfg(test)]
+use provider::{command_spec, provider_environment_allowed};
 use schema::{response_schema, review_prompt};
 use state::{Attempt, CachedUnit, Reuse, ReviewStore};
 use validation::{CapsuleMetadata, ReviewValidationError, capsule_metadata, validate_response};
+
+pub use show::{
+    StoredCitation, StoredClauseReview, StoredFinding, StoredRequirementReview,
+    StoredRequirementStatus, StoredReview, StoredReviewDetails, StoredReviewRunStatus,
+    StoredReviewVerdict, inspect_stored_review,
+};
 
 /// Version of an individual validated semantic-review response.
 #[shallguard::enforces("REQ-CLI-005")]
@@ -303,7 +313,8 @@ impl ReviewRunStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ReviewEntry {
     requirement_id: String,
     capsule_file: String,
@@ -434,26 +445,6 @@ enum FindingCategory {
     Scope,
 }
 
-struct Invocation {
-    status: Option<ExitStatus>,
-    timed_out: bool,
-    stdout: String,
-    stderr: String,
-    response: Option<String>,
-    duration_ms: u64,
-}
-
-struct ProviderInvocation<'a> {
-    provider: ReviewProvider,
-    model: Option<&'a str>,
-    local_provider: Option<&'a str>,
-    review_dir: &'a Path,
-    schema: &'a str,
-    timeout: Duration,
-    progress: Option<ProgressCallback>,
-    unit: ReviewUnitProgress<'a>,
-}
-
 struct PreparedReview {
     capsule_text: String,
     schema_text: String,
@@ -461,12 +452,6 @@ struct PreparedReview {
     prompt_digest: String,
     cache_key: String,
     metadata: CapsuleMetadata,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct CommandSpec {
-    executable: &'static str,
-    arguments: Vec<OsString>,
 }
 
 fn read_bundle_manifest(bundle_dir: &Path) -> Result<BundleManifest> {
@@ -787,227 +772,6 @@ fn validation_failure_kind(error: &ReviewValidationError) -> ReviewFailureKind {
         ReviewValidationError::Citation(_) => ReviewFailureKind::CitationInvalid,
         ReviewValidationError::Schema(_) => ReviewFailureKind::SchemaInvalid,
     }
-}
-
-fn invoke_provider(options: &ProviderInvocation<'_>) -> Result<Invocation> {
-    let stdout_path = options.review_dir.join("provider.stdout");
-    let stderr_path = options.review_dir.join("provider.stderr");
-    let stdout = File::create(&stdout_path).context("creating provider stdout log")?;
-    let stderr = File::create(&stderr_path).context("creating provider stderr log")?;
-    let stdin =
-        File::open(options.review_dir.join("prompt.txt")).context("opening provider prompt")?;
-    let spec = command_spec(
-        options.provider,
-        options.model,
-        options.local_provider,
-        options.schema,
-    );
-    let mut command = Command::new(spec.executable);
-    sanitize_provider_environment(&mut command);
-    let mut child = command
-        .args(spec.arguments)
-        .current_dir(options.review_dir)
-        .stdin(Stdio::from(stdin))
-        .stdout(Stdio::from(stdout))
-        .stderr(Stdio::from(stderr))
-        .spawn()
-        .with_context(|| format!("starting {} CLI", options.provider.as_str()))?;
-    let started = Instant::now();
-    let mut provider_progress =
-        ProviderProgress::new(options.progress, options.provider.as_str(), options.unit);
-    let (status, timed_out) = loop {
-        if let Some(status) = child.try_wait().context("waiting for provider CLI")? {
-            break (Some(status), false);
-        }
-        let elapsed = started.elapsed();
-        if elapsed >= options.timeout {
-            child.kill().context("terminating timed-out provider CLI")?;
-            let status = child.wait().context("reaping timed-out provider CLI")?;
-            break (Some(status), true);
-        }
-        provider_progress.update(elapsed);
-        thread::sleep(Duration::from_millis(100));
-    };
-    let stdout = std::fs::read_to_string(&stdout_path).context("reading provider stdout")?;
-    let stderr = std::fs::read_to_string(&stderr_path).context("reading provider stderr")?;
-    let response = match options.provider {
-        ReviewProvider::Codex => {
-            std::fs::read_to_string(options.review_dir.join("provider-response.json"))
-                .ok()
-                .or_else(|| (!stdout.trim().is_empty()).then(|| stdout.clone()))
-        }
-        ReviewProvider::Claude => (!stdout.trim().is_empty()).then(|| stdout.clone()),
-    };
-    Ok(Invocation {
-        status,
-        timed_out,
-        stdout,
-        stderr,
-        response,
-        duration_ms: millis(started.elapsed()),
-    })
-}
-
-#[shallguard::enforces("REQ-REV-002", "REQ-SEC-003")]
-fn sanitize_provider_environment(command: &mut Command) {
-    command.env_clear();
-    for (name, value) in std::env::vars_os() {
-        if provider_environment_allowed(&name) {
-            command.env(name, value);
-        }
-    }
-}
-
-fn provider_environment_allowed(name: &OsStr) -> bool {
-    let Some(name) = name.to_str() else {
-        return false;
-    };
-    matches!(
-        name,
-        "PATH"
-            | "HOME"
-            | "USER"
-            | "LOGNAME"
-            | "SHELL"
-            | "TMPDIR"
-            | "XDG_CONFIG_HOME"
-            | "XDG_CACHE_HOME"
-            | "XDG_DATA_HOME"
-            | "HTTP_PROXY"
-            | "HTTPS_PROXY"
-            | "ALL_PROXY"
-            | "NO_PROXY"
-            | "SSL_CERT_FILE"
-            | "SSL_CERT_DIR"
-            | "LANG"
-            | "LC_ALL"
-            | "TERM"
-    ) || [
-        "OPENAI_",
-        "CODEX_",
-        "ANTHROPIC_",
-        "CLAUDE_",
-        "OLLAMA_",
-        "LMSTUDIO_",
-        "LM_STUDIO_",
-    ]
-    .iter()
-    .any(|prefix| name.starts_with(prefix))
-}
-
-#[shallguard::enforces("REQ-REV-001", "REQ-REV-002", "REQ-SEC-003")]
-fn command_spec(
-    provider: ReviewProvider,
-    model: Option<&str>,
-    local_provider: Option<&str>,
-    schema: &str,
-) -> CommandSpec {
-    let mut arguments = Vec::<OsString>::new();
-    match provider {
-        ReviewProvider::Codex => {
-            arguments.extend(
-                [
-                    "exec",
-                    "--ephemeral",
-                    "--sandbox",
-                    "read-only",
-                    "--skip-git-repo-check",
-                    "--ignore-rules",
-                    "--output-schema",
-                    "response-schema.json",
-                    "--output-last-message",
-                    "provider-response.json",
-                ]
-                .into_iter()
-                .map(OsString::from),
-            );
-            if let Some(model) = model {
-                arguments.extend([OsString::from("--model"), OsString::from(model)]);
-            }
-            if let Some(local_provider) = local_provider {
-                arguments.extend([
-                    OsString::from("--oss"),
-                    OsString::from("--local-provider"),
-                    OsString::from(local_provider),
-                ]);
-            }
-            arguments.push(OsString::from("-"));
-        }
-        ReviewProvider::Claude => {
-            arguments.extend(
-                [
-                    "--print",
-                    "--bare",
-                    "--safe-mode",
-                    "--tools",
-                    "",
-                    "--no-session-persistence",
-                    "--permission-mode",
-                    "dontAsk",
-                    "--output-format",
-                    "json",
-                    "--json-schema",
-                ]
-                .into_iter()
-                .map(OsString::from),
-            );
-            arguments.push(OsString::from(schema));
-            if let Some(model) = model {
-                arguments.extend([OsString::from("--model"), OsString::from(model)]);
-            }
-        }
-    }
-    CommandSpec {
-        executable: provider.executable(),
-        arguments,
-    }
-}
-
-fn provider_version(provider: ReviewProvider) -> Result<String> {
-    let output = Command::new(provider.executable())
-        .arg("--version")
-        .output()
-        .with_context(|| {
-            format!(
-                "{} CLI is not installed or not available on PATH",
-                provider.as_str()
-            )
-        })?;
-    if !output.status.success() {
-        bail!(
-            "{} --version failed with {}",
-            provider.as_str(),
-            output.status
-        );
-    }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let version = if stdout.trim().is_empty() {
-        stderr.trim()
-    } else {
-        stdout.trim()
-    };
-    if version.is_empty() {
-        bail!("{} --version returned no version", provider.as_str());
-    }
-    Ok(version.to_string())
-}
-
-fn parse_provider_response(provider: ReviewProvider, text: &str) -> Result<ReviewResult> {
-    let value: Value = serde_json::from_str(text).context("parsing provider JSON")?;
-    let structured = match provider {
-        ReviewProvider::Codex => value,
-        ReviewProvider::Claude => {
-            if let Some(value) = value.get("structured_output") {
-                value.clone()
-            } else if let Some(result) = value.get("result").and_then(Value::as_str) {
-                serde_json::from_str(result).context("parsing Claude result JSON")?
-            } else {
-                value
-            }
-        }
-    };
-    serde_json::from_value(structured).context("decoding structured review response")
 }
 
 fn validate_requirement_id(requirement: &str) -> Result<()> {
