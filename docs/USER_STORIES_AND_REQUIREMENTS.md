@@ -189,13 +189,17 @@ rejects any traceability regression.
   active requirement ID, concise requirement description, position, and
   elapsed time; interactive status MAY update one terminal line while
   redirected output SHALL retain durable progress heartbeats. Interactive
-  terminal output SHALL use color for semantic outcomes when supported, while
-  CI, redirected output, `NO_COLOR`, and `TERM=dumb` SHALL remain ANSI-free.
-  *Enforced:* `cli:src/cli_color.rs`, `cli:src/cli_progress.rs`,
+  terminal output SHALL use color for semantic outcomes and stored-review
+  sections, labels, statuses, severities, identifiers, and paths when
+  supported, while CI, redirected output, `NO_COLOR`, and `TERM=dumb` SHALL
+  remain ANSI-free. *Enforced:* `cli:src/cli_color.rs`,
+  `cli:src/cli_review_show.rs`, `cli:src/cli_progress.rs`,
   `src/review_progress.rs`,
   `src/review_workflow.rs` · *Verified:* ✅ `src/review_progress.rs`
   (`provider_status_includes_position_description_and_elapsed_time`),
   `cli:src/cli_color.rs` (`color_requires_an_interactive_non_ci_terminal`),
+  `cli:src/cli_review_show_tests.rs`
+  (`colors_review_sections_only_when_enabled`),
   `src/review_workflow.rs`
   (`coverage_requirement_progress_is_sorted_one_per_line_with_descriptions`)
 - **REQ-CLI-004** — Generated bundles, coverage work, and local review output
@@ -245,22 +249,27 @@ rejects any traceability regression.
   review at the configured review-output path, while `--output <directory>`
   SHALL select an explicit review-output directory, and SHALL print run status,
   provider, model, processed-response counts, separate semantic-verdict counts,
-  unavailable-or-invalid count, and the artifact path. *Enforced:*
+  unavailable-or-invalid count, and the artifact path in blocks separated by
+  blank lines. *Enforced:*
   `src/review_show.rs` (`inspect_stored_review`),
   `cli:src/cli_review_show.rs` (`parse_review_show_args`,
   `render_stored_review`) · *Verified:* ✅ `src/review_show_tests.rs`
   (`reads_completed_current_attempt_and_preserves_the_artifact`),
-  `cli:src/cli_review_show.rs` (`renders_summary_and_requested_evidence_details`)
+  `cli:src/cli_review_show_tests.rs`
+  (`renders_summary_and_requested_evidence_details`)
 - **REQ-CLI-008** — Without a requirement filter, `review show` SHALL list every
-  selected requirement with its verdict and confidence; repeatable
-  `--requirement <REQ-ID>` filters SHALL instead print each requested
-  requirement's clause reviews, findings with severity and citations, missing
-  evidence, context limitations, failure information, and retained result path.
+  selected requirement with its verdict and confidence; positional `<REQ-ID>`
+  operands and repeatable explicit `--requirement <REQ-ID>` filters SHALL
+  instead print each requested requirement's clause reviews, findings with
+  severity and citations, missing evidence, context limitations, failure
+  information, and retained result path.
   *Enforced:* `cli:src/cli_review_show.rs` (`parse_review_show_args`,
   `render_stored_review`) · *Verified:* ✅ `src/review_show_tests.rs`
   (`reads_completed_current_attempt_and_preserves_the_artifact`,
   `partial_run_lists_pending_units_and_checks_requested_ids`),
-  `cli:src/cli_review_show.rs` (`parses_show_filters_and_rejects_run_options`,
+  `cli:src/cli_review_show_tests.rs`
+  (`parses_show_filters_and_rejects_run_options`,
+  `treats_positional_requirement_ids_as_filters`,
   `renders_summary_and_requested_evidence_details`)
 - **REQ-CLI-009** — `review show` SHALL support completed and partial runs,
   SHALL distinguish completed semantic verdicts from unavailable or invalid
@@ -293,7 +302,9 @@ rejects any traceability regression.
   `distinguishes_unavailable_and_invalid_attempts`,
   `rejects_tampered_result_digest`), `src/review_workflow.rs`
   (`existing_review_output_points_to_show_and_resume`),
-  `cli:src/cli_review_show.rs` (`parses_show_filters_and_rejects_run_options`,
+  `cli:src/cli_review_show_tests.rs`
+  (`parses_show_filters_and_rejects_run_options`,
+  `treats_positional_requirement_ids_as_filters`,
   `renders_summary_and_requested_evidence_details`)
 
 ## Specification User Stories

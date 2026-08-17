@@ -26,11 +26,18 @@ pub(super) fn parse_review_show_args(args: &[String]) -> Result<ReviewShowArgs> 
     while index < args.len() {
         let flag = args[index].as_str();
         index += 1;
+        if !flag.starts_with('-') {
+            requirements.insert(flag.to_string());
+            continue;
+        }
         let value = match flag {
             "--output" | "--requirement" => args
                 .get(index)
                 .with_context(|| format!("{flag} requires a value"))?,
-            unknown => bail!("unknown argument {unknown:?}; expected --output or --requirement"),
+            unknown => bail!(
+                "unknown argument {unknown:?}; expected a requirement ID, --output, or \
+                 --requirement"
+            ),
         };
         index += 1;
         match flag {
@@ -81,17 +88,47 @@ pub(super) fn run(
     }
 }
 
-#[shallguard::enforces("REQ-CLI-007", "REQ-CLI-008", "REQ-CLI-009", "REQ-CLI-011")]
+#[shallguard::enforces(
+    "REQ-CLI-003",
+    "REQ-CLI-007",
+    "REQ-CLI-008",
+    "REQ-CLI-009",
+    "REQ-CLI-011"
+)]
 fn render_stored_review(review: &StoredReview, details: bool, color: bool) -> String {
     let mut output = String::new();
-    let _ = writeln!(output, "Review: {}", review.output_dir.display());
-    let _ = writeln!(output, "Status: {}", review.status.as_str());
-    let _ = writeln!(output, "Provider: {}", review.provider);
-    let _ = writeln!(output, "Model: {}", review.model);
+    let review_path = review.output_dir.display().to_string();
     let _ = writeln!(
         output,
-        "Progress: {}/{} processed",
-        review.processed_responses, review.selected_requirements
+        "{}: {}",
+        cli_color::section("Review", color),
+        cli_color::path(&review_path, color)
+    );
+    let _ = writeln!(
+        output,
+        "{}: {}",
+        cli_color::label("Status", color),
+        cli_color::review_status(review.status.as_str(), color)
+    );
+    let _ = writeln!(
+        output,
+        "{}: {}",
+        cli_color::label("Provider", color),
+        review.provider
+    );
+    let _ = writeln!(
+        output,
+        "{}: {}",
+        cli_color::label("Model", color),
+        review.model
+    );
+    let _ = writeln!(output);
+    let _ = writeln!(
+        output,
+        "{}: {}/{} processed",
+        cli_color::label("Progress", color),
+        review.processed_responses,
+        review.selected_requirements
     );
     let summary = format!(
         "{} satisfied, {} violated, {} insufficient evidence, {} not impacted; {} unavailable or invalid",
@@ -103,7 +140,8 @@ fn render_stored_review(review: &StoredReview, details: bool, color: bool) -> St
     );
     let _ = writeln!(
         output,
-        "Semantic verdicts: {}",
+        "{}: {}",
+        cli_color::label("Semantic verdicts", color),
         cli_color::review_outcomes(&summary, color)
     );
 
@@ -113,7 +151,7 @@ fn render_stored_review(review: &StoredReview, details: bool, color: bool) -> St
             render_requirement_details(&mut output, requirement, color);
         }
     } else {
-        let _ = writeln!(output, "\nRequirements:");
+        let _ = writeln!(output, "\n{}:", cli_color::section("Requirements", color));
         for requirement in &review.requirements {
             render_requirement_summary(&mut output, requirement, color);
         }
@@ -128,7 +166,12 @@ fn render_requirement_summary(
 ) {
     match &requirement.status {
         StoredRequirementStatus::Pending => {
-            let _ = writeln!(output, "  {}  pending", requirement.requirement_id);
+            let _ = writeln!(
+                output,
+                "  {}  {}",
+                cli_color::identifier(&requirement.requirement_id, color),
+                cli_color::review_status("pending", color)
+            );
         }
         StoredRequirementStatus::Completed {
             verdict,
@@ -138,18 +181,26 @@ fn render_requirement_summary(
             let _ = writeln!(
                 output,
                 "  {}  {}  confidence {:.2}",
-                requirement.requirement_id, verdict, confidence
+                cli_color::identifier(&requirement.requirement_id, color),
+                verdict,
+                confidence
             );
         }
         StoredRequirementStatus::Unavailable { kind, .. } => {
             let _ = writeln!(
                 output,
-                "  {}  unavailable ({kind})",
-                requirement.requirement_id
+                "  {}  {} ({kind})",
+                cli_color::identifier(&requirement.requirement_id, color),
+                cli_color::review_status("unavailable", color)
             );
         }
         StoredRequirementStatus::Invalid { kind, .. } => {
-            let _ = writeln!(output, "  {}  invalid ({kind})", requirement.requirement_id);
+            let _ = writeln!(
+                output,
+                "  {}  {} ({kind})",
+                cli_color::identifier(&requirement.requirement_id, color),
+                cli_color::review_status("invalid", color)
+            );
         }
     }
 }
@@ -159,59 +210,108 @@ fn render_requirement_details(
     requirement: &StoredRequirementReview,
     color: bool,
 ) {
-    let _ = writeln!(output, "Requirement: {}", requirement.requirement_id);
+    let _ = writeln!(
+        output,
+        "{}: {}",
+        cli_color::section("Requirement", color),
+        cli_color::identifier(&requirement.requirement_id, color)
+    );
     if let Some(attempt) = requirement.attempt {
         let origin = requirement.origin.as_deref().unwrap_or("unknown");
         let duration = requirement.duration_ms.unwrap_or(0);
-        let _ = writeln!(output, "Attempt: {attempt} ({origin}, {duration} ms)");
+        let _ = writeln!(
+            output,
+            "{}: {attempt} ({origin}, {duration} ms)",
+            cli_color::label("Attempt", color)
+        );
     }
+    let _ = writeln!(output);
     match &requirement.status {
         StoredRequirementStatus::Pending => {
-            let _ = writeln!(output, "Status: pending");
+            let _ = writeln!(
+                output,
+                "{}: {}",
+                cli_color::label("Status", color),
+                cli_color::review_status("pending", color)
+            );
         }
         StoredRequirementStatus::Completed {
             verdict,
             confidence,
         } => {
             let verdict = cli_color::review_outcomes(verdict.as_str(), color);
-            let _ = writeln!(output, "Status: {verdict}");
-            let _ = writeln!(output, "Confidence: {confidence:.2}");
+            let _ = writeln!(output, "{}: {verdict}", cli_color::label("Status", color));
+            let _ = writeln!(
+                output,
+                "{}: {confidence:.2}",
+                cli_color::label("Confidence", color)
+            );
             if let Some(path) = &requirement.result_path {
-                let _ = writeln!(output, "Result: {}", path.display());
+                let path = path.display().to_string();
+                let _ = writeln!(
+                    output,
+                    "{}: {}",
+                    cli_color::label("Result", color),
+                    cli_color::path(&path, color)
+                );
             }
             if let Some(details) = &requirement.details {
+                let _ = writeln!(output);
                 render_details(output, details, color);
             }
         }
         StoredRequirementStatus::Unavailable { kind, error } => {
-            let _ = writeln!(output, "Status: unavailable");
-            let _ = writeln!(output, "Failure: {kind}");
-            let _ = writeln!(output, "Error: {error}");
+            render_failure(output, "unavailable", kind, error, color);
         }
         StoredRequirementStatus::Invalid { kind, error } => {
-            let _ = writeln!(output, "Status: invalid");
-            let _ = writeln!(output, "Failure: {kind}");
-            let _ = writeln!(output, "Error: {error}");
+            render_failure(output, "invalid", kind, error, color);
         }
     }
 }
 
+fn render_failure(output: &mut String, status: &str, kind: &str, error: &str, color: bool) {
+    let _ = writeln!(
+        output,
+        "{}: {}",
+        cli_color::label("Status", color),
+        cli_color::review_status(status, color)
+    );
+    let _ = writeln!(output, "{}: {kind}", cli_color::label("Failure", color));
+    let _ = writeln!(output, "{}: {error}", cli_color::label("Error", color));
+}
+
 fn render_details(output: &mut String, details: &StoredReviewDetails, color: bool) {
-    let _ = writeln!(output, "Clauses:");
+    let _ = writeln!(output, "{}:", cli_color::section("Clauses", color));
     for clause in &details.clause_reviews {
         let verdict = cli_color::review_outcomes(clause.verdict.as_str(), color);
-        let _ = writeln!(output, "  {}: {verdict}", clause.clause_id);
-        let _ = writeln!(output, "    Reason: {}", clause.reason);
-        render_citations(output, "    Citations", &clause.citations);
-        let _ = writeln!(output, "    Counterexample: {}", clause.counterexample);
         let _ = writeln!(
             output,
-            "    Evidence assessment: {}",
+            "  {}: {verdict}",
+            cli_color::identifier(&clause.clause_id, color)
+        );
+        let _ = writeln!(
+            output,
+            "    {}: {}",
+            cli_color::label("Reason", color),
+            clause.reason
+        );
+        render_citations(output, "    Citations", &clause.citations, color);
+        let _ = writeln!(
+            output,
+            "    {}: {}",
+            cli_color::label("Counterexample", color),
+            clause.counterexample
+        );
+        let _ = writeln!(
+            output,
+            "    {}: {}",
+            cli_color::label("Evidence assessment", color),
             clause.evidence_assessment
         );
     }
 
-    let _ = writeln!(output, "Findings:");
+    let _ = writeln!(output);
+    let _ = writeln!(output, "{}:", cli_color::section("Findings", color));
     if details.findings.is_empty() {
         let _ = writeln!(output, "  (none)");
     }
@@ -219,34 +319,65 @@ fn render_details(output: &mut String, details: &StoredReviewDetails, color: boo
         let _ = writeln!(
             output,
             "  [{}] {} — {} ({})",
-            finding.severity, finding.title, finding.clause_id, finding.category
+            cli_color::severity(&finding.severity, color),
+            finding.title,
+            cli_color::identifier(&finding.clause_id, color),
+            finding.category
         );
-        let _ = writeln!(output, "    Explanation: {}", finding.explanation);
-        let _ = writeln!(output, "    Scenario: {}", finding.scenario);
-        render_citations(output, "    Citations", &finding.citations);
-        let _ = writeln!(output, "    Affected outcome: {}", finding.affected_outcome);
         let _ = writeln!(
             output,
-            "    Suggested verification: {}",
+            "    {}: {}",
+            cli_color::label("Explanation", color),
+            finding.explanation
+        );
+        let _ = writeln!(
+            output,
+            "    {}: {}",
+            cli_color::label("Scenario", color),
+            finding.scenario
+        );
+        render_citations(output, "    Citations", &finding.citations, color);
+        let _ = writeln!(
+            output,
+            "    {}: {}",
+            cli_color::label("Affected outcome", color),
+            finding.affected_outcome
+        );
+        let _ = writeln!(
+            output,
+            "    {}: {}",
+            cli_color::label("Suggested verification", color),
             finding.suggested_verification
         );
     }
-    render_items(output, "Missing evidence", &details.missing_evidence);
-    render_items(output, "Context limitations", &details.context_limitations);
+    let _ = writeln!(output);
+    render_items(output, "Missing evidence", &details.missing_evidence, color);
+    let _ = writeln!(output);
+    render_items(
+        output,
+        "Context limitations",
+        &details.context_limitations,
+        color,
+    );
 }
 
-fn render_citations(output: &mut String, heading: &str, citations: &[StoredCitation]) {
-    let _ = writeln!(output, "{heading}:");
+fn render_citations(output: &mut String, heading: &str, citations: &[StoredCitation], color: bool) {
+    let _ = writeln!(output, "{}:", cli_color::label(heading, color));
     if citations.is_empty() {
         let _ = writeln!(output, "      (none)");
     }
     for citation in citations {
-        let _ = writeln!(output, "      {}:{}", citation.file, citation.line);
+        let _ = writeln!(
+            output,
+            "      {}:{}",
+            cli_color::path(&citation.file, color),
+            citation.line
+        );
     }
 }
 
-fn render_items(output: &mut String, heading: &str, items: &[String]) {
-    let _ = writeln!(output, "{heading}:");
+fn render_items(output: &mut String, heading: &str, items: &[String], color: bool) {
+    let _ = writeln!(output, "{}:", cli_color::section(heading, color));
     if items.is_empty() {
         let _ = writeln!(output, "  (none)");
     }
@@ -272,87 +403,5 @@ pub(super) fn review_outcome_summary(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use shallguard::review::{
-        ReviewVerdictCounts, StoredClauseReview, StoredReviewRunStatus, StoredReviewVerdict,
-    };
-
-    fn completed_review() -> StoredReview {
-        StoredReview {
-            output_dir: PathBuf::from("review-output"),
-            status: StoredReviewRunStatus::Completed,
-            provider: "codex".to_string(),
-            model: "configured-default".to_string(),
-            selected_requirements: 1,
-            processed_responses: 1,
-            verdicts: ReviewVerdictCounts {
-                satisfied: 0,
-                violated: 1,
-                insufficient_evidence: 0,
-                not_impacted: 0,
-            },
-            unavailable_or_invalid: 0,
-            requirements: vec![StoredRequirementReview {
-                requirement_id: "REQ-ZZ-001".to_string(),
-                status: StoredRequirementStatus::Completed {
-                    verdict: StoredReviewVerdict::Violated,
-                    confidence: 0.95,
-                },
-                attempt: Some(2),
-                origin: Some("resumed".to_string()),
-                duration_ms: Some(42),
-                result_path: Some(PathBuf::from(
-                    "review-output/units/REQ-ZZ-001/attempts/0002/result.json",
-                )),
-                details: Some(StoredReviewDetails {
-                    clause_reviews: vec![StoredClauseReview {
-                        clause_id: "REQ-ZZ-001/C1".to_string(),
-                        verdict: StoredReviewVerdict::Violated,
-                        reason: "direct invocation loses its operand".to_string(),
-                        citations: vec![StoredCitation {
-                            file: "src/main.rs".to_string(),
-                            line: 42,
-                        }],
-                        counterexample: "invoke directly".to_string(),
-                        evidence_assessment: "no end-to-end test".to_string(),
-                    }],
-                    findings: Vec::new(),
-                    missing_evidence: vec!["direct invocation test".to_string()],
-                    context_limitations: vec!["bounded capsule".to_string()],
-                }),
-            }],
-        }
-    }
-
-    #[shallguard::verifies("REQ-CLI-007", "REQ-CLI-008", "REQ-CLI-011")]
-    #[test]
-    fn parses_show_filters_and_rejects_run_options() {
-        let args = parse_review_show_args(&[
-            "--output".to_string(),
-            "stored-review".to_string(),
-            "--requirement".to_string(),
-            "REQ-ZZ-001".to_string(),
-        ])
-        .expect("show arguments parse");
-        assert_eq!(args.output, Some(PathBuf::from("stored-review")));
-        assert!(args.requirements.contains("REQ-ZZ-001"));
-        assert!(parse_review_show_args(&["--resume".to_string()]).is_err());
-    }
-
-    #[shallguard::verifies("REQ-CLI-007", "REQ-CLI-008", "REQ-CLI-011")]
-    #[test]
-    fn renders_summary_and_requested_evidence_details() {
-        let review = completed_review();
-        let summary = render_stored_review(&review, false, false);
-        assert!(summary.contains("Progress: 1/1 processed"));
-        assert!(summary.contains("REQ-ZZ-001  violated  confidence 0.95"));
-
-        let details = render_stored_review(&review, true, false);
-        assert!(details.contains("Requirement: REQ-ZZ-001"));
-        assert!(details.contains("REQ-ZZ-001/C1: violated"));
-        assert!(details.contains("src/main.rs:42"));
-        assert!(details.contains("Missing evidence:\n  - direct invocation test"));
-        assert!(!details.contains('\u{1b}'));
-    }
-}
+#[path = "cli_review_show_tests.rs"]
+mod tests;
