@@ -44,8 +44,7 @@ impl WeakReason {
 pub enum VacuityReason {
     /// No assertion, panic, unwrap/expect, or `?` failure path at all.
     NoFailurePath,
-    /// The only assertions are constant-foldable or compare a value
-    /// with itself.
+    /// The only assertions are constants that provably always pass.
     TrivialFailurePathsOnly,
 }
 
@@ -53,7 +52,7 @@ impl VacuityReason {
     pub fn describe(self) -> &'static str {
         match self {
             Self::NoFailurePath => "contains no failure path",
-            Self::TrivialFailurePathsOnly => "contains only constant or self-identical assertions",
+            Self::TrivialFailurePathsOnly => "contains only constant assertions that always pass",
         }
     }
 }
@@ -237,11 +236,13 @@ fn tokens_contain_failure_candidates(tokens: TokenStream) -> bool {
         match tree {
             TokenTree::Ident(ident) => {
                 let name = ident.to_string();
-                let bang = matches!(
+                // A macro invocation is ident + '!' + group; a bare '!'
+                // after an ident is an operator (`a != b`), not a macro.
+                let is_macro = matches!(
                     trees.get(i + 1),
                     Some(TokenTree::Punct(p)) if p.as_char() == '!'
-                );
-                if bang {
+                ) && matches!(trees.get(i + 2), Some(TokenTree::Group(_)));
+                if is_macro {
                     if !INNOCUOUS_MACROS.contains(&name.as_str()) {
                         return true;
                     }
@@ -261,34 +262,27 @@ fn tokens_contain_failure_candidates(tokens: TokenStream) -> bool {
     false
 }
 
-/// Whether an `assert*`-family invocation cannot fail on non-constant
-/// input: all significant arguments are literals, or the two compared
-/// sides of `assert_eq!`/`assert_ne!` are token-identical.
+/// Whether an `assert*`-family invocation provably always passes:
+/// `assert!(true)`, equal literal `assert_eq!` sides, or different
+/// literal `assert_ne!` sides. Anything else counts as a failure path -
+/// an always-failing constant (`assert!(false)`) is an unconditional
+/// panic, and token-identical non-literal sides (impure calls,
+/// floating-point values) can fail at runtime.
 #[shallguard::enforces("REQ-TRACE-010", "REQ-TRACE-011")]
 fn assertion_is_trivial(name: &str, tokens: TokenStream) -> bool {
     let args = split_top_level_commas(tokens);
-    if args.is_empty() {
-        // `assert!()` does not compile; treat as not trivial and let
-        // rustc report it.
-        return false;
-    }
-    // Significant arguments: the condition for `assert!`-style macros,
-    // the two compared sides for the `_eq`/`_ne` variants. Trailing
-    // format-message arguments are ignored. Only the standard macros in
-    // ASSERT_MACROS reach this function.
-    let significant: &[Vec<TokenTree>] = match name {
-        "assert" | "debug_assert" => &args[..1],
+    match name {
+        "assert" | "debug_assert" => args.first().is_some_and(
+            |cond| matches!(cond.as_slice(), [TokenTree::Ident(ident)] if ident == "true"),
+        ),
         _ => {
-            if args.len() < 2 {
+            if args.len() < 2 || !arg_is_literal_only(&args[0]) || !arg_is_literal_only(&args[1]) {
                 return false;
             }
-            if normalized(&args[0]) == normalized(&args[1]) {
-                return true;
-            }
-            &args[..2]
+            let equal = normalized(&args[0]) == normalized(&args[1]);
+            if name.ends_with("ne") { !equal } else { equal }
         }
-    };
-    significant.iter().all(|arg| arg_is_literal_only(arg))
+    }
 }
 
 fn split_top_level_commas(tokens: TokenStream) -> Vec<Vec<TokenTree>> {
@@ -418,19 +412,69 @@ mod tests {
 
     #[shallguard::verifies("REQ-TRACE-011")]
     #[test]
-    fn token_identical_sides_are_trivial() {
+    fn identical_non_literal_sides_classify_as_present() {
+        // Token-identical impure sides (iterators, clocks) and even a
+        // plain variable (NaN != NaN) can fail at runtime; only literal
+        // constants are provably trivial.
         assert_eq!(
             classify_fn("fn t() { assert_eq!(x, x); }"),
-            OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+            OracleClass::Present
         );
         assert_eq!(
             classify_fn("fn t() { assert_eq!(floor(0), floor(0)); }"),
-            OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+            OracleClass::Present
         );
-        // Different sides are a real failure path.
+        assert_eq!(
+            classify_fn("fn t() { assert_eq!(it.next(), it.next()); }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn("fn t() { assert_ne!(x, x); }"),
+            OracleClass::Present
+        );
         assert_eq!(
             classify_fn("fn t() { assert_eq!(floor(0), floor(1)); }"),
             OracleClass::Present
+        );
+    }
+
+    #[shallguard::verifies("REQ-TRACE-010")]
+    #[test]
+    fn always_failing_constant_asserts_are_failure_paths() {
+        // A constant assertion that always fails is an unconditional
+        // panic - the reachable guard-arm pattern.
+        assert_eq!(
+            classify_fn("fn t() { assert!(false); }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn("fn t() { assert!(false, \"expected error\"); }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn("fn t() { assert_eq!(0, 1); }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn("fn t() { assert_ne!(2, 2); }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn(
+                "fn t() { match parse(input) { Err(e) => check(e), Ok(_) => assert!(false, \"expected parse error\") } }"
+            ),
+            OracleClass::Present
+        );
+    }
+
+    #[shallguard::verifies("REQ-TRACE-009")]
+    #[test]
+    fn not_equals_comparisons_are_not_failure_paths() {
+        // `a != b` is an operator, not a macro invocation - inside macro
+        // arguments it must not count as an opaque construct.
+        assert_eq!(
+            classify_fn("fn t() { println!(\"{}\", a != b); }"),
+            OracleClass::Vacuous(VacuityReason::NoFailurePath)
         );
     }
 
@@ -516,6 +560,15 @@ mod tests {
             classify_fn("fn t() { include!(\"generated_assertions.rs\"); }"),
             OracleClass::Present
         );
+    }
+
+    #[shallguard::verifies("REQ-TRACE-017")]
+    #[test]
+    fn oracle_class_set_is_pinned() {
+        // The macro crate keeps its own copy of this list (a proc-macro
+        // crate cannot export it); both crates pin the same literal so
+        // drift fails a test instead of surfacing as confusing errors.
+        assert_eq!(ORACLE_CLASSES, &["panic", "compile", "external"]);
     }
 
     #[shallguard::verifies("REQ-TRACE-014")]
