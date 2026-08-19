@@ -14,3 +14,7 @@ exists to prevent.
 - 2026-08-19 `cli`: only `review show` produces colored output; every
   other command is monochrome, so reports read inconsistently → bug
   ([#8](https://github.com/sigi64/shallguard/issues/8))
+- 2026-08-19 `check`: a test written ahead of its requirement's ⏳→✅ flip
+  cannot carry its `#[verifies]` anchor without a stale-anchor warning, so
+  the anchor and the flip must land in the same change → accepted-cost
+  (the warning is what forces flip discipline)

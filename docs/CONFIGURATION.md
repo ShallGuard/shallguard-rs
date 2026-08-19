@@ -71,3 +71,18 @@ cargo shallguard check
 
 Set an area's `hard_enforcement` or `hard_verification` policy to `true` once
 that dimension has no historical gaps. Hardened areas cannot be baselined.
+
+An area may additionally set `strict_oracle = true` (default `false`). The
+vacuity analysis of `#[shallguard::verifies]` test bodies always reports
+vacuous evidence (a test that cannot fail) with the severity of a missing
+verification anchor; weak evidence — currently a bare `#[should_panic]`
+without an `expected` message — stays an advisory warning unless the area
+opts into `strict_oracle`, which promotes weak-evidence findings to errors:
+
+```toml
+[areas.SAFE]
+label = "Safety"
+hard_enforcement = true
+hard_verification = true
+strict_oracle = true
+```
