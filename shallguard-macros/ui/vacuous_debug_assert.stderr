@@ -1,5 +1,5 @@
 error: #[shallguard::verifies(REQ-ZZ-001)] cites a test that cannot fail: its only assertions are constants that always pass. Evidence must offer a real failure path (see SKILL.md, evidence honesty): assert an actual output of the enforcement site, or opt out visibly with oracle = "panic" | "compile" | "external"
- --> ui/vacuous_constant_assert.rs:5:4
+ --> ui/vacuous_debug_assert.rs:5:4
   |
-5 | fn constant_assertion() {
-  |    ^^^^^^^^^^^^^^^^^^
+5 | fn constant_debug_assertion() {
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^

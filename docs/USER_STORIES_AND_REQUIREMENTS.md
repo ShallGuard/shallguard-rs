@@ -420,14 +420,14 @@ rejects any traceability regression.
 
 - **REQ-TRACE-001** — Rust anchor discovery SHALL parse source with `syn` and
   SHALL ignore anchor-like text in comments and string literals. *Enforced:*
-  `src/scan.rs` (`scan`, `walk_items`) · *Verified:* ✅ `src/scan.rs`
+  `src/scan.rs` (`scan`, `walk_items`) · *Verified:* ✅ `src/scan_tests.rs`
   (`comments_are_never_anchors`, `anchor_text_inside_strings_is_invisible`)
 - **REQ-TRACE-002** — `#[shallguard::enforces]` SHALL be recognized on
   supported Rust items, impl functions, struct fields, and enum variants, and
   the scanner SHALL retain each anchor's source scope and
   executable/structural kind.
   *Enforced:* `src/scan.rs` (`walk_items`, `collect_item_attrs`,
-  `collect_fn_attrs`) · *Verified:* ✅ `src/scan.rs`
+  `collect_fn_attrs`) · *Verified:* ✅ `src/scan_tests.rs`
   (`attribute_anchors_record_executable_and_structural_scopes`,
   `field_and_variant_attributes_are_anchors`,
   `enforces_attribute_on_items_and_impl_fns`)
@@ -436,7 +436,7 @@ rejects any traceability regression.
   SHALL own the smallest enclosing executable block available to the syntax
   scanner.
   *Enforced:* `src/scan.rs` (`MacroVisitor`), `src/impact.rs`
-  (`EnforcementCollector`) · *Verified:* ✅ `src/scan.rs`
+  (`EnforcementCollector`) · *Verified:* ✅ `src/scan_tests.rs`
   (`enforces_here_macro_in_statement_and_item_position`,
   `enforces_here_nested_in_another_macro_body_is_found`), `src/impact.rs`
   (`branch_anchor_only_owns_its_enclosing_block`,
@@ -445,7 +445,7 @@ rejects any traceability regression.
   evidence only on a syntactically recognized, non-ignored test function; an
   ordinary or ignored function carrying the attribute SHALL be reported
   invalid. *Enforced:*
-  `src/scan.rs` (`collect_fn_attrs`) · *Verified:* ✅ `src/scan.rs`
+  `src/scan.rs` (`collect_fn_attrs`) · *Verified:* ✅ `src/scan_tests.rs`
   (`verifies_attribute_needs_an_enabled_test`)
 - **REQ-TRACE-005** — The checker SHALL fail for malformed documents,
   duplicate IDs, unknown live anchor IDs, or nonexistent cited Rust paths.
@@ -490,16 +490,21 @@ or constant tests
   (`empty_and_assertion_free_bodies_are_vacuous`,
   `real_failure_paths_classify_as_present`,
   `question_mark_without_result_return_is_not_a_failure_path`,
-  `failure_paths_inside_macro_arguments_are_seen`)
-- **REQ-TRACE-010** — An assertion whose arguments are all literals
-  (constant-foldable, such as `assert!(true)` or `assert_eq!(1, 1)`) SHALL
-  NOT count as a failure path. *Enforced:* `src/oracle.rs`
-  (`assertion_is_trivial`) · *Verified:* ✅ `src/oracle.rs`
-  (`literal_only_assertions_are_trivial`)
-- **REQ-TRACE-011** — An `assert_eq!` or `assert_ne!` whose two compared
-  sides are token-identical SHALL NOT count as a failure path. *Enforced:*
+  `failure_paths_inside_macro_arguments_are_seen`,
+  `not_equals_comparisons_are_not_failure_paths`)
+- **REQ-TRACE-010** — A constant assertion that provably always passes
+  (`assert!(true)`, `assert_eq!(1, 1)`, `assert_ne!(0, 1)`) SHALL NOT count
+  as a failure path; a constant assertion that always fails
+  (`assert!(false)`, `assert_eq!(0, 1)`) SHALL count as an unconditional
+  failure path. *Enforced:* `src/oracle.rs` (`assertion_is_trivial`) ·
+  *Verified:* ✅ `src/oracle.rs` (`literal_only_assertions_are_trivial`,
+  `always_failing_constant_asserts_are_failure_paths`)
+- **REQ-TRACE-011** — An `assert_eq!` or `assert_ne!` SHALL count as
+  vacuous only when both compared sides are literal; token-identical
+  non-literal sides (impure calls, floating-point values) MAY fail at
+  runtime and SHALL classify as evidence present. *Enforced:*
   `src/oracle.rs` (`assertion_is_trivial`) · *Verified:* ✅ `src/oracle.rs`
-  (`token_identical_sides_are_trivial`)
+  (`identical_non_literal_sides_classify_as_present`)
 - **REQ-TRACE-012** — `#[should_panic]` without an `expected` message on a
   `#[verifies]` test whose body offers no other failure path SHALL be
   reported as weak evidence. *Enforced:* `src/oracle.rs` (`classify`) ·
@@ -525,10 +530,10 @@ or constant tests
   opt-out SHALL suppress vacuity reporting for that test and SHALL be
   counted and listable in the check report; suppression SHALL NOT be
   silent. *Enforced:* `src/oracle.rs` (`classify`), `src/scan.rs`
-  (`oracle_suppression`), `src/check_report.rs` (`render_summary`) ·
+  (`oracle_argument`), `src/check_report.rs` (`render_summary`) ·
   *Verified:* ✅ `src/oracle.rs` (`suppression_is_recorded_not_silent`),
   `src/check_report.rs` (`suppressed_oracles_are_listed_in_the_summary`),
-  `src/scan.rs` (`raw_string_oracle_classes_decode_to_their_value`)
+  `src/scan_tests.rs` (`raw_string_oracle_classes_decode_to_their_value`)
 - **REQ-TRACE-015** — Vacuity analysis SHALL be purely syntactic and
   deterministic, SHALL NOT execute tested code, and SHALL classify any
   construct the classifier does not fully understand as evidence present
@@ -537,21 +542,24 @@ or constant tests
   `err_return_and_result_aliases_classify_as_present`,
   `third_party_assert_macros_classify_as_present`)
 - **REQ-TRACE-016** — `#[verifies]` SHALL reject at compile time a test body
-  containing no failure-path candidate tokens at all, or only
-  literal-constant or side-identical `assert!`/`assert_eq!`/`assert_ne!`
-  invocations; the error SHALL name the offending requirement IDs and
-  reference the evidence-honesty rules, and any body the token scan cannot
-  fully classify SHALL compile — the deterministic check remains
-  authoritative. *Enforced:* `src/lib.rs` (`verifies`) · *Verified:* ✅
-  `macros:tests/front_line.rs` (`definitely_vacuous_bodies_fail_to_compile`)
+  containing no failure-path candidate tokens at all, or only constant
+  `assert` -family invocations that provably always pass; the error SHALL
+  name the offending requirement IDs and reference the evidence-honesty
+  rules, and any body the token scan cannot fully classify SHALL compile —
+  the deterministic check remains authoritative. *Enforced:* `src/lib.rs`
+  (`verifies`) · *Verified:* ✅ `macros:tests/front_line.rs`
+  (`front_line_rejects_vacuity_and_enforces_oracle_classes`)
 - **REQ-TRACE-017** — The `oracle` opt-out SHALL accept only the closed
   value set `panic`, `compile`, and `external`: an unknown value SHALL be
   rejected at compile time with the accepted list, and the deterministic
   checker SHALL NOT treat an unknown class as a suppression and SHALL
   report it. *Enforced:* `src/lib.rs` (`verifies`), `src/scan.rs`
-  (`oracle_suppression`) · *Verified:* ✅ `macros:tests/front_line.rs`
-  (`oracle_classes_are_a_closed_set`), `src/scan.rs`
-  (`unknown_oracle_class_is_not_a_suppression`)
+  (`collect_fn_attrs`, `oracle_argument`) · *Verified:* ✅
+  `macros:tests/front_line.rs`
+  (`front_line_rejects_vacuity_and_enforces_oracle_classes`),
+  `src/scan_tests.rs` (`unknown_oracle_class_is_not_a_suppression`,
+  `duplicate_and_non_string_oracle_values_are_invalid`), `src/oracle.rs`
+  (`oracle_class_set_is_pinned`)
 
 ## Baseline and Ratchet User Stories
 

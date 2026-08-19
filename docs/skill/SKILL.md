@@ -89,8 +89,8 @@ anchors.
   path ending in `test`). It **rejects `#[ignore]`d tests** at compile time
   and in the checker. There is no statement form for verification.
 - `#[verifies]` also rejects, at compile time, test bodies that definitely
-  cannot fail: no failure-path tokens at all, or only constant /
-  self-identical assertions. A test whose oracle genuinely lives outside
+  cannot fail: no failure-path tokens at all, or only constant assertions
+  that provably always pass. A test whose oracle genuinely lives outside
   its body (a compile-fail harness, an external checker) opts out visibly
   with `oracle = "panic"` / `"compile"` / `"external"` — the check report
   counts and lists every suppression.
