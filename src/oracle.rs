@@ -70,8 +70,14 @@ pub fn classify(
         return OracleClass::Suppressed(class.to_string());
     }
 
+    // A non-unit return type (Result, aliases of it, ExitCode) can fail
+    // via the returned value; the classifier cannot see through aliases,
+    // so any such test conservatively counts as having a failure path.
+    if can_fail_via_return(sig) {
+        return OracleClass::Present;
+    }
+
     let mut visitor = BodyVisitor {
-        returns_result: returns_result_like(sig),
         real_failure_path: false,
         trivial_assertion: false,
         opaque_construct: false,
@@ -116,13 +122,15 @@ fn should_panic(attrs: &[syn::Attribute]) -> ShouldPanic {
     ShouldPanic::Absent
 }
 
-/// Whether `?` in this signature is a genuine failure path.
-fn returns_result_like(sig: &syn::Signature) -> bool {
+/// Whether the signature's return type can carry a failure out of the
+/// test. Only an absent or unit return type cannot; anything else —
+/// `Result`, aliases of it, `ExitCode` — conservatively can, since the
+/// classifier cannot see through type aliases.
+fn can_fail_via_return(sig: &syn::Signature) -> bool {
     match &sig.output {
         syn::ReturnType::Default => false,
         syn::ReturnType::Type(_, ty) => {
-            let rendered = quote::ToTokens::to_token_stream(ty).to_string();
-            rendered.contains("Result") || rendered.contains("Termination")
+            !matches!(&**ty, syn::Type::Tuple(tuple) if tuple.elems.is_empty())
         }
     }
 }
@@ -151,8 +159,19 @@ const INNOCUOUS_MACROS: &[&str] = &[
 /// Macros whose invocation always offers a failure path.
 const PANICKING_MACROS: &[&str] = &["panic", "todo", "unreachable", "unimplemented"];
 
+/// The standard assertion macros whose argument structure the trivial
+/// check understands. Anything else named `assert...` is third-party
+/// (insta, claims, project macros) and classifies conservatively.
+const ASSERT_MACROS: &[&str] = &[
+    "assert",
+    "assert_eq",
+    "assert_ne",
+    "debug_assert",
+    "debug_assert_eq",
+    "debug_assert_ne",
+];
+
 struct BodyVisitor {
-    returns_result: bool,
     real_failure_path: bool,
     trivial_assertion: bool,
     opaque_construct: bool,
@@ -164,16 +183,28 @@ impl<'ast> Visit<'ast> for BodyVisitor {
             self.opaque_construct = true;
             return;
         };
-        if name.starts_with("assert") {
+        if ASSERT_MACROS.contains(&name.as_str()) {
             if assertion_is_trivial(&name, mac.tokens.clone()) {
                 self.trivial_assertion = true;
+                // A trivial assertion's arguments may still contain real
+                // failure paths (assert_eq!(f().unwrap(), f().unwrap())).
+                if tokens_contain_failure_candidates(mac.tokens.clone()) {
+                    self.real_failure_path = true;
+                }
             } else {
                 self.real_failure_path = true;
             }
         } else if PANICKING_MACROS.contains(&name.as_str()) {
             self.real_failure_path = true;
-        } else if !INNOCUOUS_MACROS.contains(&name.as_str()) {
-            // Unknown macro: it may assert internally. Conservative.
+        } else if INNOCUOUS_MACROS.contains(&name.as_str()) {
+            // The macro itself cannot fail, but its arguments are
+            // eagerly evaluated expressions and may.
+            if tokens_contain_failure_candidates(mac.tokens.clone()) {
+                self.real_failure_path = true;
+            }
+        } else {
+            // Unknown macro — including third-party assert_*! — may
+            // assert internally. Conservative.
             self.opaque_construct = true;
         }
         syn::visit::visit_macro(self, mac);
@@ -189,13 +220,40 @@ impl<'ast> Visit<'ast> for BodyVisitor {
         }
         syn::visit::visit_expr_method_call(self, call);
     }
+}
 
-    fn visit_expr_try(&mut self, expr: &'ast syn::ExprTry) {
-        if self.returns_result {
-            self.real_failure_path = true;
+/// Token-level sweep of macro arguments for failure-path candidates:
+/// `unwrap`-family idents and any non-innocuous nested macro. syn's
+/// visitor does not parse macro token streams into expressions, so this
+/// keeps eagerly-evaluated argument expressions visible.
+fn tokens_contain_failure_candidates(tokens: TokenStream) -> bool {
+    let trees: Vec<TokenTree> = tokens.into_iter().collect();
+    for (i, tree) in trees.iter().enumerate() {
+        match tree {
+            TokenTree::Ident(ident) => {
+                let name = ident.to_string();
+                let bang = matches!(
+                    trees.get(i + 1),
+                    Some(TokenTree::Punct(p)) if p.as_char() == '!'
+                );
+                if bang {
+                    if !INNOCUOUS_MACROS.contains(&name.as_str()) {
+                        return true;
+                    }
+                } else if matches!(
+                    name.as_str(),
+                    "unwrap" | "expect" | "unwrap_err" | "expect_err"
+                ) {
+                    return true;
+                }
+            }
+            TokenTree::Group(group) if tokens_contain_failure_candidates(group.stream()) => {
+                return true;
+            }
+            _ => {}
         }
-        syn::visit::visit_expr_try(self, expr);
     }
+    false
 }
 
 /// Whether an `assert*`-family invocation cannot fail on non-constant
@@ -210,12 +268,12 @@ fn assertion_is_trivial(name: &str, tokens: TokenStream) -> bool {
         return false;
     }
     // Significant arguments: the condition for `assert!`-style macros,
-    // the two compared sides for `assert_eq!`/`assert_ne!`. Trailing
-    // format-message arguments are ignored. Unknown assert-like macros
-    // are trivial only when every argument is literal.
+    // the two compared sides for the `_eq`/`_ne` variants. Trailing
+    // format-message arguments are ignored. Only the standard macros in
+    // ASSERT_MACROS reach this function.
     let significant: &[Vec<TokenTree>] = match name {
-        "assert" => &args[..1],
-        "assert_eq" | "assert_ne" => {
+        "assert" | "debug_assert" => &args[..1],
+        _ => {
             if args.len() < 2 {
                 return false;
             }
@@ -224,7 +282,6 @@ fn assertion_is_trivial(name: &str, tokens: TokenStream) -> bool {
             }
             &args[..2]
         }
-        _ => &args[..],
     };
     significant.iter().all(|arg| arg_is_literal_only(arg))
 }
@@ -386,6 +443,58 @@ mod tests {
         // A real assertion outranks the bare attribute.
         assert_eq!(
             classify_fn("#[should_panic]\nfn t() { assert!(f()); }"),
+            OracleClass::Present
+        );
+    }
+
+    #[shallguard::verifies("REQ-TRACE-015")]
+    #[test]
+    fn err_return_and_result_aliases_classify_as_present() {
+        // A non-unit return type can carry the failure out of the test;
+        // the classifier cannot see through aliases, so it never gates
+        // on the type's name.
+        assert_eq!(
+            classify_fn("fn t() -> Result<(), String> { run_checks() }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn("fn t() -> Result<(), Error> { if bad() { return Err(e()); } Ok(()) }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn("fn t() -> Fallible<()> { check()?; Ok(()) }"),
+            OracleClass::Present
+        );
+    }
+
+    #[shallguard::verifies("REQ-TRACE-009")]
+    #[test]
+    fn failure_paths_inside_macro_arguments_are_seen() {
+        // Macro arguments are eagerly evaluated expressions; an unwrap
+        // inside them is a real failure path even when the macro itself
+        // is innocuous or the assertion is trivially self-identical.
+        assert_eq!(
+            classify_fn("fn t() { println!(\"{:?}\", parse(\"x\").unwrap()); }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn("fn t() { let v = vec![compute().unwrap()]; }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn("fn t() { assert_eq!(f().unwrap(), f().unwrap()); }"),
+            OracleClass::Present
+        );
+    }
+
+    #[shallguard::verifies("REQ-TRACE-015")]
+    #[test]
+    fn third_party_assert_macros_classify_as_present() {
+        // Only the standard assert macros are trivially analyzable; a
+        // third-party assert_*! (insta, claims, project macros) may
+        // compare against external state and can fail on a literal.
+        assert_eq!(
+            classify_fn("fn t() { assert_snapshot!(\"case-1\"); }"),
             OracleClass::Present
         );
     }
