@@ -88,6 +88,12 @@ anchors.
   recognized test attribute (`#[test]`, `#[tokio::test]`, or any attribute
   path ending in `test`). It **rejects `#[ignore]`d tests** at compile time
   and in the checker. There is no statement form for verification.
+- `#[verifies]` also rejects, at compile time, test bodies that definitely
+  cannot fail: no failure-path tokens at all, or only constant /
+  self-identical assertions. A test whose oracle genuinely lives outside
+  its body (a compile-fail harness, an external checker) opts out visibly
+  with `oracle = "panic"` / `"compile"` / `"external"` — the check report
+  counts and lists every suppression.
 - A single test claiming 6 or more requirements is flagged as an outlier.
 - Anchor ID format is validated at build time — a typo like `REQ-HSR-002`
   is a compile error, so `cargo build` is a cheap first sanity check.
@@ -142,6 +148,8 @@ cargo shallguard fmt            # fix doc formatting (never hand-wrap
 - Never mark an anchored test `#[ignore]`.
 - Never invent or guess a REQ ID — an ID referenced in code that no
   document defines is a hard failure.
+- Never add `oracle = "<class>"` to silence a vacuity finding when the
+  test does not genuinely match that class — that is evidence fabrication.
 - Never reuse a retired requirement ID.
 
 ## Responding to `check` failures

@@ -1,0 +1,5 @@
+error: #[shallguard::verifies(REQ-ZZ-001)] cites a test that cannot fail: the body contains no assertion, panic, unwrap/expect, or `?`. Evidence must offer a real failure path (see SKILL.md, evidence honesty): assert an actual output of the enforcement site, or opt out visibly with oracle = "panic" | "compile" | "external"
+ --> ui/vacuous_empty.rs:5:4
+  |
+5 | fn cannot_fail() {
+  |    ^^^^^^^^^^^
