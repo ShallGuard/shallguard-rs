@@ -473,7 +473,8 @@ rejects any traceability regression.
 
 ### US-TRACE-002: Vacuity-Resistant Automated Evidence
 
-**Status:** Planned
+**Status:** Partially implemented — deterministic lint landed; the
+compile-time opt-out attribute is pending
 
 **As a** maintainer  
 **I want** ✅ evidence rejected when the cited test cannot fail  
@@ -486,36 +487,46 @@ or constant tests
   no assertion macro, no `panic!`/`todo!`/`unreachable!` invocation, no
   `unwrap`/`expect`/`unwrap_err`/`expect_err` call, and no `?` operator in a
   `Result`-returning test — SHALL be reported as vacuous evidence.
-  *Enforced:* not implemented — Tier 1 vacuity lint scoped in issue #13 ·
-  *Verified:* ⏳ pending
+  *Enforced:* `src/oracle.rs` (`classify`) · *Verified:* ✅ `src/oracle.rs`
+  (`empty_and_assertion_free_bodies_are_vacuous`,
+  `real_failure_paths_classify_as_present`,
+  `question_mark_without_result_return_is_not_a_failure_path`)
 - **REQ-TRACE-010** — An assertion whose arguments are all literals
   (constant-foldable, such as `assert!(true)` or `assert_eq!(1, 1)`) SHALL
-  NOT count as a failure path. *Enforced:* not implemented — Tier 1 vacuity
-  lint scoped in issue #13 · *Verified:* ⏳ pending
+  NOT count as a failure path. *Enforced:* `src/oracle.rs`
+  (`assertion_is_trivial`) · *Verified:* ✅ `src/oracle.rs`
+  (`literal_only_assertions_are_trivial`)
 - **REQ-TRACE-011** — An `assert_eq!` or `assert_ne!` whose two compared
   sides are token-identical SHALL NOT count as a failure path. *Enforced:*
-  not implemented — Tier 1 vacuity lint scoped in issue #13 · *Verified:* ⏳
-  pending
+  `src/oracle.rs` (`assertion_is_trivial`) · *Verified:* ✅ `src/oracle.rs`
+  (`token_identical_sides_are_trivial`)
 - **REQ-TRACE-012** — `#[should_panic]` without an `expected` message on a
   `#[verifies]` test whose body offers no other failure path SHALL be
-  reported as weak evidence. *Enforced:* not implemented — Tier 1 vacuity
-  lint scoped in issue #13 · *Verified:* ⏳ pending
+  reported as weak evidence. *Enforced:* `src/oracle.rs` (`classify`) ·
+  *Verified:* ✅ `src/oracle.rs`
+  (`bare_should_panic_is_weak_and_expected_is_present`)
 - **REQ-TRACE-013** — A requirement whose only ✅ citation resolves to a
   vacuous test SHALL be counted as lacking automated verification, and
   vacuous and weak findings SHALL flow through the ratcheted baseline as
   distinct gap kinds, so pre-existing cases in adopting repositories are
-  grandfatherable and ratcheted. *Enforced:* not implemented — Tier 1
-  vacuity lint scoped in issue #13 · *Verified:* ⏳ pending
+  grandfatherable and ratcheted. *Enforced:* `src/check.rs`
+  (`evaluate_verification`, `gap_is_hard`), `src/baseline.rs` (`GapKind`) ·
+  *Verified:* ✅ `src/check.rs` (`sole_vacuous_evidence_demotes_the_requirement`,
+  `redundant_vacuous_evidence_keeps_the_requirement_anchored`,
+  `vacuous_evidence_flows_through_the_baseline_like_other_kinds`,
+  `weak_evidence_is_advisory_unless_strict_oracle`), `src/baseline.rs`
+  (`evidence_gap_kinds_round_trip_through_baseline`)
 - **REQ-TRACE-014** — An explicit `#[verifies("REQ-...", oracle = "<class>")]`
   opt-out SHALL suppress vacuity reporting for that test and SHALL be
   counted and listable in the check report; suppression SHALL NOT be
-  silent. *Enforced:* not implemented — Tier 1 vacuity lint scoped in
-  issue #13 · *Verified:* ⏳ pending
+  silent. *Enforced:* not implemented — scanner-side recognition landed;
+  the compile-time attribute lands with the macro front line (issue #13) ·
+  *Verified:* ⏳ pending
 - **REQ-TRACE-015** — Vacuity analysis SHALL be purely syntactic and
   deterministic, SHALL NOT execute tested code, and SHALL classify any
   construct the classifier does not fully understand as evidence present
-  rather than vacuous. *Enforced:* not implemented — Tier 1 vacuity lint
-  scoped in issue #13 · *Verified:* ⏳ pending
+  rather than vacuous. *Enforced:* `src/oracle.rs` (`classify`) ·
+  *Verified:* ✅ `src/oracle.rs` (`unknown_constructs_classify_as_present`)
 
 ## Baseline and Ratchet User Stories
 

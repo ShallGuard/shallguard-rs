@@ -163,6 +163,7 @@ fn builds_module_name_from_library_file_and_inline_modules() {
         test_fn: "proves_it".to_string(),
         inline_modules: vec!["tests".to_string()],
         ids: vec!["REQ-ZZ-001".to_string()],
+        oracle: crate::oracle::OracleClass::Present,
     };
     assert_eq!(
         static_test_name(
