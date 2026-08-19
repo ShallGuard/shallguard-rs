@@ -65,6 +65,16 @@ layer. It also does not prove that a SHALL statement is well-chosen —
 requirement quality stays with the human reviewer, as discussed in
 [issue #12](https://github.com/sigi64/shallguard/issues/12).
 
+## Requirement ID concurrency
+
+Requirement IDs are stable forever only once merged. When two branches
+draft the same next-free `REQ-<AREA>-<NNN>` and collide at merge or
+rebase, the rebasing branch renumbers its requirement to the next free ID;
+IDs become stable at merge to the default branch, not at draft time.
+Renumbering before merge is safe because `cargo shallguard check` fails on
+any rename missed between the document and the anchors — a half-renamed
+requirement cannot pass the gate.
+
 ## Portability
 
 Workspace-root discovery works from single-package projects and virtual Cargo
