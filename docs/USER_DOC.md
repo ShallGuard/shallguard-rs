@@ -52,16 +52,24 @@ provider authentication and data handling remain outside this tool.
 
 ## What the deterministic gate does and does not prove
 
-`cargo shallguard check` proves four things: link integrity (every
-requirement resolves to its anchors and every anchor to its requirement),
-citation reality (every ✅ claim names a real, non-ignored, anchored test),
-evidence-class consistency, and monotone debt (the committed baseline can
-only shrink). It does not prove that an anchored test is sharp — an
-`#[enforces]` attribute survives edits that gut the behavior it annotates,
-and an anchored test may be vacuous; executable coverage, human review, and
-the vacuity lints proposed in
-[issue #13](https://github.com/sigi64/shallguard/issues/13) address that
-layer. It also does not prove that a SHALL statement is well-chosen —
+`cargo shallguard check` proves five things:
+
+- **Link integrity** — every requirement resolves to its anchors and every
+  anchor to its requirement.
+- **Citation reality** — every ✅ claim names a real, non-ignored, anchored
+  test.
+- **Evidence-class consistency.**
+- **Monotone debt** — the committed baseline can only shrink.
+- **An evidence floor** — a cited test that cannot fail (no failure path,
+  or only provably always-passing assertions) is rejected, at compile time
+  for the certain cases and as check findings otherwise; every `oracle`
+  opt-out is counted and listed in the report.
+
+It does not prove that an anchored test is sharp — an `#[enforces]`
+attribute survives edits that gut the behavior it annotates, and a test
+above the vacuity floor can still pass without exercising the contract;
+executable coverage, human review, and semantic review address that layer.
+It also does not prove that a SHALL statement is well-chosen —
 requirement quality stays with the human reviewer, as discussed in
 [issue #12](https://github.com/sigi64/shallguard/issues/12).
 
