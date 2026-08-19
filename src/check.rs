@@ -18,10 +18,12 @@ use crate::scan::{Anchors, VerificationAnchor, scan};
 pub use crate::check_report::{Finding, Report};
 
 /// Result of a monotonic baseline maintenance command.
+#[derive(Debug)]
 pub struct BaselineChange {
     pub path: PathBuf,
     pub entries: usize,
     pub removed: usize,
+    pub added: usize,
 }
 
 struct TraceabilityGap {
@@ -88,6 +90,7 @@ pub fn initialize_baseline(
         path,
         entries: count,
         removed: 0,
+        added: count,
     })
 }
 
@@ -125,6 +128,65 @@ pub fn prune_baseline(
         path,
         entries: baseline.gaps.len(),
         removed,
+        added: 0,
+    })
+}
+
+/// Adds exceptions only for gaps of kinds the committed baseline has
+/// never recorded — the tool-upgrade path when a new release starts
+/// detecting a gap kind that older releases could not. Kinds already
+/// present stay removal-only.
+#[shallguard::enforces("REQ-BASE-006")]
+pub fn extend_baseline(
+    root: &Path,
+    docs: &[DocSpec],
+    config: &RepositoryConfig,
+) -> Result<BaselineChange> {
+    require_complete_scope(docs, config, "extend")?;
+    let analysis = analyze(root, docs, config)?;
+    // Only structural errors block extension; the unbaselined gaps of a
+    // newly detectable kind are exactly what this command records.
+    ensure_no_non_gap_errors(&analysis, "extend")?;
+    let baseline = Baseline::load(root, &config.baseline)?;
+
+    let existing_kinds: HashSet<GapKind> = baseline.gaps.iter().map(|entry| entry.kind).collect();
+    let candidates: Vec<&GapKey> = analysis
+        .gaps
+        .keys()
+        .filter(|key| !existing_kinds.contains(&key.kind) && !gap_is_advisory(key.kind))
+        .collect();
+    if let Some(hard) = candidates
+        .iter()
+        .find(|key| gap_is_hard(key.kind, &analysis.gaps[**key].area, config))
+    {
+        bail!(
+            "cannot extend baseline: hard-area gap {} ({}) must be fixed",
+            hard.requirement,
+            hard.kind
+        );
+    }
+    if candidates.is_empty() {
+        return Ok(BaselineChange {
+            path: root.join(&config.baseline),
+            entries: baseline.gaps.len(),
+            removed: 0,
+            added: 0,
+        });
+    }
+    let added = candidates.len();
+    let mut entries = baseline.gaps.clone();
+    entries.extend(candidates.into_iter().map(|key| BaselineEntry {
+        requirement: key.requirement.clone(),
+        kind: key.kind,
+    }));
+    let merged = Baseline::from_entries(entries);
+    let total = merged.gaps.len();
+    let path = merged.write_pruned(root, &config.baseline)?;
+    Ok(BaselineChange {
+        path,
+        entries: total,
+        removed: 0,
+        added,
     })
 }
 
@@ -669,14 +731,18 @@ fn apply_baseline(
         if let Some(reason) = stale_reason {
             stats.resolved += 1;
             if stale_is_error {
-                analysis.errors.push(baseline_finding(
-                    config,
-                    format!(
-                        "stale baseline entry {} ({}): {reason}; remove it with `cargo \
-                         shallguard baseline prune`",
-                        entry.requirement, entry.kind
-                    ),
-                ));
+                let message = format!(
+                    "stale baseline entry {} ({}): {reason}; remove it with `cargo \
+                     shallguard baseline prune`",
+                    entry.requirement, entry.kind
+                );
+                if gap_is_advisory(entry.kind) {
+                    // Fixing an advisory finding must never break the
+                    // gate, even when its entry got in out-of-band.
+                    analysis.warnings.push(baseline_finding(config, message));
+                } else {
+                    analysis.errors.push(baseline_finding(config, message));
+                }
             }
         }
     }
@@ -697,7 +763,7 @@ fn baseline_finding(config: &RepositoryConfig, message: String) -> Finding {
     }
 }
 
-#[shallguard::enforces("REQ-BASE-003", "REQ-TRACE-013")]
+#[shallguard::enforces("REQ-BASE-003", "REQ-TRACE-013", "REQ-TRACE-018")]
 fn gap_is_hard(kind: GapKind, area: &str, config: &RepositoryConfig) -> bool {
     match kind {
         GapKind::EnforcementAnchor => config.area_is_hard(area, false),

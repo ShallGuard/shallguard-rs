@@ -237,7 +237,7 @@ fn strip_anchor_attrs(
             Some("enforces") => {
                 match &attr.meta {
                     syn::Meta::List(list) => {
-                        validate_id_list("enforces", list.tokens.clone().into(), false, errors);
+                        validate_id_list("#[enforces]", list.tokens.clone().into(), false, errors);
                     }
                     _ => errors.extend(
                         syn::Error::new_spanned(
@@ -561,21 +561,25 @@ fn scan_body_tokens(tokens: proc_macro2::TokenStream, scan: &mut FrontLineScan) 
                     Some(TokenTree::Punct(p)) if p.as_char() == '!'
                 );
                 if bang && let Some(TokenTree::Group(group)) = trees.get(i + 2) {
-                    if matches!(
-                        name.as_str(),
-                        "assert"
-                            | "assert_eq"
-                            | "assert_ne"
-                            | "debug_assert"
-                            | "debug_assert_eq"
-                            | "debug_assert_ne"
-                    ) {
+                    // A path-qualified invocation (harness::assert!) is a
+                    // third-party macro reusing a std name: conservative.
+                    let path_qualified =
+                        i > 0 && matches!(&trees[i - 1], TokenTree::Punct(p) if p.as_char() == ':');
+                    if !path_qualified
+                        && matches!(
+                            name.as_str(),
+                            "assert"
+                                | "assert_eq"
+                                | "assert_ne"
+                                | "debug_assert"
+                                | "debug_assert_eq"
+                                | "debug_assert_ne"
+                        )
+                    {
                         if assert_args_trivial(&name, group.stream()) {
+                            // A trivial assertion never fails, so its
+                            // format-message arguments never evaluate.
                             scan.trivial_assertion = true;
-                            // The argument expressions still run: an
-                            // unwrap inside identical sides is a real
-                            // failure path.
-                            scan_body_tokens(group.stream(), scan);
                         } else {
                             scan.candidate = true;
                         }
@@ -649,8 +653,12 @@ fn assert_args_trivial(name: &str, tokens: proc_macro2::TokenStream) -> bool {
             if args.len() < 2 || !literal_only(&args[0]) || !literal_only(&args[1]) {
                 return false;
             }
-            let equal = render(&args[0]) == render(&args[1]);
-            if name.ends_with("ne") { !equal } else { equal }
+            // `assert_ne!` is never provably passing: textually
+            // different literals may be numerically equal (1 vs 0x1).
+            if name.ends_with("ne") {
+                return false;
+            }
+            render(&args[0]) == render(&args[1])
         }
     }
 }

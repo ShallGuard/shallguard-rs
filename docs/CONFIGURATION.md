@@ -60,7 +60,10 @@ once and commit it:
 cargo shallguard baseline init
 ```
 
-The baseline is a ratchet, not an allowlist to extend. New gaps fail checking.
+The baseline is a ratchet, not an allowlist to extend. New gaps fail
+checking. The one sanctioned growth is `cargo shallguard baseline extend`
+after a tool upgrade: it records only gaps of kinds the committed baseline
+has never contained (kinds the recording release could not detect).
 After adding honest enforcement or verification anchors, remove only resolved
 entries and commit the result with the anchors:
 

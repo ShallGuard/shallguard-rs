@@ -13,7 +13,12 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-pub const BASELINE_SCHEMA: u32 = 1;
+/// Oldest baseline schema this release reads.
+pub const BASELINE_SCHEMA_MIN: u32 = 1;
+/// Newest baseline schema this release reads and writes. Schema 2 adds
+/// the vacuity gap kinds; a baseline without them stays schema 1 so
+/// older binaries keep reading it.
+pub const BASELINE_SCHEMA_MAX: u32 = 2;
 
 /// A traceability dimension that may have historical debt.
 #[shallguard::enforces("REQ-TRACE-013")]
@@ -28,6 +33,16 @@ pub enum GapKind {
     /// The best available evidence is structurally weak (e.g. bare
     /// `#[should_panic]`).
     WeakEvidence,
+}
+
+impl GapKind {
+    /// The oldest baseline schema that can represent this kind.
+    fn minimum_schema(self) -> u32 {
+        match self {
+            Self::EnforcementAnchor | Self::VerificationAnchor | Self::EvidenceCitation => 1,
+            Self::VacuousEvidence | Self::WeakEvidence => 2,
+        }
+    }
 }
 
 impl fmt::Display for GapKind {
@@ -85,10 +100,12 @@ pub struct Baseline {
 
 impl Baseline {
     pub fn from_entries(gaps: Vec<BaselineEntry>) -> Self {
-        let mut baseline = Self {
-            schema: BASELINE_SCHEMA,
-            gaps,
-        };
+        let schema = gaps
+            .iter()
+            .map(|entry| entry.kind.minimum_schema())
+            .max()
+            .unwrap_or(BASELINE_SCHEMA_MIN);
+        let mut baseline = Self { schema, gaps };
         baseline.sort();
         baseline
     }
@@ -102,17 +119,28 @@ impl Baseline {
 
     /// Parses and validates baseline content obtained from a Git
     /// revision or another non-filesystem source.
+    #[shallguard::enforces("REQ-BASE-007")]
     pub fn parse(text: &str, source: &str) -> Result<Self> {
-        let mut baseline: Self = toml::from_str(text)
+        // Validate the schema before full deserialization, so a newer
+        // baseline fails with the version in the message instead of an
+        // opaque unknown-variant error.
+        #[derive(Deserialize)]
+        struct SchemaProbe {
+            schema: u32,
+        }
+        let probe: SchemaProbe = toml::from_str(text)
             .with_context(|| format!("parsing traceability baseline {source}"))?;
-        if baseline.schema != BASELINE_SCHEMA {
+        if !(BASELINE_SCHEMA_MIN..=BASELINE_SCHEMA_MAX).contains(&probe.schema) {
             bail!(
-                "unsupported traceability baseline schema {} in {} (expected {})",
-                baseline.schema,
+                "unsupported traceability baseline schema {} in {} (this release supports {}..={})",
+                probe.schema,
                 source,
-                BASELINE_SCHEMA
+                BASELINE_SCHEMA_MIN,
+                BASELINE_SCHEMA_MAX
             );
         }
+        let mut baseline: Self = toml::from_str(text)
+            .with_context(|| format!("parsing traceability baseline {source}"))?;
         baseline.sort();
         Ok(baseline)
     }
@@ -130,7 +158,7 @@ impl Baseline {
     }
 
     pub fn render(&self) -> Result<String> {
-        let mut sorted = self.clone();
+        let mut sorted = Self::from_entries(self.gaps.clone());
         sorted.sort();
         let body = toml::to_string_pretty(&sorted).context("serializing traceability baseline")?;
         Ok(format!(
@@ -201,6 +229,39 @@ mod tests {
 
         let parsed: Baseline = toml::from_str(&rendered).expect("rendered TOML parses");
         assert_eq!(parsed, baseline);
+    }
+
+    #[shallguard::verifies("REQ-BASE-007")]
+    #[test]
+    fn schema_is_validated_before_full_deserialization() {
+        // A future schema fails by number, even when the body contains
+        // gap kinds this release has never heard of.
+        let text =
+            "schema = 3\n\n[[gap]]\nrequirement = \"REQ-AA-001\"\nkind = \"quantum-evidence\"\n";
+        let err = Baseline::parse(text, "test").expect_err("schema 3 must be rejected");
+        let message = format!("{err:#}");
+        assert!(message.contains("unsupported traceability baseline schema 3"));
+        assert!(message.contains("1..=2"));
+    }
+
+    #[shallguard::verifies("REQ-BASE-007")]
+    #[test]
+    fn schema_follows_the_newest_gap_kind() {
+        // Old kinds keep schema 1 so pinned older binaries still read it.
+        let old_only =
+            Baseline::from_entries(vec![entry("REQ-AA-001", GapKind::EnforcementAnchor)]);
+        assert_eq!(old_only.schema, 1);
+        assert!(old_only.render().expect("renders").contains("schema = 1"));
+
+        let with_vacuous = Baseline::from_entries(vec![
+            entry("REQ-AA-001", GapKind::EnforcementAnchor),
+            entry("REQ-AA-002", GapKind::VacuousEvidence),
+        ]);
+        assert_eq!(with_vacuous.schema, 2);
+        let rendered = with_vacuous.render().expect("renders");
+        assert!(rendered.contains("schema = 2"));
+        let parsed = Baseline::parse(&rendered, "test").expect("schema 2 reads back");
+        assert_eq!(parsed, with_vacuous);
     }
 
     #[shallguard::verifies("REQ-TRACE-013")]

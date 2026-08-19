@@ -721,25 +721,56 @@ fn compare_baseline(
     };
     let before = Baseline::parse(&text, &format!("{base}:{baseline_name}"))?;
     let old: BTreeSet<GapKey> = before.gaps.iter().map(|entry| entry.key()).collect();
+    let old_kinds: BTreeSet<_> = before.gaps.iter().map(|entry| entry.kind).collect();
     for added in head
         .gaps
         .iter()
         .map(|entry| entry.key())
         .filter(|key| !old.contains(key))
     {
-        state.findings.push(ImpactFinding {
-            code: "baseline-entry-added".to_string(),
-            severity: FindingSeverity::Error,
-            requirement: Some(added.requirement.clone()),
-            file: Some(baseline_name.clone()),
-            line: Some(1),
-            message: format!(
-                "MR adds a {} exception; baseline maintenance is removal-only",
-                added.kind
-            ),
-        });
+        state.findings.push(baseline_addition_finding(
+            &added,
+            &old_kinds,
+            &baseline_name,
+        ));
     }
     Ok(())
+}
+
+/// Classifies one baseline addition: a kind the recorded baseline never
+/// contained is a tool-upgrade extension and stays a reviewable warning;
+/// anything else is forbidden growth.
+#[shallguard::enforces("REQ-BASE-005")]
+fn baseline_addition_finding(
+    added: &GapKey,
+    old_kinds: &BTreeSet<crate::baseline::GapKind>,
+    baseline_name: &str,
+) -> ImpactFinding {
+    if !old_kinds.contains(&added.kind) {
+        return ImpactFinding {
+            code: "baseline-extended".to_string(),
+            severity: FindingSeverity::Warning,
+            requirement: Some(added.requirement.clone()),
+            file: Some(baseline_name.to_string()),
+            line: Some(1),
+            message: format!(
+                "MR extends the baseline with a {} exception, a gap kind the \
+                 recording tool version could not detect; review the added debt",
+                added.kind
+            ),
+        };
+    }
+    ImpactFinding {
+        code: "baseline-entry-added".to_string(),
+        severity: FindingSeverity::Error,
+        requirement: Some(added.requirement.clone()),
+        file: Some(baseline_name.to_string()),
+        line: Some(1),
+        message: format!(
+            "MR adds a {} exception; baseline maintenance is removal-only",
+            added.kind
+        ),
+    }
 }
 
 #[derive(Debug)]
@@ -2223,6 +2254,28 @@ mod tests {
             module_root(Path::new("crates/widget-app/src/router.rs")),
             "widget_app::router"
         );
+    }
+
+    #[shallguard::verifies("REQ-BASE-005")]
+    #[test]
+    fn new_kind_baseline_addition_is_a_reviewable_warning() {
+        use crate::baseline::GapKind;
+        let old_kinds: BTreeSet<GapKind> = BTreeSet::from([GapKind::EnforcementAnchor]);
+        let extension = baseline_addition_finding(
+            &GapKey::new("REQ-ZZ-001", GapKind::VacuousEvidence),
+            &old_kinds,
+            ".shallguard/baseline.toml",
+        );
+        assert_eq!(extension.code, "baseline-extended");
+        assert!(matches!(extension.severity, FindingSeverity::Warning));
+
+        let growth = baseline_addition_finding(
+            &GapKey::new("REQ-ZZ-002", GapKind::EnforcementAnchor),
+            &old_kinds,
+            ".shallguard/baseline.toml",
+        );
+        assert_eq!(growth.code, "baseline-entry-added");
+        assert!(matches!(growth.severity, FindingSeverity::Error));
     }
 
     #[shallguard::verifies("REQ-BASE-005")]

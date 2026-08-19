@@ -493,10 +493,12 @@ or constant tests
   `failure_paths_inside_macro_arguments_are_seen`,
   `not_equals_comparisons_are_not_failure_paths`)
 - **REQ-TRACE-010** — A constant assertion that provably always passes
-  (`assert!(true)`, `assert_eq!(1, 1)`, `assert_ne!(0, 1)`) SHALL NOT count
-  as a failure path; a constant assertion that always fails
-  (`assert!(false)`, `assert_eq!(0, 1)`) SHALL count as an unconditional
-  failure path. *Enforced:* `src/oracle.rs` (`assertion_is_trivial`) ·
+  (`assert!(true)`, `assert_eq!(1, 1)`) SHALL NOT count as a failure path;
+  a constant assertion that always fails (`assert!(false)`,
+  `assert_eq!(0, 1)`) SHALL count as an unconditional failure path; and
+  `assert_ne!` SHALL never be treated as provably passing, because
+  textually different literals may be numerically equal
+  (`assert_ne!(1, 0x1)`). *Enforced:* `src/oracle.rs` (`assertion_is_trivial`) ·
   *Verified:* ✅ `src/oracle.rs` (`literal_only_assertions_are_trivial`,
   `always_failing_constant_asserts_are_failure_paths`)
 - **REQ-TRACE-011** — An `assert_eq!` or `assert_ne!` SHALL count as
@@ -560,6 +562,13 @@ or constant tests
   `src/scan_tests.rs` (`unknown_oracle_class_is_not_a_suppression`,
   `duplicate_and_non_string_oracle_values_are_invalid`), `src/oracle.rs`
   (`oracle_class_set_is_pinned`)
+- **REQ-TRACE-018** — Weak-evidence findings SHALL be advisory warnings by
+  default, and an area configured with `strict_oracle = true` SHALL
+  promote them to errors that cannot be baselined. *Enforced:*
+  `src/check.rs` (`gap_is_hard`), `src/config.rs` (`area_strict_oracle`) ·
+  *Verified:* ✅ `src/check_tests.rs`
+  (`weak_evidence_is_advisory_unless_strict_oracle`,
+  `stale_advisory_baseline_entries_never_hard_fail`)
 
 ## Baseline and Ratchet User Stories
 
@@ -587,15 +596,34 @@ or constant tests
   `src/config.rs` (`RepositoryConfig::area_is_hard`) ·
   *Verified:* ✅ `src/check_tests.rs` (`hard_area_cannot_be_baselined`)
 - **REQ-BASE-004** — A resolved or retired gap SHALL make its baseline entry
-  stale and fail checking until `baseline prune` removes it; pruning SHALL
-  remove only resolved entries. *Enforced:* `src/check.rs`
+  stale and fail checking until `baseline prune` removes it, except entries
+  of advisory-only kinds, whose staleness SHALL be reported as a warning;
+  pruning SHALL remove only resolved entries. *Enforced:* `src/check.rs`
   (`apply_baseline`, `prune_baseline`) · *Verified:* ✅ `src/check_tests.rs`
   (`fixed_gap_makes_entry_stale`, `prune_mode_accepts_resolved_entry_for_removal`)
 - **REQ-BASE-005** — Change impact SHALL reject manual baseline growth after
-  initialization and SHALL reject modification of a requirement that still
-  carries historical debt. *Enforced:* `src/impact.rs` (`compare_baseline`,
+  initialization, except entries of a gap kind previously absent from the
+  committed baseline (a tool-upgrade extension), which SHALL be reported as
+  a reviewable warning; and it SHALL reject modification of a requirement
+  that still carries historical debt. *Enforced:* `src/impact.rs` (`compare_baseline`,
   `compare_requirement_documents`) · *Verified:* ✅ `src/impact.rs`
-  (`changed_requirement_with_baseline_debt_is_policy_error`)
+  (`changed_requirement_with_baseline_debt_is_policy_error`,
+  `new_kind_baseline_addition_is_a_reviewable_warning`)
+- **REQ-BASE-006** — `cargo shallguard baseline extend` SHALL add exceptions
+  only for detected gaps of kinds with no existing entry in the committed
+  baseline (kinds the recording tool version could not detect), SHALL
+  refuse when such a gap lies in a hardened area, and SHALL NOT otherwise
+  grow the baseline — removal-only maintenance is unchanged. *Enforced:*
+  `src/check.rs` (`extend_baseline`) · *Verified:* ✅ `src/check_tests.rs`
+  (`extend_records_only_newly_detectable_kinds`)
+- **REQ-BASE-007** — Baseline reading SHALL validate the schema version
+  before full deserialization and SHALL report an unsupported version by
+  number; a baseline containing gap kinds unknown to schema 1 SHALL be
+  written with schema 2, and schemas 1 and 2 SHALL both be readable.
+  *Enforced:* `src/baseline.rs` (`Baseline::parse`, `Baseline::from_entries`)
+  · *Verified:* ✅ `src/baseline.rs`
+  (`schema_is_validated_before_full_deserialization`,
+  `schema_follows_the_newest_gap_kind`)
 
 ## Change Impact User Stories
 

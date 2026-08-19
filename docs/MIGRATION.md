@@ -122,6 +122,21 @@ Progress is visible, not vibes: the per-area table from `cargo shallguard
 check` (anchored / tested / pending counts) plus the baseline gap count are
 the migration dashboard. Both trend monotonically toward zero.
 
+### Upgrading the tool mid-migration
+
+A newer ShallGuard release may detect gap kinds an older release could
+not (the vacuity lints are one). Pre-existing gaps of such a kind are
+historical debt, not new regressions, and there is a dedicated ratchet
+path for them:
+
+```bash
+cargo shallguard baseline extend   # records only gaps of kinds the
+                                   # committed baseline has never seen
+```
+
+`extend` refuses gaps in hardened areas and refuses to grow kinds the
+baseline already tracks — ordinary maintenance stays removal-only.
+
 ## Phase 4: Harden, then develop requirement-first
 
 When an area has no remaining gaps in a dimension, flip it to

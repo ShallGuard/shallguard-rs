@@ -413,7 +413,7 @@ From a ShallGuard source checkout, `cargo run -- <arguments>` runs the
 | `cargo shallguard check` | Cross-check requirements against code and test anchors (the CI gate). |
 | `cargo shallguard fmt [--check]` | Format (or verify formatting of) requirement blocks. |
 | `cargo shallguard lint` | Lint requirement documents without writing. |
-| `cargo shallguard baseline <check\|init\|prune>` | Manage the ratcheted gap baseline. |
+| `cargo shallguard baseline <check\|init\|extend\|prune>` | Manage the ratcheted gap baseline; `extend` records only gap kinds a newer release started detecting. |
 | `cargo shallguard impact --base <rev>\|--target <branch>` | Map a Git diff to impacted requirements and their tests (JSON/Markdown). |
 | `cargo shallguard test-index` | Enumerate the exact Cargo tests behind verification anchors. |
 | `cargo shallguard coverage` | Collect LLVM execution evidence for verification tests (needs `cargo-llvm-cov`). |

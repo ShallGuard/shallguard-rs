@@ -187,14 +187,20 @@ impl<'ast> Visit<'ast> for BodyVisitor {
             self.opaque_construct = true;
             return;
         };
+        // A path-qualified invocation (harness::assert!) is a third-party
+        // macro that merely reuses a std name: conservative.
+        if mac.path.segments.len() != 1 {
+            self.opaque_construct = true;
+            syn::visit::visit_macro(self, mac);
+            return;
+        }
         if ASSERT_MACROS.contains(&name.as_str()) {
             if assertion_is_trivial(&name, mac.tokens.clone()) {
+                // A trivial assertion never fails, so its format-message
+                // arguments never evaluate - an unwrap there is not a
+                // failure path. Non-literal compared sides are already
+                // non-trivial.
                 self.trivial_assertion = true;
-                // A trivial assertion's arguments may still contain real
-                // failure paths (assert_eq!(f().unwrap(), f().unwrap())).
-                if tokens_contain_failure_candidates(mac.tokens.clone()) {
-                    self.real_failure_path = true;
-                }
             } else {
                 self.real_failure_path = true;
             }
@@ -279,8 +285,12 @@ fn assertion_is_trivial(name: &str, tokens: TokenStream) -> bool {
             if args.len() < 2 || !arg_is_literal_only(&args[0]) || !arg_is_literal_only(&args[1]) {
                 return false;
             }
-            let equal = normalized(&args[0]) == normalized(&args[1]);
-            if name.ends_with("ne") { !equal } else { equal }
+            // `assert_ne!` is never provably passing: textually
+            // different literals may be numerically equal (1 vs 0x1).
+            if name.ends_with("ne") {
+                return false;
+            }
+            normalized(&args[0]) == normalized(&args[1])
         }
     }
 }
@@ -399,13 +409,27 @@ mod tests {
             OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
         );
         assert_eq!(
-            classify_fn("fn t() { assert_ne!(0, 1, \"context {}\", 2); }"),
+            classify_fn("fn t() { assert_eq!(1, 1, \"context {}\", 2); }"),
             OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
         );
+        // assert_ne! is never provably passing: 1 and 0x1 differ
+        // textually but are equal, so ne stays a failure path.
+        assert_eq!(
+            classify_fn("fn t() { assert_ne!(0, 1); }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn("fn t() { assert_ne!(1, 0x1); }"),
+            OracleClass::Present
+        );
         // A literal condition with a non-literal message is still trivial:
-        // the message never fires.
+        // the message never fires - not even an unwrap inside it.
         assert_eq!(
             classify_fn("fn t() { assert!(true, \"saw {}\", value()); }"),
+            OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+        );
+        assert_eq!(
+            classify_fn("fn t() { assert_eq!(1, 1, \"state: {}\", inspect().unwrap()); }"),
             OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
         );
     }
@@ -544,6 +568,11 @@ mod tests {
         // compare against external state and can fail on a literal.
         assert_eq!(
             classify_fn("fn t() { assert_snapshot!(\"case-1\"); }"),
+            OracleClass::Present
+        );
+        // Path-qualified reuse of a std assert name is third-party too.
+        assert_eq!(
+            classify_fn("fn t() { harness::assert!(true); }"),
             OracleClass::Present
         );
     }

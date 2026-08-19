@@ -222,7 +222,7 @@ fn vacuous_evidence_flows_through_the_baseline_like_other_kinds() {
     assert!(hard.errors.iter().any(|f| f.message.contains("forbidden")));
 }
 
-#[shallguard::verifies("REQ-TRACE-013")]
+#[shallguard::verifies("REQ-TRACE-013", "REQ-TRACE-018")]
 #[test]
 fn weak_evidence_is_advisory_unless_strict_oracle() {
     let kind = GapKind::WeakEvidence;
@@ -285,4 +285,98 @@ fn hard_area_cannot_be_baselined() {
             .iter()
             .any(|finding| finding.message.contains("forbidden"))
     );
+}
+
+#[shallguard::verifies("REQ-BASE-004", "REQ-TRACE-018")]
+#[test]
+fn stale_advisory_baseline_entries_never_hard_fail() {
+    // A weak-evidence entry that entered the baseline out-of-band must
+    // not break the gate when the weak test is fixed.
+    let kind = GapKind::WeakEvidence;
+    let mut analysis = analysis(requirement("REQ-ZZ-001", "ZZ", false), None);
+    let stats = apply_baseline(
+        &mut analysis,
+        &baseline("REQ-ZZ-001", kind),
+        true,
+        true,
+        &config(None),
+    );
+    assert!(analysis.errors.is_empty());
+    assert_eq!(stats.resolved, 1);
+    assert!(
+        analysis
+            .warnings
+            .iter()
+            .any(|finding| finding.message.contains("stale baseline entry"))
+    );
+}
+
+#[shallguard::verifies("REQ-BASE-006")]
+#[test]
+fn extend_records_only_newly_detectable_kinds() {
+    use crate::config::DocumentConfig;
+
+    let dir = std::env::temp_dir().join(format!("shallguard-extend-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("docs")).expect("BUG: temp dirs");
+    std::fs::create_dir_all(dir.join("src")).expect("BUG: temp dirs");
+    std::fs::create_dir_all(dir.join(".shallguard")).expect("BUG: temp dirs");
+    std::fs::write(
+        dir.join("docs/REQUIREMENTS.md"),
+        "# Fixture\n\n**System Requirements:**\n\n\
+         - **REQ-ZZ-001** \u{2014} The floor SHALL hold. *Enforced:* `src/lib.rs`\n  \
+         (`floor`) \u{b7} *Verified:* \u{2705} `src/lib.rs` (`vacuous_check`)\n",
+    )
+    .expect("BUG: write doc");
+    std::fs::write(
+        dir.join("src/lib.rs"),
+        "#[shallguard::enforces(\"REQ-ZZ-001\")]\npub fn floor() {}\n\n\
+         #[cfg(test)]\nmod tests {\n    #[shallguard::verifies(\"REQ-ZZ-001\")]\n    \
+         #[test]\n    fn vacuous_check() {\n        assert!(true);\n    }\n}\n",
+    )
+    .expect("BUG: write src");
+    std::fs::write(dir.join(".shallguard/baseline.toml"), "schema = 1\n")
+        .expect("BUG: write baseline");
+
+    let mut config = config(None);
+    config.documents = vec![DocumentConfig {
+        path: PathBuf::from("docs/REQUIREMENTS.md"),
+        source_root: PathBuf::from("."),
+    }];
+    config.areas.insert(
+        "ZZ".to_string(),
+        AreaConfig {
+            label: "Fixture".to_string(),
+            hard_enforcement: false,
+            hard_verification: false,
+            strict_oracle: false,
+        },
+    );
+    let docs = config.documents();
+
+    // First extension records the vacuous-evidence gap the old tool
+    // version could not detect; the baseline bumps to schema 2.
+    let change = extend_baseline(&dir, &docs, &config).expect("extend succeeds");
+    assert_eq!(change.added, 1);
+    let written = std::fs::read_to_string(dir.join(".shallguard/baseline.toml"))
+        .expect("BUG: baseline readable");
+    assert!(written.contains("vacuous-evidence"));
+    assert!(written.contains("schema = 2"));
+
+    // The kind is now recorded: extension is closed for it.
+    let again = extend_baseline(&dir, &docs, &config).expect("extend is idempotent");
+    assert_eq!(again.added, 0);
+
+    // Hardened areas refuse extension outright.
+    config
+        .areas
+        .get_mut("ZZ")
+        .expect("BUG: area exists")
+        .hard_verification = true;
+    std::fs::write(dir.join(".shallguard/baseline.toml"), "schema = 1\n")
+        .expect("BUG: reset baseline");
+    let err = extend_baseline(&dir, &docs, &config).expect_err("hard area refuses");
+    assert!(format!("{err:#}").contains("hard-area gap"));
+
+    std::fs::remove_dir_all(&dir).ok();
 }

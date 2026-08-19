@@ -65,6 +65,7 @@ enum Command {
     Format(FormatArgs),
     BaselineInit,
     BaselinePrune,
+    BaselineExtend,
     Impact(ImpactArgs),
     Bundle(BundleArgs),
     TestIndex(TestIndexArgs),
@@ -205,12 +206,15 @@ fn main() -> ExitCode {
         },
         [baseline, action] if baseline == "baseline" && action == "init" => Command::BaselineInit,
         [baseline, action] if baseline == "baseline" && action == "prune" => Command::BaselinePrune,
+        [baseline, action] if baseline == "baseline" && action == "extend" => {
+            Command::BaselineExtend
+        }
         [baseline, action, docs @ ..] if baseline == "baseline" && action == "check" => {
             Command::Check(docs.to_vec())
         }
         [baseline, ..] if baseline == "baseline" => {
             eprintln!(
-                "{COMMAND_NAME}: expected `baseline check`, `baseline init`, or `baseline prune`"
+                "{COMMAND_NAME}: expected `baseline check`, `baseline init`, `baseline extend`, or `baseline prune`"
             );
             return ExitCode::FAILURE;
         }
@@ -235,6 +239,7 @@ fn main() -> ExitCode {
         | Command::Clean
         | Command::BaselineInit
         | Command::BaselinePrune
+        | Command::BaselineExtend
         | Command::Impact(_)
         | Command::Bundle(_)
         | Command::TestIndex(_)
@@ -284,6 +289,23 @@ fn main() -> ExitCode {
                 }
                 Err(err) => {
                     eprintln!("{COMMAND_NAME} baseline init failed: {err:#}");
+                    ExitCode::FAILURE
+                }
+            };
+        }
+        Command::BaselineExtend => {
+            return match shallguard::check::extend_baseline(&root, &docs, &config) {
+                Ok(change) => {
+                    println!(
+                        "extended {} with {} gap(s) of newly detectable kind(s); {} total",
+                        change.path.display(),
+                        change.added,
+                        change.entries
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(err) => {
+                    eprintln!("{COMMAND_NAME} baseline extend failed: {err:#}");
                     ExitCode::FAILURE
                 }
             };

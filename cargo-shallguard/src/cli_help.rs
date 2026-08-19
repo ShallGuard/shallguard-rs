@@ -30,7 +30,7 @@ Usage:
   cargo shallguard fmt [--check] [<doc.md> ...]
   cargo shallguard lint [<doc.md> ...]
   cargo shallguard clean
-  cargo shallguard baseline <check|init|prune>
+  cargo shallguard baseline <check|init|extend|prune>
   cargo shallguard impact <--base <revision>|--target <branch>> [--json <path>] [--markdown <path>]
   cargo shallguard bundle --impact <impact.json> [--coverage <coverage.json>] [options]
   cargo shallguard test-index <--enumerate|--catalog <path>> [options]
