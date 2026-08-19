@@ -48,6 +48,10 @@ For **new behavior**, in this order, all in the same change set:
    target, `*Verified:*` ⏳ (pending). Exploration/spikes may precede the
    draft, but the final implementation pass starts from the written
    requirement. New behavior without a requirement is an incomplete change.
+   If a merge or rebase collides on the number, the rebasing branch
+   renumbers to the next free ID — IDs become stable at merge to the
+   default branch, not at draft time, and `cargo shallguard check` catches
+   any rename missed between document and anchors.
 2. **Implement and anchor the enforcement site.**
 3. **Write the test, anchor it with `#[verifies]`**, and only then flip
    ⏳ to ✅ with a citation naming the exact test file and function:
@@ -122,6 +126,10 @@ cargo shallguard fmt            # fix doc formatting (never hand-wrap
   the fix. A stale baseline entry is itself a failure.
 - If the consuming repo has no ShallGuard CI job yet, the local run IS the
   gate — never skip it because "CI will catch it".
+- If the repository keeps a friction log (`docs/FRICTION.md`): when the
+  gate or the workflow produces friction while you work, append a one-line
+  entry there in the same change set — never work around friction
+  silently.
 
 ## Never do
 
