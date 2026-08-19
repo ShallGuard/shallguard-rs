@@ -473,8 +473,7 @@ rejects any traceability regression.
 
 ### US-TRACE-002: Vacuity-Resistant Automated Evidence
 
-**Status:** Partially implemented — deterministic lint landed; the
-compile-time opt-out attribute is pending
+**Status:** Implemented
 
 **As a** maintainer  
 **I want** ✅ evidence rejected when the cited test cannot fail  
@@ -525,9 +524,10 @@ or constant tests
 - **REQ-TRACE-014** — An explicit `#[verifies("REQ-...", oracle = "<class>")]`
   opt-out SHALL suppress vacuity reporting for that test and SHALL be
   counted and listable in the check report; suppression SHALL NOT be
-  silent. *Enforced:* not implemented — scanner-side recognition landed;
-  the compile-time attribute lands with the macro front line (issue #13) ·
-  *Verified:* ⏳ pending
+  silent. *Enforced:* `src/oracle.rs` (`classify`), `src/scan.rs`
+  (`oracle_suppression`), `src/check_report.rs` (`render_summary`) ·
+  *Verified:* ✅ `src/oracle.rs` (`suppression_is_recorded_not_silent`),
+  `src/check_report.rs` (`suppressed_oracles_are_listed_in_the_summary`)
 - **REQ-TRACE-015** — Vacuity analysis SHALL be purely syntactic and
   deterministic, SHALL NOT execute tested code, and SHALL classify any
   construct the classifier does not fully understand as evidence present
@@ -535,6 +535,19 @@ or constant tests
   *Verified:* ✅ `src/oracle.rs` (`unknown_constructs_classify_as_present`,
   `err_return_and_result_aliases_classify_as_present`,
   `third_party_assert_macros_classify_as_present`)
+- **REQ-TRACE-016** — `#[verifies]` SHALL reject at compile time a test body
+  containing no failure-path candidate tokens at all, or only
+  literal-constant or side-identical `assert!`/`assert_eq!`/`assert_ne!`
+  invocations; the error SHALL name the offending requirement IDs and
+  reference the evidence-honesty rules, and any body the token scan cannot
+  fully classify SHALL compile — the deterministic check remains
+  authoritative. *Enforced:* `src/lib.rs` (`verifies`) · *Verified:* ✅
+  `macros:tests/front_line.rs` (`definitely_vacuous_bodies_fail_to_compile`)
+- **REQ-TRACE-017** — The `oracle` opt-out SHALL accept only the closed
+  value set `panic`, `compile`, and `external`; an unknown value SHALL be
+  rejected at compile time with the accepted list. *Enforced:* `src/lib.rs`
+  (`verifies`) · *Verified:* ✅ `macros:tests/front_line.rs`
+  (`oracle_classes_are_a_closed_set`)
 
 ## Baseline and Ratchet User Stories
 
