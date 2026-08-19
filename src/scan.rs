@@ -664,6 +664,7 @@ fn oracle_argument(attr: &syn::Attribute) -> OracleArgument {
 /// Renders attribute tokens for ID harvesting with every
 /// `oracle = <value>` argument removed, so a REQ-shaped opt-out value
 /// can never fabricate a verification anchor.
+#[shallguard::enforces("REQ-TRACE-019")]
 fn id_search_text(tokens: proc_macro2::TokenStream) -> String {
     let trees: Vec<proc_macro2::TokenTree> = tokens.into_iter().collect();
     let mut kept = Vec::new();
@@ -672,7 +673,15 @@ fn id_search_text(tokens: proc_macro2::TokenStream) -> String {
         let is_oracle_eq = matches!(&trees[i], proc_macro2::TokenTree::Ident(name) if *name == "oracle")
             && matches!(trees.get(i + 1), Some(proc_macro2::TokenTree::Punct(eq)) if eq.as_char() == '=');
         if is_oracle_eq {
-            i += 3;
+            i += 2;
+            while i < trees.len()
+                && !matches!(&trees[i], proc_macro2::TokenTree::Punct(comma) if comma.as_char() == ',')
+            {
+                i += 1;
+            }
+            if i < trees.len() {
+                i += 1;
+            }
             continue;
         }
         kept.push(trees[i].to_string());

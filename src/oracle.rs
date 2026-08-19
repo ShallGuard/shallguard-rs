@@ -187,9 +187,9 @@ impl<'ast> Visit<'ast> for BodyVisitor {
             self.opaque_construct = true;
             return;
         };
-        // A path-qualified invocation (harness::assert!) is a third-party
-        // macro that merely reuses a std name: conservative.
-        if mac.path.segments.len() != 1 {
+        // Exact std/core qualification names the standard macro. Other
+        // qualified paths may reuse the name for a third-party macro.
+        if !is_standard_macro_path(&mac.path) {
             self.opaque_construct = true;
             syn::visit::visit_macro(self, mac);
             return;
@@ -232,6 +232,17 @@ impl<'ast> Visit<'ast> for BodyVisitor {
     }
 }
 
+fn is_standard_macro_path(path: &syn::Path) -> bool {
+    match path.segments.len() {
+        1 => true,
+        2 => path
+            .segments
+            .first()
+            .is_some_and(|segment| segment.ident == "std" || segment.ident == "core"),
+        _ => false,
+    }
+}
+
 /// Token-level sweep of macro arguments for failure-path candidates:
 /// `unwrap`-family idents and any non-innocuous nested macro. syn's
 /// visitor does not parse macro token streams into expressions, so this
@@ -268,12 +279,10 @@ fn tokens_contain_failure_candidates(tokens: TokenStream) -> bool {
     false
 }
 
-/// Whether an `assert*`-family invocation provably always passes:
-/// `assert!(true)`, equal literal `assert_eq!` sides, or different
-/// literal `assert_ne!` sides. Anything else counts as a failure path -
-/// an always-failing constant (`assert!(false)`) is an unconditional
-/// panic, and token-identical non-literal sides (impure calls,
-/// floating-point values) can fail at runtime.
+/// Whether an `assert*`-family invocation provably always passes.
+/// Anything else counts as a failure path: an always-failing constant
+/// is an unconditional panic, and token-identical non-literal sides
+/// can fail at runtime.
 #[shallguard::enforces("REQ-TRACE-010", "REQ-TRACE-011")]
 fn assertion_is_trivial(name: &str, tokens: TokenStream) -> bool {
     let args = split_top_level_commas(tokens);
@@ -290,9 +299,26 @@ fn assertion_is_trivial(name: &str, tokens: TokenStream) -> bool {
             if name.ends_with("ne") {
                 return false;
             }
-            normalized(&args[0]) == normalized(&args[1])
+            literal_args_equal(&args[0], &args[1])
         }
     }
+}
+
+fn literal_args_equal(left: &[TokenTree], right: &[TokenTree]) -> bool {
+    match (integer_literal_value(left), integer_literal_value(right)) {
+        (Some(left), Some(right)) => left == right,
+        _ => normalized(left) == normalized(right),
+    }
+}
+
+fn integer_literal_value(arg: &[TokenTree]) -> Option<u128> {
+    let [TokenTree::Literal(literal)] = arg else {
+        return None;
+    };
+    let syn::Lit::Int(integer) = syn::Lit::new(literal.clone()) else {
+        return None;
+    };
+    integer.base10_parse().ok()
 }
 
 fn split_top_level_commas(tokens: TokenStream) -> Vec<Vec<TokenTree>> {
@@ -412,6 +438,10 @@ mod tests {
             classify_fn("fn t() { assert_eq!(1, 1, \"context {}\", 2); }"),
             OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
         );
+        assert_eq!(
+            classify_fn("fn t() { assert_eq!(1, 0x1); }"),
+            OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+        );
         // assert_ne! is never provably passing: 1 and 0x1 differ
         // textually but are equal, so ne stays a failure path.
         assert_eq!(
@@ -431,6 +461,23 @@ mod tests {
         assert_eq!(
             classify_fn("fn t() { assert_eq!(1, 1, \"state: {}\", inspect().unwrap()); }"),
             OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+        );
+    }
+
+    #[shallguard::verifies("REQ-TRACE-010", "REQ-TRACE-015")]
+    #[test]
+    fn standard_library_assert_paths_are_classified() {
+        assert_eq!(
+            classify_fn("fn t() { std::assert!(true); }"),
+            OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+        );
+        assert_eq!(
+            classify_fn("fn t() { core::assert_eq!(1, 0x1); }"),
+            OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+        );
+        assert_eq!(
+            classify_fn("fn t() { std::assert!(false); }"),
+            OracleClass::Present
         );
     }
 
@@ -570,7 +617,7 @@ mod tests {
             classify_fn("fn t() { assert_snapshot!(\"case-1\"); }"),
             OracleClass::Present
         );
-        // Path-qualified reuse of a std assert name is third-party too.
+        // A nonstandard path that reuses a standard assert name is third-party.
         assert_eq!(
             classify_fn("fn t() { harness::assert!(true); }"),
             OracleClass::Present

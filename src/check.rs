@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, bail};
 
 use crate::DocSpec;
-use crate::baseline::{Baseline, BaselineEntry, GapKey, GapKind};
+use crate::baseline::{BASELINE_SCHEMA_MAX, Baseline, BaselineEntry, GapKey, GapKind};
 use crate::check_evidence::{
     VerificationOutcome, evaluate_verification, vacuity_reason, weak_reason,
 };
@@ -132,10 +132,8 @@ pub fn prune_baseline(
     })
 }
 
-/// Adds exceptions only for gaps of kinds the committed baseline has
-/// never recorded — the tool-upgrade path when a new release starts
-/// detecting a gap kind that older releases could not. Kinds already
-/// present stay removal-only.
+/// Adds exceptions only for gap kinds newer than the detector capability
+/// recorded by the committed baseline, then advances that capability.
 #[shallguard::enforces("REQ-BASE-006")]
 pub fn extend_baseline(
     root: &Path,
@@ -149,23 +147,9 @@ pub fn extend_baseline(
     ensure_no_non_gap_errors(&analysis, "extend")?;
     let baseline = Baseline::load(root, &config.baseline)?;
 
-    let existing_kinds: HashSet<GapKind> = baseline.gaps.iter().map(|entry| entry.kind).collect();
-    let candidates: Vec<&GapKey> = analysis
-        .gaps
-        .keys()
-        .filter(|key| !existing_kinds.contains(&key.kind) && !gap_is_advisory(key.kind))
-        .collect();
-    if let Some(hard) = candidates
-        .iter()
-        .find(|key| gap_is_hard(key.kind, &analysis.gaps[**key].area, config))
-    {
-        bail!(
-            "cannot extend baseline: hard-area gap {} ({}) must be fixed",
-            hard.requirement,
-            hard.kind
-        );
-    }
-    if candidates.is_empty() {
+    let candidates = extension_candidates(&analysis, &baseline, config)?;
+    let added = candidates.len();
+    if added == 0 && baseline.schema == BASELINE_SCHEMA_MAX {
         return Ok(BaselineChange {
             path: root.join(&config.baseline),
             entries: baseline.gaps.len(),
@@ -173,8 +157,7 @@ pub fn extend_baseline(
             added: 0,
         });
     }
-    let added = candidates.len();
-    let mut entries = baseline.gaps.clone();
+    let mut entries = baseline.gaps;
     entries.extend(candidates.into_iter().map(|key| BaselineEntry {
         requirement: key.requirement.clone(),
         kind: key.kind,
@@ -188,6 +171,33 @@ pub fn extend_baseline(
         removed: 0,
         added,
     })
+}
+
+#[shallguard::enforces("REQ-BASE-006")]
+fn extension_candidates<'a>(
+    analysis: &'a Analysis,
+    baseline: &Baseline,
+    config: &RepositoryConfig,
+) -> Result<Vec<&'a GapKey>> {
+    let newly_supported: Vec<&GapKey> = analysis
+        .gaps
+        .keys()
+        .filter(|key| key.kind.minimum_schema() > baseline.schema)
+        .collect();
+    if let Some(hard) = newly_supported
+        .iter()
+        .find(|key| gap_is_hard(key.kind, &analysis.gaps[**key].area, config))
+    {
+        bail!(
+            "cannot extend baseline: hard gap {} ({}) must be fixed",
+            hard.requirement,
+            hard.kind
+        );
+    }
+    Ok(newly_supported
+        .into_iter()
+        .filter(|key| !gap_is_advisory(key.kind))
+        .collect())
 }
 
 /// Detects invariant failures and traceability gaps without deciding

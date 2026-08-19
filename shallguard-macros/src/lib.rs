@@ -561,11 +561,7 @@ fn scan_body_tokens(tokens: proc_macro2::TokenStream, scan: &mut FrontLineScan) 
                     Some(TokenTree::Punct(p)) if p.as_char() == '!'
                 );
                 if bang && let Some(TokenTree::Group(group)) = trees.get(i + 2) {
-                    // A path-qualified invocation (harness::assert!) is a
-                    // third-party macro reusing a std name: conservative.
-                    let path_qualified =
-                        i > 0 && matches!(&trees[i - 1], TokenTree::Punct(p) if p.as_char() == ':');
-                    if !path_qualified
+                    if standard_macro_path(&trees, i)
                         && matches!(
                             name.as_str(),
                             "assert"
@@ -611,11 +607,28 @@ fn scan_body_tokens(tokens: proc_macro2::TokenStream, scan: &mut FrontLineScan) 
     }
 }
 
-/// Whether an `assert*` invocation provably always passes:
-/// `assert!(true)`, equal literal `_eq` sides, or different literal
-/// `_ne` sides. Always-failing constants are unconditional panics and
-/// token-identical impure sides can fail, so both count as failure
-/// paths.
+fn standard_macro_path(trees: &[proc_macro2::TokenTree], macro_index: usize) -> bool {
+    if !path_separator_before(trees, macro_index) {
+        return true;
+    }
+    let Some(namespace_index) = macro_index.checked_sub(3) else {
+        return false;
+    };
+    let Some(proc_macro2::TokenTree::Ident(namespace)) = trees.get(namespace_index) else {
+        return false;
+    };
+    (namespace == "std" || namespace == "core") && !path_separator_before(trees, namespace_index)
+}
+
+fn path_separator_before(trees: &[proc_macro2::TokenTree], index: usize) -> bool {
+    index >= 2
+        && matches!(&trees[index - 1], proc_macro2::TokenTree::Punct(p) if p.as_char() == ':')
+        && matches!(&trees[index - 2], proc_macro2::TokenTree::Punct(p) if p.as_char() == ':')
+}
+
+/// Whether an `assert*` invocation provably always passes. Always-failing
+/// constants are unconditional panics and token-identical impure sides can
+/// fail, so both count as failure paths.
 fn assert_args_trivial(name: &str, tokens: proc_macro2::TokenStream) -> bool {
     use proc_macro2::TokenTree;
     let mut args: Vec<Vec<TokenTree>> = vec![Vec::new()];
@@ -658,9 +671,25 @@ fn assert_args_trivial(name: &str, tokens: proc_macro2::TokenStream) -> bool {
             if name.ends_with("ne") {
                 return false;
             }
-            render(&args[0]) == render(&args[1])
+            match (
+                integer_literal_value(&args[0]),
+                integer_literal_value(&args[1]),
+            ) {
+                (Some(left), Some(right)) => left == right,
+                _ => render(&args[0]) == render(&args[1]),
+            }
         }
     }
+}
+
+fn integer_literal_value(arg: &[proc_macro2::TokenTree]) -> Option<u128> {
+    let [proc_macro2::TokenTree::Literal(literal)] = arg else {
+        return None;
+    };
+    let syn::Lit::Int(integer) = syn::Lit::new(literal.clone()) else {
+        return None;
+    };
+    integer.base10_parse().ok()
 }
 
 fn anchor(name: &str, args: TokenStream, item: TokenStream) -> TokenStream {

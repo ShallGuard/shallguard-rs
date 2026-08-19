@@ -16,8 +16,7 @@ use serde::{Deserialize, Serialize};
 /// Oldest baseline schema this release reads.
 pub const BASELINE_SCHEMA_MIN: u32 = 1;
 /// Newest baseline schema this release reads and writes. Schema 2 adds
-/// the vacuity gap kinds; a baseline without them stays schema 1 so
-/// older binaries keep reading it.
+/// the vacuity gap kinds and records that the detector knows them.
 pub const BASELINE_SCHEMA_MAX: u32 = 2;
 
 /// A traceability dimension that may have historical debt.
@@ -36,8 +35,9 @@ pub enum GapKind {
 }
 
 impl GapKind {
-    /// The oldest baseline schema that can represent this kind.
-    fn minimum_schema(self) -> u32 {
+    /// The oldest detector and serialization schema that supports this kind.
+    #[shallguard::enforces("REQ-BASE-006", "REQ-BASE-007")]
+    pub(crate) fn minimum_schema(self) -> u32 {
         match self {
             Self::EnforcementAnchor | Self::VerificationAnchor | Self::EvidenceCitation => 1,
             Self::VacuousEvidence | Self::WeakEvidence => 2,
@@ -99,13 +99,13 @@ pub struct Baseline {
 }
 
 impl Baseline {
+    /// Creates a baseline recorded by the current detector.
+    #[shallguard::enforces("REQ-BASE-007")]
     pub fn from_entries(gaps: Vec<BaselineEntry>) -> Self {
-        let schema = gaps
-            .iter()
-            .map(|entry| entry.kind.minimum_schema())
-            .max()
-            .unwrap_or(BASELINE_SCHEMA_MIN);
-        let mut baseline = Self { schema, gaps };
+        let mut baseline = Self {
+            schema: BASELINE_SCHEMA_MAX,
+            gaps,
+        };
         baseline.sort();
         baseline
     }
@@ -141,6 +141,20 @@ impl Baseline {
         }
         let mut baseline: Self = toml::from_str(text)
             .with_context(|| format!("parsing traceability baseline {source}"))?;
+        if let Some(entry) = baseline
+            .gaps
+            .iter()
+            .find(|entry| entry.kind.minimum_schema() > baseline.schema)
+        {
+            bail!(
+                "traceability baseline entry {} ({}) requires schema {} but {} declares schema {}",
+                entry.requirement,
+                entry.kind,
+                entry.kind.minimum_schema(),
+                source,
+                baseline.schema
+            );
+        }
         baseline.sort();
         Ok(baseline)
     }
@@ -157,8 +171,10 @@ impl Baseline {
         duplicates
     }
 
+    /// Serializes the baseline without changing its recorded detector capability.
+    #[shallguard::enforces("REQ-BASE-007")]
     pub fn render(&self) -> Result<String> {
-        let mut sorted = Self::from_entries(self.gaps.clone());
+        let mut sorted = self.clone();
         sorted.sort();
         let body = toml::to_string_pretty(&sorted).context("serializing traceability baseline")?;
         Ok(format!(
@@ -246,22 +262,50 @@ mod tests {
 
     #[shallguard::verifies("REQ-BASE-007")]
     #[test]
-    fn schema_follows_the_newest_gap_kind() {
-        // Old kinds keep schema 1 so pinned older binaries still read it.
+    fn declared_schema_must_support_entry_kinds() {
+        let text =
+            "schema = 1\n\n[[gap]]\nrequirement = \"REQ-AA-001\"\nkind = \"vacuous-evidence\"\n";
+        let error = Baseline::parse(text, "test").expect_err("schema 1 cannot encode vacuity");
+        let message = format!("{error:#}");
+        assert!(message.contains("vacuous-evidence"));
+        assert!(message.contains("requires schema 2"));
+        assert!(message.contains("declares schema 1"));
+    }
+
+    #[shallguard::verifies("REQ-BASE-007")]
+    #[test]
+    fn current_baseline_records_detector_capability() {
+        let empty = Baseline::from_entries(Vec::new());
+        assert_eq!(empty.schema, BASELINE_SCHEMA_MAX);
+
         let old_only =
             Baseline::from_entries(vec![entry("REQ-AA-001", GapKind::EnforcementAnchor)]);
-        assert_eq!(old_only.schema, 1);
-        assert!(old_only.render().expect("renders").contains("schema = 1"));
+        assert_eq!(old_only.schema, BASELINE_SCHEMA_MAX);
 
         let with_vacuous = Baseline::from_entries(vec![
             entry("REQ-AA-001", GapKind::EnforcementAnchor),
             entry("REQ-AA-002", GapKind::VacuousEvidence),
         ]);
-        assert_eq!(with_vacuous.schema, 2);
+        assert_eq!(with_vacuous.schema, BASELINE_SCHEMA_MAX);
         let rendered = with_vacuous.render().expect("renders");
         assert!(rendered.contains("schema = 2"));
         let parsed = Baseline::parse(&rendered, "test").expect("schema 2 reads back");
         assert_eq!(parsed, with_vacuous);
+    }
+
+    #[shallguard::verifies("REQ-BASE-007")]
+    #[test]
+    fn render_preserves_detector_capability() {
+        let legacy = Baseline {
+            schema: BASELINE_SCHEMA_MIN,
+            gaps: vec![entry("REQ-AA-001", GapKind::EnforcementAnchor)],
+        };
+        let rendered = legacy.render().expect("legacy baseline renders");
+        assert!(rendered.contains("schema = 1"));
+        assert_eq!(
+            Baseline::parse(&rendered, "test").expect("legacy baseline reads back"),
+            legacy
+        );
     }
 
     #[shallguard::verifies("REQ-TRACE-013")]

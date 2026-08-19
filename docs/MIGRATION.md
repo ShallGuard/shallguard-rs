@@ -130,12 +130,14 @@ historical debt, not new regressions, and there is a dedicated ratchet
 path for them:
 
 ```bash
-cargo shallguard baseline extend   # records only gaps of kinds the
-                                   # committed baseline has never seen
+cargo shallguard baseline extend   # records gaps from detector schemas
+                                   # newer than the committed capability
 ```
 
-`extend` refuses gaps in hardened areas and refuses to grow kinds the
-baseline already tracks — ordinary maintenance stays removal-only.
+`extend` refuses hard gaps and records only eligible non-advisory debt. A
+successful run advances the baseline's detector capability even when there is
+nothing to add, closing the upgrade window so future gaps remain hard
+regressions. Ordinary maintenance stays removal-only.
 
 ## Phase 4: Harden, then develop requirement-first
 

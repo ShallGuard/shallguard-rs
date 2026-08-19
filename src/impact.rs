@@ -694,6 +694,7 @@ fn requirement_change_reasons(
     reasons
 }
 
+#[shallguard::enforces("REQ-BASE-005")]
 fn compare_baseline(
     root: &Path,
     base: &str,
@@ -720,8 +721,12 @@ fn compare_baseline(
         return Ok(());
     };
     let before = Baseline::parse(&text, &format!("{base}:{baseline_name}"))?;
+    if let Some(finding) =
+        baseline_schema_change_finding(before.schema, head.schema, &baseline_name)
+    {
+        state.findings.push(finding);
+    }
     let old: BTreeSet<GapKey> = before.gaps.iter().map(|entry| entry.key()).collect();
-    let old_kinds: BTreeSet<_> = before.gaps.iter().map(|entry| entry.kind).collect();
     for added in head
         .gaps
         .iter()
@@ -730,23 +735,57 @@ fn compare_baseline(
     {
         state.findings.push(baseline_addition_finding(
             &added,
-            &old_kinds,
+            before.schema,
             &baseline_name,
         ));
     }
     Ok(())
 }
 
-/// Classifies one baseline addition: a kind the recorded baseline never
-/// contained is a tool-upgrade extension and stays a reviewable warning;
-/// anything else is forbidden growth.
+#[shallguard::enforces("REQ-BASE-005")]
+fn baseline_schema_change_finding(
+    before: u32,
+    after: u32,
+    baseline_name: &str,
+) -> Option<ImpactFinding> {
+    let (code, severity, message) = match after.cmp(&before) {
+        std::cmp::Ordering::Less => (
+            "baseline-schema-downgraded",
+            FindingSeverity::Error,
+            format!(
+                "MR lowers the recorded detector capability from schema {before} to {after}; \
+                 baseline capability is monotonic"
+            ),
+        ),
+        std::cmp::Ordering::Greater => (
+            "baseline-detector-advanced",
+            FindingSeverity::Warning,
+            format!(
+                "MR advances the recorded detector capability from schema {before} to {after}; \
+                 review the capability change and any newly grandfathered gaps"
+            ),
+        ),
+        std::cmp::Ordering::Equal => return None,
+    };
+    Some(ImpactFinding {
+        code: code.to_string(),
+        severity,
+        requirement: None,
+        file: Some(baseline_name.to_string()),
+        line: Some(1),
+        message,
+    })
+}
+
+/// Classifies additions against recorded detector capability rather than
+/// inferring provenance from whichever debt entries happen to exist.
 #[shallguard::enforces("REQ-BASE-005")]
 fn baseline_addition_finding(
     added: &GapKey,
-    old_kinds: &BTreeSet<crate::baseline::GapKind>,
+    recorded_schema: u32,
     baseline_name: &str,
 ) -> ImpactFinding {
-    if !old_kinds.contains(&added.kind) {
+    if added.kind.minimum_schema() > recorded_schema {
         return ImpactFinding {
             code: "baseline-extended".to_string(),
             severity: FindingSeverity::Warning,
@@ -2258,24 +2297,51 @@ mod tests {
 
     #[shallguard::verifies("REQ-BASE-005")]
     #[test]
-    fn new_kind_baseline_addition_is_a_reviewable_warning() {
-        use crate::baseline::GapKind;
-        let old_kinds: BTreeSet<GapKind> = BTreeSet::from([GapKind::EnforcementAnchor]);
+    fn baseline_additions_follow_recorded_detector_capability() {
+        use crate::baseline::{BASELINE_SCHEMA_MAX, BASELINE_SCHEMA_MIN, GapKind};
+
         let extension = baseline_addition_finding(
             &GapKey::new("REQ-ZZ-001", GapKind::VacuousEvidence),
-            &old_kinds,
+            BASELINE_SCHEMA_MIN,
             ".shallguard/baseline.toml",
         );
         assert_eq!(extension.code, "baseline-extended");
         assert!(matches!(extension.severity, FindingSeverity::Warning));
 
-        let growth = baseline_addition_finding(
+        let old_kind_growth = baseline_addition_finding(
             &GapKey::new("REQ-ZZ-002", GapKind::EnforcementAnchor),
-            &old_kinds,
+            BASELINE_SCHEMA_MIN,
             ".shallguard/baseline.toml",
         );
-        assert_eq!(growth.code, "baseline-entry-added");
-        assert!(matches!(growth.severity, FindingSeverity::Error));
+        assert_eq!(old_kind_growth.code, "baseline-entry-added");
+        assert!(matches!(old_kind_growth.severity, FindingSeverity::Error));
+
+        let current_detector_growth = baseline_addition_finding(
+            &GapKey::new("REQ-ZZ-003", GapKind::VacuousEvidence),
+            BASELINE_SCHEMA_MAX,
+            ".shallguard/baseline.toml",
+        );
+        assert_eq!(current_detector_growth.code, "baseline-entry-added");
+        assert!(matches!(
+            current_detector_growth.severity,
+            FindingSeverity::Error
+        ));
+    }
+
+    #[shallguard::verifies("REQ-BASE-005")]
+    #[test]
+    fn baseline_schema_downgrade_is_policy_error() {
+        let downgrade = baseline_schema_change_finding(2, 1, ".shallguard/baseline.toml")
+            .expect("schema downgrade is reported");
+        assert_eq!(downgrade.code, "baseline-schema-downgraded");
+        assert!(matches!(downgrade.severity, FindingSeverity::Error));
+
+        let advance = baseline_schema_change_finding(1, 2, ".shallguard/baseline.toml")
+            .expect("schema advance is reviewable");
+        assert_eq!(advance.code, "baseline-detector-advanced");
+        assert!(matches!(advance.severity, FindingSeverity::Warning));
+
+        assert!(baseline_schema_change_finding(2, 2, ".shallguard/baseline.toml").is_none());
     }
 
     #[shallguard::verifies("REQ-BASE-005")]

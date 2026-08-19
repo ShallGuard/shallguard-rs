@@ -316,8 +316,8 @@ fn stale_advisory_baseline_entries_never_hard_fail() {
 fn extend_records_only_newly_detectable_kinds() {
     use crate::config::DocumentConfig;
 
-    let dir = std::env::temp_dir().join(format!("shallguard-extend-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
+    let temporary = tempfile::tempdir().expect("temporary repository");
+    let dir = temporary.path();
     std::fs::create_dir_all(dir.join("docs")).expect("BUG: temp dirs");
     std::fs::create_dir_all(dir.join("src")).expect("BUG: temp dirs");
     std::fs::create_dir_all(dir.join(".shallguard")).expect("BUG: temp dirs");
@@ -356,16 +356,31 @@ fn extend_records_only_newly_detectable_kinds() {
 
     // First extension records the vacuous-evidence gap the old tool
     // version could not detect; the baseline bumps to schema 2.
-    let change = extend_baseline(&dir, &docs, &config).expect("extend succeeds");
+    let change = extend_baseline(dir, &docs, &config).expect("extend succeeds");
     assert_eq!(change.added, 1);
     let written = std::fs::read_to_string(dir.join(".shallguard/baseline.toml"))
         .expect("BUG: baseline readable");
     assert!(written.contains("vacuous-evidence"));
     assert!(written.contains("schema = 2"));
 
-    // The kind is now recorded: extension is closed for it.
-    let again = extend_baseline(&dir, &docs, &config).expect("extend is idempotent");
+    // The detector capability is now recorded: extension is closed for it.
+    let again = extend_baseline(dir, &docs, &config).expect("extend is idempotent");
     assert_eq!(again.added, 0);
+
+    // A gap supported by the recorded detector can never become an
+    // extension merely because that kind is absent from the debt list.
+    std::fs::write(
+        dir.join("src/lib.rs"),
+        "pub fn floor() {}\n\n\
+         #[cfg(test)]\nmod tests {\n    #[shallguard::verifies(\"REQ-ZZ-001\")]\n    \
+         #[test]\n    fn vacuous_check() {\n        assert!(true);\n    }\n}\n",
+    )
+    .expect("BUG: rewrite src");
+    let fresh_old_kind = extend_baseline(dir, &docs, &config).expect("old kind is not extended");
+    assert_eq!(fresh_old_kind.added, 0);
+    let unchanged = std::fs::read_to_string(dir.join(".shallguard/baseline.toml"))
+        .expect("BUG: baseline readable");
+    assert!(!unchanged.contains("enforcement-anchor"));
 
     // Hardened areas refuse extension outright.
     config
@@ -375,8 +390,112 @@ fn extend_records_only_newly_detectable_kinds() {
         .hard_verification = true;
     std::fs::write(dir.join(".shallguard/baseline.toml"), "schema = 1\n")
         .expect("BUG: reset baseline");
-    let err = extend_baseline(&dir, &docs, &config).expect_err("hard area refuses");
-    assert!(format!("{err:#}").contains("hard-area gap"));
+    let err = extend_baseline(dir, &docs, &config).expect_err("hard area refuses");
+    assert!(format!("{err:#}").contains("hard gap"));
+}
 
-    std::fs::remove_dir_all(&dir).ok();
+#[shallguard::verifies("REQ-BASE-006")]
+#[test]
+fn extension_candidates_follow_detector_capability() {
+    let legacy = Baseline {
+        schema: crate::baseline::BASELINE_SCHEMA_MIN,
+        gaps: Vec::new(),
+    };
+    let current = Baseline::from_entries(Vec::new());
+    let vacuous = analysis(
+        requirement("REQ-ZZ-001", "ZZ", false),
+        Some(GapKind::VacuousEvidence),
+    );
+    assert_eq!(
+        extension_candidates(&vacuous, &legacy, &config(None))
+            .expect("legacy detector may extend")
+            .len(),
+        1
+    );
+    assert!(
+        extension_candidates(&vacuous, &current, &config(None))
+            .expect("current detector remains removal-only")
+            .is_empty()
+    );
+
+    let old_kind = analysis(
+        requirement("REQ-ZZ-001", "ZZ", false),
+        Some(GapKind::EnforcementAnchor),
+    );
+    assert!(
+        extension_candidates(&old_kind, &legacy, &config(None))
+            .expect("long-supported kinds remain removal-only")
+            .is_empty()
+    );
+}
+
+#[shallguard::verifies("REQ-BASE-006", "REQ-BASE-007")]
+#[test]
+fn successful_empty_extension_advances_detector_capability() {
+    use crate::config::DocumentConfig;
+
+    let temporary = tempfile::tempdir().expect("temporary repository");
+    let dir = temporary.path();
+    std::fs::create_dir_all(dir.join("docs")).expect("BUG: temp docs");
+    std::fs::create_dir_all(dir.join("src")).expect("BUG: temp src");
+    std::fs::create_dir_all(dir.join(".shallguard")).expect("BUG: temp baseline");
+    std::fs::write(
+        dir.join("docs/REQUIREMENTS.md"),
+        "# Fixture\n\n**System Requirements:**\n\n\
+         - **REQ-ZZ-001** — The floor SHALL hold. *Enforced:* `src/lib.rs`\n  \
+         (`floor`) · *Verified:* 👁 code review only\n",
+    )
+    .expect("BUG: write doc");
+    std::fs::write(
+        dir.join("src/lib.rs"),
+        "#[shallguard::enforces(\"REQ-ZZ-001\")]\npub fn floor() {}\n",
+    )
+    .expect("BUG: write src");
+    std::fs::write(dir.join(".shallguard/baseline.toml"), "schema = 1\n")
+        .expect("BUG: write legacy baseline");
+
+    let mut config = config(None);
+    config.documents = vec![DocumentConfig {
+        path: PathBuf::from("docs/REQUIREMENTS.md"),
+        source_root: PathBuf::from("."),
+    }];
+    config.areas.insert(
+        "ZZ".to_string(),
+        AreaConfig {
+            label: "Fixture".to_string(),
+            hard_enforcement: false,
+            hard_verification: false,
+            strict_oracle: false,
+        },
+    );
+
+    let change = extend_baseline(dir, &config.documents(), &config)
+        .expect("gap-free extension advances capability");
+    assert_eq!(change.added, 0);
+    assert_eq!(change.entries, 0);
+    let written = std::fs::read_to_string(dir.join(".shallguard/baseline.toml"))
+        .expect("BUG: baseline readable");
+    assert!(written.contains("schema = 2"));
+    assert!(!written.contains("[[gap]]"));
+}
+
+#[shallguard::verifies("REQ-BASE-006")]
+#[test]
+fn strict_oracle_gap_blocks_extension_before_advisory_filtering() {
+    let legacy = Baseline {
+        schema: crate::baseline::BASELINE_SCHEMA_MIN,
+        gaps: Vec::new(),
+    };
+    let weak = analysis(
+        requirement("REQ-ZZ-001", "ZZ", false),
+        Some(GapKind::WeakEvidence),
+    );
+    assert!(
+        extension_candidates(&weak, &legacy, &config(None))
+            .expect("ordinary weak evidence stays advisory")
+            .is_empty()
+    );
+    let error = extension_candidates(&weak, &legacy, &strict_config("ZZ"))
+        .expect_err("strict weak evidence must block extension");
+    assert!(format!("{error:#}").contains("hard gap REQ-ZZ-001 (weak-evidence)"));
 }

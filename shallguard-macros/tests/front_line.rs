@@ -19,6 +19,9 @@ fn front_line_rejects_vacuity_and_enforces_oracle_classes() {
     cases.compile_fail("ui/vacuous_debug_assert.rs");
     cases.compile_fail("ui/vacuous_not_equals.rs");
     cases.compile_fail("ui/vacuous_lazy_message.rs");
+    cases.compile_fail("ui/vacuous_std_assert.rs");
+    cases.compile_fail("ui/vacuous_assert_eq_hex.rs");
+    cases.compile_fail("ui/vacuous_struct_field_assert.rs");
     // Fallible shapes compile: the zero-false-positive contract.
     cases.pass("ui/pass_unwrap.rs");
     cases.pass("ui/pass_question_mark.rs");
