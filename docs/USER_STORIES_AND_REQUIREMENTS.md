@@ -455,7 +455,7 @@ rejects any traceability regression.
   enforcement anchor in every documented enforcement file, and an automated
   requirement SHALL resolve to a test carrying its exact verification anchor.
   *Enforced:* `src/check.rs` (`analyze`, `enforced_path_has_anchor`) ·
-  *Verified:* ✅ `src/check.rs`
+  *Verified:* ✅ `src/check_tests.rs`
   (`requires_an_anchor_in_every_documented_enforcement_file`)
 - **REQ-TRACE-007** — Anchor relations SHALL be many-to-many: one site MAY
   claim multiple requirements and one requirement MAY have multiple
@@ -490,7 +490,8 @@ or constant tests
   *Enforced:* `src/oracle.rs` (`classify`) · *Verified:* ✅ `src/oracle.rs`
   (`empty_and_assertion_free_bodies_are_vacuous`,
   `real_failure_paths_classify_as_present`,
-  `question_mark_without_result_return_is_not_a_failure_path`)
+  `question_mark_without_result_return_is_not_a_failure_path`,
+  `failure_paths_inside_macro_arguments_are_seen`)
 - **REQ-TRACE-010** — An assertion whose arguments are all literals
   (constant-foldable, such as `assert!(true)` or `assert_eq!(1, 1)`) SHALL
   NOT count as a failure path. *Enforced:* `src/oracle.rs`
@@ -504,17 +505,22 @@ or constant tests
   `#[verifies]` test whose body offers no other failure path SHALL be
   reported as weak evidence. *Enforced:* `src/oracle.rs` (`classify`) ·
   *Verified:* ✅ `src/oracle.rs`
-  (`bare_should_panic_is_weak_and_expected_is_present`)
+  (`bare_should_panic_is_weak_and_expected_is_present`),
+  `src/check_evidence.rs` (`weak_anchors_are_reported_even_beside_solid_evidence`)
 - **REQ-TRACE-013** — A requirement whose only ✅ citation resolves to a
   vacuous test SHALL be counted as lacking automated verification, and
   vacuous and weak findings SHALL flow through the ratcheted baseline as
   distinct gap kinds, so pre-existing cases in adopting repositories are
-  grandfatherable and ratcheted. *Enforced:* `src/check.rs`
-  (`evaluate_verification`, `gap_is_hard`), `src/baseline.rs` (`GapKind`) ·
-  *Verified:* ✅ `src/check.rs` (`sole_vacuous_evidence_demotes_the_requirement`,
-  `redundant_vacuous_evidence_keeps_the_requirement_anchored`,
-  `vacuous_evidence_flows_through_the_baseline_like_other_kinds`,
-  `weak_evidence_is_advisory_unless_strict_oracle`), `src/baseline.rs`
+  grandfatherable and ratcheted; advisory weak-evidence findings SHALL NOT
+  be recorded by baseline initialization. *Enforced:*
+  `src/check_evidence.rs` (`evaluate_verification`), `src/check.rs`
+  (`gap_is_hard`, `baseline_entries`), `src/baseline.rs` (`GapKind`) ·
+  *Verified:* ✅ `src/check_evidence.rs`
+  (`sole_vacuous_evidence_demotes_the_requirement`,
+  `redundant_vacuous_evidence_keeps_the_requirement_anchored`),
+  `src/check_tests.rs` (`vacuous_evidence_flows_through_the_baseline_like_other_kinds`,
+  `weak_evidence_is_advisory_unless_strict_oracle`,
+  `advisory_kinds_are_not_recorded_by_baseline_init`), `src/baseline.rs`
   (`evidence_gap_kinds_round_trip_through_baseline`)
 - **REQ-TRACE-014** — An explicit `#[verifies("REQ-...", oracle = "<class>")]`
   opt-out SHALL suppress vacuity reporting for that test and SHALL be
@@ -526,7 +532,9 @@ or constant tests
   deterministic, SHALL NOT execute tested code, and SHALL classify any
   construct the classifier does not fully understand as evidence present
   rather than vacuous. *Enforced:* `src/oracle.rs` (`classify`) ·
-  *Verified:* ✅ `src/oracle.rs` (`unknown_constructs_classify_as_present`)
+  *Verified:* ✅ `src/oracle.rs` (`unknown_constructs_classify_as_present`,
+  `err_return_and_result_aliases_classify_as_present`,
+  `third_party_assert_macros_classify_as_present`)
 
 ## Baseline and Ratchet User Stories
 
@@ -547,16 +555,16 @@ or constant tests
 - **REQ-BASE-002** — An exact historical gap MAY remain a visible warning, but
   any gap absent from the committed baseline SHALL be a hard regression.
   *Enforced:* `src/check.rs` (`apply_baseline`, `record_gap`) · *Verified:* ✅
-  `src/check.rs` (`exact_baseline_gap_is_known_warning`,
+  `src/check_tests.rs` (`exact_baseline_gap_is_known_warning`,
   `unbaselined_gap_is_a_regression`)
 - **REQ-BASE-003** — Areas configured as fully hardened SHALL NOT accept
   baseline exceptions. *Enforced:* `src/check.rs` (`gap_is_hard`),
   `src/config.rs` (`RepositoryConfig::area_is_hard`) ·
-  *Verified:* ✅ `src/check.rs` (`hard_area_cannot_be_baselined`)
+  *Verified:* ✅ `src/check_tests.rs` (`hard_area_cannot_be_baselined`)
 - **REQ-BASE-004** — A resolved or retired gap SHALL make its baseline entry
   stale and fail checking until `baseline prune` removes it; pruning SHALL
   remove only resolved entries. *Enforced:* `src/check.rs`
-  (`apply_baseline`, `prune_baseline`) · *Verified:* ✅ `src/check.rs`
+  (`apply_baseline`, `prune_baseline`) · *Verified:* ✅ `src/check_tests.rs`
   (`fixed_gap_makes_entry_stale`, `prune_mode_accepts_resolved_entry_for_removal`)
 - **REQ-BASE-005** — Change impact SHALL reject manual baseline growth after
   initialization and SHALL reject modification of a requirement that still
