@@ -527,7 +527,8 @@ or constant tests
   silent. *Enforced:* `src/oracle.rs` (`classify`), `src/scan.rs`
   (`oracle_suppression`), `src/check_report.rs` (`render_summary`) ·
   *Verified:* ✅ `src/oracle.rs` (`suppression_is_recorded_not_silent`),
-  `src/check_report.rs` (`suppressed_oracles_are_listed_in_the_summary`)
+  `src/check_report.rs` (`suppressed_oracles_are_listed_in_the_summary`),
+  `src/scan.rs` (`raw_string_oracle_classes_decode_to_their_value`)
 - **REQ-TRACE-015** — Vacuity analysis SHALL be purely syntactic and
   deterministic, SHALL NOT execute tested code, and SHALL classify any
   construct the classifier does not fully understand as evidence present
@@ -544,10 +545,13 @@ or constant tests
   authoritative. *Enforced:* `src/lib.rs` (`verifies`) · *Verified:* ✅
   `macros:tests/front_line.rs` (`definitely_vacuous_bodies_fail_to_compile`)
 - **REQ-TRACE-017** — The `oracle` opt-out SHALL accept only the closed
-  value set `panic`, `compile`, and `external`; an unknown value SHALL be
-  rejected at compile time with the accepted list. *Enforced:* `src/lib.rs`
-  (`verifies`) · *Verified:* ✅ `macros:tests/front_line.rs`
-  (`oracle_classes_are_a_closed_set`)
+  value set `panic`, `compile`, and `external`: an unknown value SHALL be
+  rejected at compile time with the accepted list, and the deterministic
+  checker SHALL NOT treat an unknown class as a suppression and SHALL
+  report it. *Enforced:* `src/lib.rs` (`verifies`), `src/scan.rs`
+  (`oracle_suppression`) · *Verified:* ✅ `macros:tests/front_line.rs`
+  (`oracle_classes_are_a_closed_set`), `src/scan.rs`
+  (`unknown_oracle_class_is_not_a_suppression`)
 
 ## Baseline and Ratchet User Stories
 
