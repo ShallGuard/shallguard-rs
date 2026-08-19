@@ -175,3 +175,7 @@ integration, opening a design discussion before implementation is encouraged.
 Do not claim that tests, coverage, or an LLM verdict prove more than they
 actually demonstrate. Clear pending evidence is preferable to a false claim of
 completed verification.
+
+When the gate or the workflow produces friction during development, append a
+one-line entry to [docs/FRICTION.md](docs/FRICTION.md) in the same change set
+instead of working around it silently.
