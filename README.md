@@ -10,12 +10,16 @@ connection breaks.
 
 An agent opens a merge request. It compiles, every test passes, CI is green.
 It has also deleted the test proving a critical invariant — or rewritten it
-into `assert!(true)` — and nothing in the pipeline notices. With ShallGuard,
-that invariant is a numbered SHALL statement in a Markdown document, anchored
-to the code that enforces it and the test that proves it. Deleting the test
-or dropping the anchor fails `cargo shallguard check`; the `assert!(true)`
-rewrite does not even compile, and the check flags remaining evidence that
-cannot fail. No network, no model, no flakiness.
+into `assert!(true)` — and nothing in the pipeline notices.
+
+With ShallGuard, that invariant is a numbered SHALL statement in a Markdown
+document, anchored to the code that enforces it and the test that proves it:
+
+- deleting the test or dropping the anchor fails `cargo shallguard check`;
+- the `assert!(true)` rewrite does not even compile;
+- the check flags remaining evidence that cannot fail.
+
+No network, no model, no flakiness.
 
 The whole development loop — contract, anchors, the gate, and the gate
 catching a deleted test — in one terminal session:
@@ -74,16 +78,19 @@ Deterministic checking needs no network access and no model. What the gate
 proves is the *link*, not the quality of the evidence behind it — the exact
 boundary is spelled out in
 [what the deterministic gate does and does not prove](docs/USER_DOC.md#what-the-deterministic-gate-does-and-does-not-prove).
-Optional subcommands add executable coverage evidence (via
-`cargo-llvm-cov`), Git change-impact analysis, and local LLM-assisted
-semantic review.
+
+Optional subcommands add:
+
+- executable coverage evidence (via `cargo-llvm-cov`),
+- Git change-impact analysis,
+- local LLM-assisted semantic review.
 
 ## Why "ShallGuard"?
 
 Requirement specifications written in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119)
 style use the normative keyword **SHALL** for mandatory behavior. ShallGuard
 *guards the SHALL statements*: every SHALL must point at the code that
-enforces it and the automated test offered as its evidence, and the ratcheted
+enforces it and the automated test offered as its evidence. The ratcheted
 check makes sure a guarded SHALL can never silently lose that evidence link
 again.
 
@@ -198,11 +205,15 @@ Areas with no remaining gaps can be hardened (`hard_enforcement`,
 `hard_verification`) so they can never be baselined again.
 
 For a large existing codebase, [docs/MIGRATION.md](docs/MIGRATION.md) walks
-through the full agent-assisted migration: an agent recovers the SHALL
-contracts from the code, a human reviews every statement, the baseline
-records today's debt once, and an agent-in-the-loop ratchet pays it off
-batch by batch — including a case study of a 535-requirement production
-workspace migrated this way.
+through the full agent-assisted migration:
+
+- an agent recovers the SHALL contracts from the code,
+- a human reviews every statement,
+- the baseline records today's debt once,
+- an agent-in-the-loop ratchet pays it off batch by batch.
+
+It includes a case study of a 535-requirement production workspace migrated
+this way.
 
 ## The philosophy and the review loop
 
@@ -286,12 +297,13 @@ return nonzero, but a human decision merges the MR.
 
 `cargo shallguard review` chains the whole evidence pipeline — impact
 analysis, executable coverage via `cargo-llvm-cov`, a bounded review capsule
-— and hands the capsule to a local agent for a per-clause verdict. Here a
-colleague's new scheduling mode compiles, passes every test, and keeps the
-deterministic gate green, yet quietly bypasses the required worker floor.
-Coverage proves the anchored test *reaches* the code; only the semantic
-review notices the new match arm violates the SHALL contract — complete with
-a counterexample and a suggested fix:
+— and hands the capsule to a local agent for a per-clause verdict.
+
+Here a colleague's new scheduling mode compiles, passes every test, and
+keeps the deterministic gate green, yet quietly bypasses the required worker
+floor. Coverage proves the anchored test *reaches* the code; only the
+semantic review notices the new match arm violates the SHALL contract —
+complete with a counterexample and a suggested fix:
 
 ![ShallGuard semantic review demo](docs/demo/semantic-review.gif)
 
@@ -332,13 +344,18 @@ an anchor, or renaming a cited file fails the pipeline immediately.
 The repository also contains
 `.github/workflows/shallguard-review.yml`. It publishes an optional semantic
 review as an updated pull-request comment and retains the Markdown report plus
-the auditable local-review directory as a workflow artifact. For organization
-repositories it uses the built-in job token with `copilot-requests: write`;
-the organization must permit Copilot CLI requests from Actions. Where built-in
-Copilot requests are unavailable, add an optional repository Actions secret
-named `COPILOT_GITHUB_TOKEN` containing a user-owned fine-grained token with
-the Copilot Requests account permission. The workflow prefers that secret and
-otherwise falls back to the job token.
+the auditable local-review directory as a workflow artifact.
+
+Credentials:
+
+- Organization repositories use the built-in job token with
+  `copilot-requests: write`; the organization must permit Copilot CLI
+  requests from Actions.
+- Where built-in Copilot requests are unavailable, add an optional
+  repository Actions secret named `COPILOT_GITHUB_TOKEN` containing a
+  user-owned fine-grained token with the Copilot Requests account
+  permission. The workflow prefers that secret and otherwise falls back to
+  the job token.
 
 The advisory workflow deliberately has a different trust boundary from the
 required `Rust` workflow:
@@ -365,14 +382,18 @@ cargo shallguard review show REQ-CLI-001 --format markdown
 ## AI agent skill
 
 In the loop above, agents do the implementing — and they are also the ones
-most tempted to satisfy the checker the wrong way (fabricated evidence
-citations, anchors deleted to silence failures, requirements reworded to
-match the code, assertions gutted until the test cannot fail — that last
-one now rejected at compile time or flagged by the check, a mechanism
-rather than a rule). [`docs/skill/SKILL.md`](docs/skill/SKILL.md) is a
-standalone, self-contained operating manual for agents: the
-requirements-first workflow, anchor placement rules, evidence-honesty rules,
-the commands that form the gate, and a failure-to-correct-response table.
+most tempted to satisfy the checker the wrong way:
+
+- fabricated evidence citations,
+- anchors deleted to silence failures,
+- requirements reworded to match the code,
+- assertions gutted until the test cannot fail — that last one now rejected
+  at compile time or flagged by the check, a mechanism rather than a rule.
+
+[`docs/skill/SKILL.md`](docs/skill/SKILL.md) is a standalone,
+self-contained operating manual for agents: the requirements-first
+workflow, anchor placement rules, evidence-honesty rules, the commands that
+form the gate, and a failure-to-correct-response table.
 
 It is a single file with no external references, so installing it is one
 copy.

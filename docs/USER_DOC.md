@@ -3,9 +3,15 @@
 ## Purpose
 
 `cargo shallguard` connects numbered Markdown requirements to Rust enforcement
-sites and verification tests. It can check traceability, format requirement
-blocks, analyze Git change impact, enumerate exact Cargo tests, collect LLVM
-execution evidence, build review capsules, and run optional semantic review.
+sites and verification tests. It can:
+
+- check traceability,
+- format requirement blocks,
+- analyze Git change impact,
+- enumerate exact Cargo tests,
+- collect LLVM execution evidence,
+- build review capsules,
+- run optional semantic review.
 
 ## Installation
 
@@ -46,9 +52,12 @@ cargo shallguard impact --target origin/main \
   --markdown requirement-impact.md
 ```
 
-`coverage` requires `cargo-llvm-cov`. `review` additionally requires the
-selected provider CLI and may send bounded source capsules to that provider;
-provider authentication and data handling remain outside this tool.
+Additional prerequisites:
+
+- `coverage` requires `cargo-llvm-cov`.
+- `review` requires the selected provider CLI and may send bounded source
+  capsules to that provider; provider authentication and data handling
+  remain outside this tool.
 
 ## What the deterministic gate does and does not prove
 
@@ -65,27 +74,34 @@ provider authentication and data handling remain outside this tool.
   for the certain cases and as check findings otherwise; every `oracle`
   opt-out is counted and listed in the report.
 
-It does not prove that an anchored test is sharp — an `#[enforces]`
-attribute survives edits that gut the behavior it annotates, and a test
-above the vacuity floor can still pass without exercising the contract;
-executable coverage, human review, and semantic review address that layer.
-It also does not prove that a SHALL statement is well-chosen —
-requirement quality stays with the human reviewer, as discussed in
-[issue #12](https://github.com/sigi64/shallguard/issues/12).
+It does not prove two things:
+
+- **Test sharpness** — an `#[enforces]` attribute survives edits that gut
+  the behavior it annotates, and a test above the vacuity floor can still
+  pass without exercising the contract. Executable coverage, human review,
+  and semantic review address that layer.
+- **Requirement quality** — whether a SHALL statement is well-chosen stays
+  with the human reviewer, as discussed in
+  [issue #12](https://github.com/sigi64/shallguard/issues/12).
 
 ## Requirement ID concurrency
 
-Requirement IDs are stable forever only once merged. When two branches
-draft the same next-free `REQ-<AREA>-<NNN>` and collide at merge or
-rebase, the rebasing branch renumbers its requirement to the next free ID;
-IDs become stable at merge to the default branch, not at draft time.
-Renumbering before merge is safe because `cargo shallguard check` fails on
-any rename missed between the document and the anchors — a half-renamed
-requirement cannot pass the gate.
+Requirement IDs become stable at merge to the default branch, not at draft
+time. When two branches draft the same next-free `REQ-<AREA>-<NNN>` and
+collide at merge or rebase:
+
+- the rebasing branch renumbers its requirement to the next free ID;
+- renumbering before merge is safe, because `cargo shallguard check` fails
+  on any rename missed between the document and the anchors — a
+  half-renamed requirement cannot pass the gate.
 
 ## Portability
 
 Workspace-root discovery works from single-package projects and virtual Cargo
-workspaces. Requirement documents, source ownership, path prefixes, area
-policies, baseline, artifact locations, and review defaults are all owned by
-the consuming repository's `shallguard.toml`.
+workspaces. The consuming repository's `shallguard.toml` owns all policy:
+
+- requirement documents,
+- source ownership and path prefixes,
+- area policies,
+- baseline and artifact locations,
+- review defaults.
