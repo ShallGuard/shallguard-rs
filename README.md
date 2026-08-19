@@ -207,6 +207,13 @@ New gaps always fail; only the exact committed historical gaps are tolerated.
 Areas with no remaining gaps can be hardened (`hard_enforcement`,
 `hard_verification`) so they can never be baselined again.
 
+For a large existing codebase, [docs/MIGRATION.md](docs/MIGRATION.md) walks
+through the full agent-assisted migration: an agent recovers the SHALL
+contracts from the code, a human reviews every statement, the baseline
+records today's debt once, and an agent-in-the-loop ratchet pays it off
+batch by batch — including a case study of a 535-requirement production
+workspace migrated this way.
+
 ## Reviewing a merge request
 
 This is where the human-in-the-loop pays off. Whether the branch was written
@@ -443,6 +450,7 @@ introduced traceability gaps fail immediately.
 
 See the [user documentation](docs/USER_DOC.md),
 [technical documentation](docs/TECHNICAL_DOC.md),
+[migration guide](docs/MIGRATION.md),
 [release documentation](docs/RELEASING.md),
 [configuration reference](docs/CONFIGURATION.md),
 [glossary](docs/GLOSSARY.md), the
