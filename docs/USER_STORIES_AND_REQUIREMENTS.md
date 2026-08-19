@@ -471,6 +471,52 @@ rejects any traceability regression.
   *Verified:* ✅ `tests/public_anchor_api.rs`
   (`public_namespace_exposes_all_anchor_macros`)
 
+### US-TRACE-002: Vacuity-Resistant Automated Evidence
+
+**Status:** Planned
+
+**As a** maintainer  
+**I want** ✅ evidence rejected when the cited test cannot fail  
+**So that** a green traceability report cannot be earned by assertion-free
+or constant tests
+
+**System Requirements:**
+
+- **REQ-TRACE-009** — A `#[verifies]` test body containing no failure path —
+  no assertion macro, no `panic!`/`todo!`/`unreachable!` invocation, no
+  `unwrap`/`expect`/`unwrap_err`/`expect_err` call, and no `?` operator in a
+  `Result`-returning test — SHALL be reported as vacuous evidence.
+  *Enforced:* not implemented — Tier 1 vacuity lint scoped in issue #13 ·
+  *Verified:* ⏳ pending
+- **REQ-TRACE-010** — An assertion whose arguments are all literals
+  (constant-foldable, such as `assert!(true)` or `assert_eq!(1, 1)`) SHALL
+  NOT count as a failure path. *Enforced:* not implemented — Tier 1 vacuity
+  lint scoped in issue #13 · *Verified:* ⏳ pending
+- **REQ-TRACE-011** — An `assert_eq!` or `assert_ne!` whose two compared
+  sides are token-identical SHALL NOT count as a failure path. *Enforced:*
+  not implemented — Tier 1 vacuity lint scoped in issue #13 · *Verified:* ⏳
+  pending
+- **REQ-TRACE-012** — `#[should_panic]` without an `expected` message on a
+  `#[verifies]` test whose body offers no other failure path SHALL be
+  reported as weak evidence. *Enforced:* not implemented — Tier 1 vacuity
+  lint scoped in issue #13 · *Verified:* ⏳ pending
+- **REQ-TRACE-013** — A requirement whose only ✅ citation resolves to a
+  vacuous test SHALL be counted as lacking automated verification, and
+  vacuous and weak findings SHALL flow through the ratcheted baseline as
+  distinct gap kinds, so pre-existing cases in adopting repositories are
+  grandfatherable and ratcheted. *Enforced:* not implemented — Tier 1
+  vacuity lint scoped in issue #13 · *Verified:* ⏳ pending
+- **REQ-TRACE-014** — An explicit `#[verifies("REQ-...", oracle = "<class>")]`
+  opt-out SHALL suppress vacuity reporting for that test and SHALL be
+  counted and listable in the check report; suppression SHALL NOT be
+  silent. *Enforced:* not implemented — Tier 1 vacuity lint scoped in
+  issue #13 · *Verified:* ⏳ pending
+- **REQ-TRACE-015** — Vacuity analysis SHALL be purely syntactic and
+  deterministic, SHALL NOT execute tested code, and SHALL classify any
+  construct the classifier does not fully understand as evidence present
+  rather than vacuous. *Enforced:* not implemented — Tier 1 vacuity lint
+  scoped in issue #13 · *Verified:* ⏳ pending
+
 ## Baseline and Ratchet User Stories
 
 ### US-BASE-001: Prevent New Debt without Rewriting History

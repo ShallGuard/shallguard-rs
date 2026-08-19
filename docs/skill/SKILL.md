@@ -151,6 +151,7 @@ cargo shallguard fmt            # fix doc formatting (never hand-wrap
 | ID in code not defined in any document | Add the requirement, or fix the typo — never delete the anchor blindly |
 | Duplicate requirement IDs | Renumber the newer one and its anchors |
 | ✅ claim with no anchored test | Write and anchor the test, or downgrade honestly to ⏳ |
+| Vacuous-evidence finding (test cannot fail) | Assert an actual output of the enforcement site, or downgrade the document line honestly — never launder a trivial assertion through indirection |
 | ✅ citation names no concrete test file/function | Complete the citation with the real file and function |
 | Cited path does not exist | Fix the citation to the real file — never fabricate a path |
 | Enforced file carries no anchor with the ID | Anchor the real enforcement site — never move the anchor to a file that merely mentions the code |
