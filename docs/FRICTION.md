@@ -27,3 +27,12 @@ exists to prevent.
   invariant is guarded only by shared regression fixtures → lint idea
   (a shared proc-macro2-only crate would create one authority, but that
   is a new publishable crate — maintainer decision)
+- 2026-08-19 `test-index`: tests split into `#[path = "*_tests.rs"]` files
+  resolve by unique-suffix fallback instead of exact syntactic name (the
+  file-derived module guess differs from the libtest name); pre-existing
+  convention across the repo, breaks only on a cross-file test-name
+  collision → accepted-cost (revisit if an Ambiguous resolution appears)
+- 2026-08-19 `impact`: src/impact.rs was already ~2,300 lines and the
+  round-3 fix added ~55 more (baseline_addition_finding + test) instead of
+  splitting first; the module needs a real decomposition pass → lint idea
+  (candidates: baseline comparison, dependency analysis, scope collection)

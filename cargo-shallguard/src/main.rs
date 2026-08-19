@@ -43,12 +43,15 @@ use anyhow::{Context, Result, bail};
 mod cli_color;
 #[path = "cli_help.rs"]
 mod cli_help;
+#[path = "cli_impact.rs"]
+mod cli_impact;
 #[path = "cli_progress.rs"]
 mod cli_progress;
 #[path = "cli_review.rs"]
 mod cli_review;
 #[path = "cli_review_show.rs"]
 mod cli_review_show;
+use cli_impact::{run_impact, write_artifact};
 use cli_progress::print_progress;
 use cli_review::parse_review_args;
 use cli_review_show::{ReviewShowArgs, parse_review_show_args, review_outcome_summary};
@@ -65,6 +68,7 @@ enum Command {
     Format(FormatArgs),
     BaselineInit,
     BaselinePrune,
+    BaselineExtend,
     Impact(ImpactArgs),
     Bundle(BundleArgs),
     TestIndex(TestIndexArgs),
@@ -205,12 +209,15 @@ fn main() -> ExitCode {
         },
         [baseline, action] if baseline == "baseline" && action == "init" => Command::BaselineInit,
         [baseline, action] if baseline == "baseline" && action == "prune" => Command::BaselinePrune,
+        [baseline, action] if baseline == "baseline" && action == "extend" => {
+            Command::BaselineExtend
+        }
         [baseline, action, docs @ ..] if baseline == "baseline" && action == "check" => {
             Command::Check(docs.to_vec())
         }
         [baseline, ..] if baseline == "baseline" => {
             eprintln!(
-                "{COMMAND_NAME}: expected `baseline check`, `baseline init`, or `baseline prune`"
+                "{COMMAND_NAME}: expected `baseline check`, `baseline init`, `baseline extend`, or `baseline prune`"
             );
             return ExitCode::FAILURE;
         }
@@ -235,6 +242,7 @@ fn main() -> ExitCode {
         | Command::Clean
         | Command::BaselineInit
         | Command::BaselinePrune
+        | Command::BaselineExtend
         | Command::Impact(_)
         | Command::Bundle(_)
         | Command::TestIndex(_)
@@ -284,6 +292,24 @@ fn main() -> ExitCode {
                 }
                 Err(err) => {
                     eprintln!("{COMMAND_NAME} baseline init failed: {err:#}");
+                    ExitCode::FAILURE
+                }
+            };
+        }
+        Command::BaselineExtend => {
+            return match shallguard::check::extend_baseline(&root, &docs, &config) {
+                Ok(change) => {
+                    println!(
+                        "baseline extension complete for {}; added {} newly detectable gap(s); \
+                         {} total",
+                        change.path.display(),
+                        change.added,
+                        change.entries
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(err) => {
+                    eprintln!("{COMMAND_NAME} baseline extend failed: {err:#}");
                     ExitCode::FAILURE
                 }
             };
@@ -640,78 +666,6 @@ fn parse_coverage_args(args: &[String]) -> Result<CoverageArgs> {
         json,
         markdown,
     })
-}
-
-#[shallguard::enforces("REQ-IMP-007")]
-fn run_impact(
-    root: &Path,
-    docs: &[shallguard::DocSpec],
-    config: &shallguard::config::RepositoryConfig,
-    args: &ImpactArgs,
-) -> ExitCode {
-    let base = match args.base.as_ref() {
-        Some(CliBase::Revision(revision)) => shallguard::impact::BaseSelection::Revision(revision),
-        Some(CliBase::Target(target)) => shallguard::impact::BaseSelection::MergeBaseWith(target),
-        None => match config.review.target.as_deref() {
-            Some(target) => shallguard::impact::BaseSelection::MergeBaseWith(target),
-            None => {
-                eprintln!(
-                    "{COMMAND_NAME} impact failed: provide --base or --target, set a CI base, \
-                     or configure review.target in shallguard.toml"
-                );
-                return ExitCode::FAILURE;
-            }
-        },
-    };
-    let options = shallguard::impact::ImpactOptions {
-        base,
-        baseline_path: &config.baseline,
-    };
-    let artifact = match shallguard::impact::analyze(root, docs, &options) {
-        Ok(artifact) => artifact,
-        Err(err) => {
-            eprintln!("{COMMAND_NAME} impact failed: {err:#}");
-            return ExitCode::FAILURE;
-        }
-    };
-    let policy_failed = artifact.has_policy_errors();
-    let json = match artifact.to_json() {
-        Ok(json) => json,
-        Err(err) => {
-            eprintln!("{COMMAND_NAME} impact failed: {err:#}");
-            return ExitCode::FAILURE;
-        }
-    };
-    if let Err(err) = write_artifact(&args.json, &json) {
-        eprintln!("{COMMAND_NAME} impact failed: {err:#}");
-        return ExitCode::FAILURE;
-    }
-    if let Some(path) = &args.markdown
-        && let Err(err) = write_artifact(path, &artifact.to_markdown())
-    {
-        eprintln!("{COMMAND_NAME} impact failed: {err:#}");
-        return ExitCode::FAILURE;
-    }
-    if policy_failed {
-        eprintln!("{COMMAND_NAME} impact: deterministic policy findings require changes");
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
-    }
-}
-
-fn write_artifact(path: &Path, content: &str) -> Result<()> {
-    if path == Path::new("-") {
-        print!("{content}");
-        return Ok(());
-    }
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("creating artifact directory {}", parent.display()))?;
-    }
-    std::fs::write(path, content).with_context(|| format!("writing artifact {}", path.display()))
 }
 
 #[shallguard::enforces("REQ-CLI-004")]

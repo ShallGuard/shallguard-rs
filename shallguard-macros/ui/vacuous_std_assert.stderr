@@ -1,0 +1,11 @@
+error: #[shallguard::verifies(REQ-ZZ-001)] cites a test that cannot fail: its only assertions are constants that always pass. Evidence must offer a real failure path (see SKILL.md, evidence honesty): assert an actual output of the enforcement site, or opt out visibly with oracle = "panic" | "compile" | "external"
+ --> ui/vacuous_std_assert.rs:5:4
+  |
+5 | fn standard_qualified_constant_assertion() {
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: #[shallguard::verifies(REQ-ZZ-002)] cites a test that cannot fail: its only assertions are constants that always pass. Evidence must offer a real failure path (see SKILL.md, evidence honesty): assert an actual output of the enforcement site, or opt out visibly with oracle = "panic" | "compile" | "external"
+  --> ui/vacuous_std_assert.rs:11:4
+   |
+11 | fn core_qualified_constant_assertion() {
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

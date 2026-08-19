@@ -187,14 +187,20 @@ impl<'ast> Visit<'ast> for BodyVisitor {
             self.opaque_construct = true;
             return;
         };
+        // Exact std/core qualification names the standard macro. Other
+        // qualified paths may reuse the name for a third-party macro.
+        if !is_standard_macro_path(&mac.path) {
+            self.opaque_construct = true;
+            syn::visit::visit_macro(self, mac);
+            return;
+        }
         if ASSERT_MACROS.contains(&name.as_str()) {
             if assertion_is_trivial(&name, mac.tokens.clone()) {
+                // A trivial assertion never fails, so its format-message
+                // arguments never evaluate - an unwrap there is not a
+                // failure path. Non-literal compared sides are already
+                // non-trivial.
                 self.trivial_assertion = true;
-                // A trivial assertion's arguments may still contain real
-                // failure paths (assert_eq!(f().unwrap(), f().unwrap())).
-                if tokens_contain_failure_candidates(mac.tokens.clone()) {
-                    self.real_failure_path = true;
-                }
             } else {
                 self.real_failure_path = true;
             }
@@ -223,6 +229,17 @@ impl<'ast> Visit<'ast> for BodyVisitor {
             self.real_failure_path = true;
         }
         syn::visit::visit_expr_method_call(self, call);
+    }
+}
+
+fn is_standard_macro_path(path: &syn::Path) -> bool {
+    match path.segments.len() {
+        1 => true,
+        2 => path
+            .segments
+            .first()
+            .is_some_and(|segment| segment.ident == "std" || segment.ident == "core"),
+        _ => false,
     }
 }
 
@@ -262,12 +279,10 @@ fn tokens_contain_failure_candidates(tokens: TokenStream) -> bool {
     false
 }
 
-/// Whether an `assert*`-family invocation provably always passes:
-/// `assert!(true)`, equal literal `assert_eq!` sides, or different
-/// literal `assert_ne!` sides. Anything else counts as a failure path -
-/// an always-failing constant (`assert!(false)`) is an unconditional
-/// panic, and token-identical non-literal sides (impure calls,
-/// floating-point values) can fail at runtime.
+/// Whether an `assert*`-family invocation provably always passes.
+/// Anything else counts as a failure path: an always-failing constant
+/// is an unconditional panic, and token-identical non-literal sides
+/// can fail at runtime.
 #[shallguard::enforces("REQ-TRACE-010", "REQ-TRACE-011")]
 fn assertion_is_trivial(name: &str, tokens: TokenStream) -> bool {
     let args = split_top_level_commas(tokens);
@@ -279,10 +294,31 @@ fn assertion_is_trivial(name: &str, tokens: TokenStream) -> bool {
             if args.len() < 2 || !arg_is_literal_only(&args[0]) || !arg_is_literal_only(&args[1]) {
                 return false;
             }
-            let equal = normalized(&args[0]) == normalized(&args[1]);
-            if name.ends_with("ne") { !equal } else { equal }
+            // `assert_ne!` is never provably passing: textually
+            // different literals may be numerically equal (1 vs 0x1).
+            if name.ends_with("ne") {
+                return false;
+            }
+            literal_args_equal(&args[0], &args[1])
         }
     }
+}
+
+fn literal_args_equal(left: &[TokenTree], right: &[TokenTree]) -> bool {
+    match (integer_literal_value(left), integer_literal_value(right)) {
+        (Some(left), Some(right)) => left == right,
+        _ => normalized(left) == normalized(right),
+    }
+}
+
+fn integer_literal_value(arg: &[TokenTree]) -> Option<u128> {
+    let [TokenTree::Literal(literal)] = arg else {
+        return None;
+    };
+    let syn::Lit::Int(integer) = syn::Lit::new(literal.clone()) else {
+        return None;
+    };
+    integer.base10_parse().ok()
 }
 
 fn split_top_level_commas(tokens: TokenStream) -> Vec<Vec<TokenTree>> {
@@ -399,14 +435,49 @@ mod tests {
             OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
         );
         assert_eq!(
-            classify_fn("fn t() { assert_ne!(0, 1, \"context {}\", 2); }"),
+            classify_fn("fn t() { assert_eq!(1, 1, \"context {}\", 2); }"),
             OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
         );
+        assert_eq!(
+            classify_fn("fn t() { assert_eq!(1, 0x1); }"),
+            OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+        );
+        // assert_ne! is never provably passing: 1 and 0x1 differ
+        // textually but are equal, so ne stays a failure path.
+        assert_eq!(
+            classify_fn("fn t() { assert_ne!(0, 1); }"),
+            OracleClass::Present
+        );
+        assert_eq!(
+            classify_fn("fn t() { assert_ne!(1, 0x1); }"),
+            OracleClass::Present
+        );
         // A literal condition with a non-literal message is still trivial:
-        // the message never fires.
+        // the message never fires - not even an unwrap inside it.
         assert_eq!(
             classify_fn("fn t() { assert!(true, \"saw {}\", value()); }"),
             OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+        );
+        assert_eq!(
+            classify_fn("fn t() { assert_eq!(1, 1, \"state: {}\", inspect().unwrap()); }"),
+            OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+        );
+    }
+
+    #[shallguard::verifies("REQ-TRACE-010", "REQ-TRACE-015")]
+    #[test]
+    fn standard_library_assert_paths_are_classified() {
+        assert_eq!(
+            classify_fn("fn t() { std::assert!(true); }"),
+            OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+        );
+        assert_eq!(
+            classify_fn("fn t() { core::assert_eq!(1, 0x1); }"),
+            OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly)
+        );
+        assert_eq!(
+            classify_fn("fn t() { std::assert!(false); }"),
+            OracleClass::Present
         );
     }
 
@@ -544,6 +615,11 @@ mod tests {
         // compare against external state and can fail on a literal.
         assert_eq!(
             classify_fn("fn t() { assert_snapshot!(\"case-1\"); }"),
+            OracleClass::Present
+        );
+        // A nonstandard path that reuses a standard assert name is third-party.
+        assert_eq!(
+            classify_fn("fn t() { harness::assert!(true); }"),
             OracleClass::Present
         );
     }

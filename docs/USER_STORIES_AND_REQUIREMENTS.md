@@ -492,12 +492,16 @@ or constant tests
   `question_mark_without_result_return_is_not_a_failure_path`,
   `failure_paths_inside_macro_arguments_are_seen`,
   `not_equals_comparisons_are_not_failure_paths`)
-- **REQ-TRACE-010** — A constant assertion that provably always passes
-  (`assert!(true)`, `assert_eq!(1, 1)`, `assert_ne!(0, 1)`) SHALL NOT count
-  as a failure path; a constant assertion that always fails
-  (`assert!(false)`, `assert_eq!(0, 1)`) SHALL count as an unconditional
-  failure path. *Enforced:* `src/oracle.rs` (`assertion_is_trivial`) ·
-  *Verified:* ✅ `src/oracle.rs` (`literal_only_assertions_are_trivial`,
+- **REQ-TRACE-010** — An unqualified or `std`/`core`-qualified constant assertion that
+  provably always passes (`assert!(true)`, `assert_eq!(1, 1)`, `assert_eq!(1, 0x1)`)
+  SHALL NOT count as a failure path; semantically equal integer literals SHALL compare
+  equal regardless of spelling; a constant assertion that always fails
+  (`assert!(false)`, `assert_eq!(0, 1)`) SHALL count as an unconditional failure path;
+  and `assert_ne!` SHALL never be treated as provably passing, because textually
+  different literals may be numerically equal (`assert_ne!(1, 0x1)`). *Enforced:*
+  `src/oracle.rs` (`BodyVisitor::visit_macro`, `assertion_is_trivial`) · *Verified:* ✅
+  `src/oracle.rs` (`literal_only_assertions_are_trivial`,
+  `standard_library_assert_paths_are_classified`,
   `always_failing_constant_asserts_are_failure_paths`)
 - **REQ-TRACE-011** — An `assert_eq!` or `assert_ne!` SHALL count as
   vacuous only when both compared sides are literal; token-identical
@@ -534,20 +538,24 @@ or constant tests
   *Verified:* ✅ `src/oracle.rs` (`suppression_is_recorded_not_silent`),
   `src/check_report.rs` (`suppressed_oracles_are_listed_in_the_summary`),
   `src/scan_tests.rs` (`raw_string_oracle_classes_decode_to_their_value`)
-- **REQ-TRACE-015** — Vacuity analysis SHALL be purely syntactic and
-  deterministic, SHALL NOT execute tested code, and SHALL classify any
-  construct the classifier does not fully understand as evidence present
-  rather than vacuous. *Enforced:* `src/oracle.rs` (`classify`) ·
-  *Verified:* ✅ `src/oracle.rs` (`unknown_constructs_classify_as_present`,
+- **REQ-TRACE-015** — Vacuity analysis SHALL be purely syntactic and deterministic,
+  SHALL NOT execute tested code, and SHALL classify any construct the classifier does
+  not fully understand as evidence present rather than vacuous; a third-party
+  path-qualified macro that reuses a standard assertion name SHALL remain conservative,
+  while an exact `std` or `core` qualification SHALL be analyzed as the standard macro.
+  *Enforced:* `src/oracle.rs` (`classify`, `BodyVisitor::visit_macro`) · *Verified:* ✅
+  `src/oracle.rs` (`unknown_constructs_classify_as_present`,
   `err_return_and_result_aliases_classify_as_present`,
-  `third_party_assert_macros_classify_as_present`)
-- **REQ-TRACE-016** — `#[verifies]` SHALL reject at compile time a test body
-  containing no failure-path candidate tokens at all, or only constant
-  `assert` -family invocations that provably always pass; the error SHALL
-  name the offending requirement IDs and reference the evidence-honesty
-  rules, and any body the token scan cannot fully classify SHALL compile —
-  the deterministic check remains authoritative. *Enforced:* `src/lib.rs`
-  (`verifies`) · *Verified:* ✅ `macros:tests/front_line.rs`
+  `third_party_assert_macros_classify_as_present`,
+  `standard_library_assert_paths_are_classified`)
+- **REQ-TRACE-016** — `#[verifies]` SHALL reject at compile time a test body containing
+  no failure-path candidate tokens at all, or only constant `assert`-family invocations
+  that provably always pass; exact `std`/`core` qualification and an unrelated preceding
+  single colon SHALL NOT exempt a standard assertion from this analysis; the error SHALL
+  name the offending requirement IDs and reference the evidence-honesty rules, and any
+  body the token scan cannot fully classify SHALL compile — the deterministic check
+  remains authoritative. *Enforced:* `src/lib.rs` (`verifies`) · *Verified:* ✅
+  `macros:tests/front_line.rs`
   (`front_line_rejects_vacuity_and_enforces_oracle_classes`)
 - **REQ-TRACE-017** — The `oracle` opt-out SHALL accept only the closed
   value set `panic`, `compile`, and `external`: an unknown value SHALL be
@@ -560,6 +568,18 @@ or constant tests
   `src/scan_tests.rs` (`unknown_oracle_class_is_not_a_suppression`,
   `duplicate_and_non_string_oracle_values_are_invalid`), `src/oracle.rs`
   (`oracle_class_set_is_pinned`)
+- **REQ-TRACE-018** — Weak-evidence findings SHALL be advisory warnings by
+  default, and an area configured with `strict_oracle = true` SHALL
+  promote them to errors that cannot be baselined. *Enforced:*
+  `src/check.rs` (`gap_is_hard`), `src/config.rs` (`area_strict_oracle`) ·
+  *Verified:* ✅ `src/check_tests.rs`
+  (`weak_evidence_is_advisory_unless_strict_oracle`,
+  `stale_advisory_baseline_entries_never_hard_fail`)
+- **REQ-TRACE-019** — Verification-anchor requirement IDs SHALL be harvested only from
+  positional string arguments; every token belonging to an `oracle = <value>` argument,
+  including malformed or unknown values, SHALL be excluded so oracle text cannot
+  fabricate a requirement claim. *Enforced:* `src/scan.rs` (`id_search_text`) ·
+  *Verified:* ✅ `src/scan_tests.rs` (`oracle_values_cannot_fabricate_requirement_ids`)
 
 ## Baseline and Ratchet User Stories
 
@@ -587,15 +607,46 @@ or constant tests
   `src/config.rs` (`RepositoryConfig::area_is_hard`) ·
   *Verified:* ✅ `src/check_tests.rs` (`hard_area_cannot_be_baselined`)
 - **REQ-BASE-004** — A resolved or retired gap SHALL make its baseline entry
-  stale and fail checking until `baseline prune` removes it; pruning SHALL
-  remove only resolved entries. *Enforced:* `src/check.rs`
+  stale and fail checking until `baseline prune` removes it, except entries
+  of advisory-only kinds, whose staleness SHALL be reported as a warning;
+  pruning SHALL remove only resolved entries. *Enforced:* `src/check.rs`
   (`apply_baseline`, `prune_baseline`) · *Verified:* ✅ `src/check_tests.rs`
   (`fixed_gap_makes_entry_stale`, `prune_mode_accepts_resolved_entry_for_removal`)
 - **REQ-BASE-005** — Change impact SHALL reject manual baseline growth after
-  initialization and SHALL reject modification of a requirement that still
-  carries historical debt. *Enforced:* `src/impact.rs` (`compare_baseline`,
-  `compare_requirement_documents`) · *Verified:* ✅ `src/impact.rs`
-  (`changed_requirement_with_baseline_debt_is_policy_error`)
+  initialization, except entries whose minimum detector schema is newer than the
+  capability schema recorded by the committed baseline, which SHALL be reported as a
+  reviewable tool-upgrade extension; advancing the capability schema SHALL be reported
+  for review, lowering it SHALL be rejected; and modification of a requirement that
+  still carries historical debt SHALL be rejected. *Enforced:* `src/impact.rs`
+  (`compare_baseline`,
+  `baseline_addition_finding`, `compare_requirement_documents`) · *Verified:* ✅
+  `src/impact.rs` (`baseline_additions_follow_recorded_detector_capability`,
+  `baseline_schema_downgrade_is_policy_error`,
+  `changed_requirement_with_baseline_debt_is_policy_error`)
+- **REQ-BASE-006** — `cargo shallguard baseline extend` SHALL add exceptions only for
+  detected non-advisory gaps whose minimum detector schema is newer than the capability
+  schema recorded by the committed baseline, SHALL refuse every newly supported hard gap
+  before advisory filtering, SHALL advance the recorded capability to the current
+  detector schema after every successful extension even when no exception is added, and
+  SHALL NOT otherwise grow the baseline. *Enforced:* `src/check.rs` (`extend_baseline`,
+  `extension_candidates`), `src/baseline.rs` (`GapKind::minimum_schema`) · *Verified:* ✅
+  `src/check_tests.rs` (`extend_records_only_newly_detectable_kinds`,
+  `extension_candidates_follow_detector_capability`,
+  `successful_empty_extension_advances_detector_capability`,
+  `strict_oracle_gap_blocks_extension_before_advisory_filtering`)
+- **REQ-BASE-007** — Baseline reading SHALL validate the schema version before full
+  deserialization, SHALL report an unsupported version by number, and SHALL reject an
+  entry whose kind requires a newer schema than declared; schemas 1 and 2 SHALL remain
+  readable, newly initialized baselines and successful extensions SHALL record the
+  current detector schema independently of their entries, pruning SHALL preserve that
+  capability, and rendering SHALL NOT lower it. *Enforced:* `src/baseline.rs`
+  (`GapKind::minimum_schema`, `Baseline::parse`, `Baseline::from_entries`,
+  `Baseline::render`) · *Verified:* ✅ `src/baseline.rs`
+  (`schema_is_validated_before_full_deserialization`,
+  `declared_schema_must_support_entry_kinds`,
+  `current_baseline_records_detector_capability`,
+  `render_preserves_detector_capability`), `src/check_tests.rs`
+  (`successful_empty_extension_advances_detector_capability`)
 
 ## Change Impact User Stories
 
@@ -649,7 +700,7 @@ or constant tests
 - **REQ-IMP-007** — Impact output SHALL be emitted as a versioned artifact with
   base/head identity, configuration, impact class, reason, confidence, source
   location, unclaimed changes, and policy findings even when policy causes a
-  nonzero exit. *Enforced:* `src/impact.rs` (`ImpactArtifact`), `cli:src/main.rs`
+  nonzero exit. *Enforced:* `src/impact.rs` (`ImpactArtifact`), `cli:src/cli_impact.rs`
   (`run_impact`) · *Verified:* ✅ `src/impact.rs`
   (`json_artifact_uses_versioned_schema_and_configuration`)
 

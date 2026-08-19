@@ -18,6 +18,10 @@ fn front_line_rejects_vacuity_and_enforces_oracle_classes() {
     cases.compile_fail("ui/vacuous_constant_assert.rs");
     cases.compile_fail("ui/vacuous_debug_assert.rs");
     cases.compile_fail("ui/vacuous_not_equals.rs");
+    cases.compile_fail("ui/vacuous_lazy_message.rs");
+    cases.compile_fail("ui/vacuous_std_assert.rs");
+    cases.compile_fail("ui/vacuous_assert_eq_hex.rs");
+    cases.compile_fail("ui/vacuous_struct_field_assert.rs");
     // Fallible shapes compile: the zero-false-positive contract.
     cases.pass("ui/pass_unwrap.rs");
     cases.pass("ui/pass_question_mark.rs");
@@ -26,6 +30,8 @@ fn front_line_rejects_vacuity_and_enforces_oracle_classes() {
     cases.pass("ui/pass_idempotency_assert.rs");
     cases.pass("ui/pass_guard_arm_assert_false.rs");
     cases.pass("ui/pass_identical_impure_sides.rs");
+    cases.pass("ui/pass_assert_ne_hex.rs");
+    cases.pass("ui/pass_path_qualified_assert.rs");
     // The oracle opt-out is a closed set (REQ-TRACE-017).
     cases.compile_fail("ui/oracle_unknown.rs");
     cases.pass("ui/pass_oracle_panic.rs");

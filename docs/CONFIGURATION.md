@@ -60,7 +60,13 @@ once and commit it:
 cargo shallguard baseline init
 ```
 
-The baseline is a ratchet, not an allowlist to extend. New gaps fail checking.
+The baseline is a ratchet, not an allowlist to extend. New gaps fail
+checking. The one sanctioned growth is `cargo shallguard baseline extend`
+after a tool upgrade: it records only non-advisory gaps introduced by a
+detector schema newer than the capability recorded in the committed baseline.
+A successful extension advances that capability even when it adds no entries,
+so later gaps cannot masquerade as upgrade debt. Hard gaps always refuse the
+extension, including weak evidence promoted by `strict_oracle`.
 After adding honest enforcement or verification anchors, remove only resolved
 entries and commit the result with the anchors:
 

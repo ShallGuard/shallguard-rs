@@ -1,5 +1,5 @@
 # Historical traceability debt. Do not add or refresh entries.
 # `cargo shallguard baseline prune` only removes resolved debt.
 
-schema = 1
+schema = 2
 gap = []

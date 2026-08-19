@@ -417,3 +417,31 @@ mod tests {
             .contains("must be a string literal")
     );
 }
+
+#[shallguard::verifies("REQ-TRACE-019")]
+#[test]
+fn oracle_values_cannot_fabricate_requirement_ids() {
+    let anchors = scan_text(
+        "\
+#[cfg(test)]
+mod tests {
+    #[shallguard::verifies(\"REQ-RD-006\", oracle = \"REQ-FAKE-999\")]
+    #[test]
+    fn unknown_string_value() {}
+
+    #[shallguard::verifies(
+        \"REQ-RD-007\",
+        oracle = bogus(\"REQ-FAKE-998\") stray,
+        \"REQ-RD-008\"
+    )]
+    #[test]
+    fn malformed_multi_token_value() {}
+}
+",
+    );
+    let ids: Vec<&str> = anchors.verified_ids().collect();
+    assert_eq!(ids, vec!["REQ-RD-006", "REQ-RD-007", "REQ-RD-008"]);
+    assert!(!ids.contains(&"REQ-FAKE-999"));
+    assert!(!ids.contains(&"REQ-FAKE-998"));
+    assert_eq!(anchors.invalid.len(), 2);
+}

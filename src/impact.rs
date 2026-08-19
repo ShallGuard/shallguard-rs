@@ -694,6 +694,7 @@ fn requirement_change_reasons(
     reasons
 }
 
+#[shallguard::enforces("REQ-BASE-005")]
 fn compare_baseline(
     root: &Path,
     base: &str,
@@ -720,6 +721,11 @@ fn compare_baseline(
         return Ok(());
     };
     let before = Baseline::parse(&text, &format!("{base}:{baseline_name}"))?;
+    if let Some(finding) =
+        baseline_schema_change_finding(before.schema, head.schema, &baseline_name)
+    {
+        state.findings.push(finding);
+    }
     let old: BTreeSet<GapKey> = before.gaps.iter().map(|entry| entry.key()).collect();
     for added in head
         .gaps
@@ -727,19 +733,83 @@ fn compare_baseline(
         .map(|entry| entry.key())
         .filter(|key| !old.contains(key))
     {
-        state.findings.push(ImpactFinding {
-            code: "baseline-entry-added".to_string(),
-            severity: FindingSeverity::Error,
-            requirement: Some(added.requirement.clone()),
-            file: Some(baseline_name.clone()),
-            line: Some(1),
-            message: format!(
-                "MR adds a {} exception; baseline maintenance is removal-only",
-                added.kind
-            ),
-        });
+        state.findings.push(baseline_addition_finding(
+            &added,
+            before.schema,
+            &baseline_name,
+        ));
     }
     Ok(())
+}
+
+#[shallguard::enforces("REQ-BASE-005")]
+fn baseline_schema_change_finding(
+    before: u32,
+    after: u32,
+    baseline_name: &str,
+) -> Option<ImpactFinding> {
+    let (code, severity, message) = match after.cmp(&before) {
+        std::cmp::Ordering::Less => (
+            "baseline-schema-downgraded",
+            FindingSeverity::Error,
+            format!(
+                "MR lowers the recorded detector capability from schema {before} to {after}; \
+                 baseline capability is monotonic"
+            ),
+        ),
+        std::cmp::Ordering::Greater => (
+            "baseline-detector-advanced",
+            FindingSeverity::Warning,
+            format!(
+                "MR advances the recorded detector capability from schema {before} to {after}; \
+                 review the capability change and any newly grandfathered gaps"
+            ),
+        ),
+        std::cmp::Ordering::Equal => return None,
+    };
+    Some(ImpactFinding {
+        code: code.to_string(),
+        severity,
+        requirement: None,
+        file: Some(baseline_name.to_string()),
+        line: Some(1),
+        message,
+    })
+}
+
+/// Classifies additions against recorded detector capability rather than
+/// inferring provenance from whichever debt entries happen to exist.
+#[shallguard::enforces("REQ-BASE-005")]
+fn baseline_addition_finding(
+    added: &GapKey,
+    recorded_schema: u32,
+    baseline_name: &str,
+) -> ImpactFinding {
+    if added.kind.minimum_schema() > recorded_schema {
+        return ImpactFinding {
+            code: "baseline-extended".to_string(),
+            severity: FindingSeverity::Warning,
+            requirement: Some(added.requirement.clone()),
+            file: Some(baseline_name.to_string()),
+            line: Some(1),
+            message: format!(
+                "MR extends the baseline with a {} exception, a gap kind the \
+                 recording tool version could not detect; review the added debt",
+                added.kind
+            ),
+        };
+    }
+    ImpactFinding {
+        code: "baseline-entry-added".to_string(),
+        severity: FindingSeverity::Error,
+        requirement: Some(added.requirement.clone()),
+        file: Some(baseline_name.to_string()),
+        line: Some(1),
+        message: format!(
+            "MR adds a {} exception; baseline maintenance is removal-only",
+            added.kind
+        ),
+    }
 }
 
 #[derive(Debug)]
@@ -2223,6 +2293,55 @@ mod tests {
             module_root(Path::new("crates/widget-app/src/router.rs")),
             "widget_app::router"
         );
+    }
+
+    #[shallguard::verifies("REQ-BASE-005")]
+    #[test]
+    fn baseline_additions_follow_recorded_detector_capability() {
+        use crate::baseline::{BASELINE_SCHEMA_MAX, BASELINE_SCHEMA_MIN, GapKind};
+
+        let extension = baseline_addition_finding(
+            &GapKey::new("REQ-ZZ-001", GapKind::VacuousEvidence),
+            BASELINE_SCHEMA_MIN,
+            ".shallguard/baseline.toml",
+        );
+        assert_eq!(extension.code, "baseline-extended");
+        assert!(matches!(extension.severity, FindingSeverity::Warning));
+
+        let old_kind_growth = baseline_addition_finding(
+            &GapKey::new("REQ-ZZ-002", GapKind::EnforcementAnchor),
+            BASELINE_SCHEMA_MIN,
+            ".shallguard/baseline.toml",
+        );
+        assert_eq!(old_kind_growth.code, "baseline-entry-added");
+        assert!(matches!(old_kind_growth.severity, FindingSeverity::Error));
+
+        let current_detector_growth = baseline_addition_finding(
+            &GapKey::new("REQ-ZZ-003", GapKind::VacuousEvidence),
+            BASELINE_SCHEMA_MAX,
+            ".shallguard/baseline.toml",
+        );
+        assert_eq!(current_detector_growth.code, "baseline-entry-added");
+        assert!(matches!(
+            current_detector_growth.severity,
+            FindingSeverity::Error
+        ));
+    }
+
+    #[shallguard::verifies("REQ-BASE-005")]
+    #[test]
+    fn baseline_schema_downgrade_is_policy_error() {
+        let downgrade = baseline_schema_change_finding(2, 1, ".shallguard/baseline.toml")
+            .expect("schema downgrade is reported");
+        assert_eq!(downgrade.code, "baseline-schema-downgraded");
+        assert!(matches!(downgrade.severity, FindingSeverity::Error));
+
+        let advance = baseline_schema_change_finding(1, 2, ".shallguard/baseline.toml")
+            .expect("schema advance is reviewable");
+        assert_eq!(advance.code, "baseline-detector-advanced");
+        assert!(matches!(advance.severity, FindingSeverity::Warning));
+
+        assert!(baseline_schema_change_finding(2, 2, ".shallguard/baseline.toml").is_none());
     }
 
     #[shallguard::verifies("REQ-BASE-005")]

@@ -237,7 +237,7 @@ fn strip_anchor_attrs(
             Some("enforces") => {
                 match &attr.meta {
                     syn::Meta::List(list) => {
-                        validate_id_list("enforces", list.tokens.clone().into(), false, errors);
+                        validate_id_list("#[enforces]", list.tokens.clone().into(), false, errors);
                     }
                     _ => errors.extend(
                         syn::Error::new_spanned(
@@ -561,21 +561,21 @@ fn scan_body_tokens(tokens: proc_macro2::TokenStream, scan: &mut FrontLineScan) 
                     Some(TokenTree::Punct(p)) if p.as_char() == '!'
                 );
                 if bang && let Some(TokenTree::Group(group)) = trees.get(i + 2) {
-                    if matches!(
-                        name.as_str(),
-                        "assert"
-                            | "assert_eq"
-                            | "assert_ne"
-                            | "debug_assert"
-                            | "debug_assert_eq"
-                            | "debug_assert_ne"
-                    ) {
+                    if standard_macro_path(&trees, i)
+                        && matches!(
+                            name.as_str(),
+                            "assert"
+                                | "assert_eq"
+                                | "assert_ne"
+                                | "debug_assert"
+                                | "debug_assert_eq"
+                                | "debug_assert_ne"
+                        )
+                    {
                         if assert_args_trivial(&name, group.stream()) {
+                            // A trivial assertion never fails, so its
+                            // format-message arguments never evaluate.
                             scan.trivial_assertion = true;
-                            // The argument expressions still run: an
-                            // unwrap inside identical sides is a real
-                            // failure path.
-                            scan_body_tokens(group.stream(), scan);
                         } else {
                             scan.candidate = true;
                         }
@@ -607,11 +607,28 @@ fn scan_body_tokens(tokens: proc_macro2::TokenStream, scan: &mut FrontLineScan) 
     }
 }
 
-/// Whether an `assert*` invocation provably always passes:
-/// `assert!(true)`, equal literal `_eq` sides, or different literal
-/// `_ne` sides. Always-failing constants are unconditional panics and
-/// token-identical impure sides can fail, so both count as failure
-/// paths.
+fn standard_macro_path(trees: &[proc_macro2::TokenTree], macro_index: usize) -> bool {
+    if !path_separator_before(trees, macro_index) {
+        return true;
+    }
+    let Some(namespace_index) = macro_index.checked_sub(3) else {
+        return false;
+    };
+    let Some(proc_macro2::TokenTree::Ident(namespace)) = trees.get(namespace_index) else {
+        return false;
+    };
+    (namespace == "std" || namespace == "core") && !path_separator_before(trees, namespace_index)
+}
+
+fn path_separator_before(trees: &[proc_macro2::TokenTree], index: usize) -> bool {
+    index >= 2
+        && matches!(&trees[index - 1], proc_macro2::TokenTree::Punct(p) if p.as_char() == ':')
+        && matches!(&trees[index - 2], proc_macro2::TokenTree::Punct(p) if p.as_char() == ':')
+}
+
+/// Whether an `assert*` invocation provably always passes. Always-failing
+/// constants are unconditional panics and token-identical impure sides can
+/// fail, so both count as failure paths.
 fn assert_args_trivial(name: &str, tokens: proc_macro2::TokenStream) -> bool {
     use proc_macro2::TokenTree;
     let mut args: Vec<Vec<TokenTree>> = vec![Vec::new()];
@@ -649,10 +666,30 @@ fn assert_args_trivial(name: &str, tokens: proc_macro2::TokenStream) -> bool {
             if args.len() < 2 || !literal_only(&args[0]) || !literal_only(&args[1]) {
                 return false;
             }
-            let equal = render(&args[0]) == render(&args[1]);
-            if name.ends_with("ne") { !equal } else { equal }
+            // `assert_ne!` is never provably passing: textually
+            // different literals may be numerically equal (1 vs 0x1).
+            if name.ends_with("ne") {
+                return false;
+            }
+            match (
+                integer_literal_value(&args[0]),
+                integer_literal_value(&args[1]),
+            ) {
+                (Some(left), Some(right)) => left == right,
+                _ => render(&args[0]) == render(&args[1]),
+            }
         }
     }
+}
+
+fn integer_literal_value(arg: &[proc_macro2::TokenTree]) -> Option<u128> {
+    let [proc_macro2::TokenTree::Literal(literal)] = arg else {
+        return None;
+    };
+    let syn::Lit::Int(integer) = syn::Lit::new(literal.clone()) else {
+        return None;
+    };
+    integer.base10_parse().ok()
 }
 
 fn anchor(name: &str, args: TokenStream, item: TokenStream) -> TokenStream {

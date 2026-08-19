@@ -142,6 +142,7 @@ impl RepositoryConfig {
     }
 
     /// Whether weak-evidence findings are errors in this area.
+    #[shallguard::enforces("REQ-TRACE-018")]
     pub fn area_strict_oracle(&self, area: &str) -> bool {
         self.areas
             .get(area)
