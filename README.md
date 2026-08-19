@@ -24,14 +24,14 @@ labor into a machine-checked loop:
   in Markdown documents, versioned and reviewed like code.
 - **Anyone — or any agent — implements.** Every requirement must point at the
   code that enforces it (`#[shallguard::enforces]`) and the automated test
-  that proves it (`#[shallguard::verifies]`). New behavior arrives with its
-  contract in the same merge request.
+  cited as its evidence (`#[shallguard::verifies]`). New behavior arrives
+  with its contract in the same merge request.
 - **A deterministic gate protects the link.** `cargo shallguard check` fails
   CI on dangling references, unanchored requirements, and evidence claims
   with no real test behind them. No network, no model, no flakiness — and a
   ratcheted baseline means traceability debt can only shrink.
 - **Review is assisted; the decision stays yours.** For each merge request,
-  map the diff to the impacted contracts, run exactly their proving tests,
+  map the diff to the impacted contracts, run exactly their anchored tests,
   and optionally let a local agent argue whether the change still honors the
   SHALL statements — advisory verdicts with counterexamples, never a merge
   button.
@@ -76,9 +76,13 @@ flowchart LR
     CHECK -- "gap or stale reference" --> FAIL(["Nonzero exit — CI fails"])
 ```
 
-Deterministic checking needs no network access and no model. Optional
-subcommands add executable coverage evidence (via `cargo-llvm-cov`), Git
-change-impact analysis, and local LLM-assisted semantic review.
+Deterministic checking needs no network access and no model. What the gate
+proves is the *link*, not the quality of the evidence behind it — the exact
+boundary is spelled out in
+[what the deterministic gate does and does not prove](docs/USER_DOC.md#what-the-deterministic-gate-does-and-does-not-prove).
+Optional subcommands add executable coverage evidence (via
+`cargo-llvm-cov`), Git change-impact analysis, and local LLM-assisted
+semantic review.
 
 The whole development loop — contract, anchors, the gate, and the gate
 catching a deleted test — in one terminal session:
@@ -94,8 +98,9 @@ keyword **SHALL** for mandatory behavior:
 > evidence only on a syntactically recognized, non-ignored test function…
 
 ShallGuard *guards the SHALL statements*: every SHALL must point at the code
-that enforces it and the automated test that proves it, and the ratcheted
-check makes sure a guarded SHALL can never silently lose its evidence again.
+that enforces it and the automated test offered as its evidence, and the
+ratcheted check makes sure a guarded SHALL can never silently lose that
+evidence link again.
 
 ## Installation
 
@@ -245,12 +250,12 @@ sequenceDiagram
 ```
 
 Reviewing a colleague's branch looks like this — map the diff to the
-contracts it touches, read the contract, run exactly its proving test:
+contracts it touches, read the contract, run exactly its anchored test:
 
 ![ShallGuard review workflow demo](docs/demo/review-workflow.gif)
 
 The impact artifact answers the reviewer's first questions directly: *which
-contracts does this diff touch, and which tests prove they still hold?*
+contracts does this diff touch, and which anchored tests are bound to them?*
 Model verdicts from `review` are advisory only; provider or schema failures
 return nonzero, but a human decision merges the MR.
 

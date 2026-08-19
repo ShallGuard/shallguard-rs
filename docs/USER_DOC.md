@@ -50,6 +50,21 @@ cargo shallguard impact --target origin/main \
 selected provider CLI and may send bounded source capsules to that provider;
 provider authentication and data handling remain outside this tool.
 
+## What the deterministic gate does and does not prove
+
+`cargo shallguard check` proves four things: link integrity (every
+requirement resolves to its anchors and every anchor to its requirement),
+citation reality (every ✅ claim names a real, non-ignored, anchored test),
+evidence-class consistency, and monotone debt (the committed baseline can
+only shrink). It does not prove that an anchored test is sharp — an
+`#[enforces]` attribute survives edits that gut the behavior it annotates,
+and an anchored test may be vacuous; executable coverage, human review, and
+the vacuity lints proposed in
+[issue #13](https://github.com/sigi64/shallguard/issues/13) address that
+layer. It also does not prove that a SHALL statement is well-chosen —
+requirement quality stays with the human reviewer, as discussed in
+[issue #12](https://github.com/sigi64/shallguard/issues/12).
+
 ## Portability
 
 Workspace-root discovery works from single-package projects and virtual Cargo
