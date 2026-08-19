@@ -16,6 +16,8 @@ fn definitely_vacuous_bodies_fail_to_compile() {
     cases.pass("ui/pass_unwrap.rs");
     cases.pass("ui/pass_question_mark.rs");
     cases.pass("ui/pass_should_panic_expected.rs");
+    cases.pass("ui/pass_result_tail.rs");
+    cases.pass("ui/pass_idempotency_assert.rs");
 }
 
 #[shallguard::verifies("REQ-TRACE-017", oracle = "compile")]

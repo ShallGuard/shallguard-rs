@@ -531,7 +531,24 @@ fn collect_fn_attrs(
                         ),
                     });
                 } else if let Some((line, ids)) = attr_ids(attr, id_re) {
-                    let suppression = oracle_suppression(attr);
+                    // The closed oracle set holds in the checker too: an
+                    // unknown class the macro would reject must not
+                    // satisfy the gate through an uncompiled file.
+                    let mut suppression = oracle_suppression(attr);
+                    if let Some(class) = &suppression
+                        && !oracle::ORACLE_CLASSES.contains(&class.as_str())
+                    {
+                        anchors.invalid.push(InvalidAnchor {
+                            file: file.to_path_buf(),
+                            line: attr_line(attr),
+                            message: format!(
+                                "unknown oracle class {class:?} on `{ident}` is not a \
+                                 suppression; accepted values: \"panic\", \"compile\", \
+                                 \"external\""
+                            ),
+                        });
+                        suppression = None;
+                    }
                     anchors.verification.push(VerificationAnchor {
                         file: file.to_path_buf(),
                         line,
@@ -579,8 +596,9 @@ fn source_range(span: proc_macro2::Span) -> SourceRange {
 }
 
 /// Extracts an `oracle = "<class>"` opt-out from a `#[shallguard::verifies]`
-/// attribute's argument tokens.
-#[shallguard::enforces("REQ-TRACE-014")]
+/// attribute's argument tokens. String literals are parsed through `syn`
+/// so raw strings decode to their actual value.
+#[shallguard::enforces("REQ-TRACE-014", "REQ-TRACE-017")]
 fn oracle_suppression(attr: &syn::Attribute) -> Option<String> {
     let syn::Meta::List(list) = &attr.meta else {
         return None;
@@ -594,9 +612,9 @@ fn oracle_suppression(attr: &syn::Attribute) -> Option<String> {
         ] = window
             && *name == "oracle"
             && eq.as_char() == '='
+            && let syn::Lit::Str(lit) = syn::Lit::new(value.clone())
         {
-            let raw = value.to_string();
-            return Some(raw.trim_matches('"').to_string());
+            return Some(lit.value());
         }
     }
     None
@@ -892,6 +910,51 @@ fn a() {
         );
         assert!(anchors.enforcement.is_empty());
         assert!(anchors.references.is_empty());
+    }
+
+    #[shallguard::verifies("REQ-TRACE-014", "REQ-TRACE-017")]
+    #[test]
+    fn unknown_oracle_class_is_not_a_suppression() {
+        let anchors = scan_text(
+            "\
+#[cfg(test)]
+mod tests {
+    #[shallguard::verifies(\"REQ-RD-006\", oracle = \"trustme\")]
+    #[test]
+    fn cannot_fail() {}
+}
+",
+        );
+        // The anchor stays, but the invalid class does not suppress
+        // vacuity analysis and is reported.
+        assert_eq!(anchors.verification.len(), 1);
+        assert!(matches!(
+            anchors.verification[0].oracle,
+            crate::oracle::OracleClass::Vacuous(_)
+        ));
+        assert_eq!(anchors.invalid.len(), 1);
+        assert!(anchors.invalid[0].message.contains("unknown oracle class"));
+    }
+
+    #[shallguard::verifies("REQ-TRACE-014")]
+    #[test]
+    fn raw_string_oracle_classes_decode_to_their_value() {
+        let anchors = scan_text(
+            "\
+#[cfg(test)]
+mod tests {
+    #[shallguard::verifies(\"REQ-RD-006\", oracle = r\"compile\")]
+    #[test]
+    fn compile_oracle() {}
+}
+",
+        );
+        assert_eq!(anchors.verification.len(), 1);
+        assert_eq!(
+            anchors.verification[0].oracle,
+            crate::oracle::OracleClass::Suppressed("compile".to_string())
+        );
+        assert!(anchors.invalid.is_empty());
     }
 
     #[shallguard::verifies("REQ-TRACE-004")]
