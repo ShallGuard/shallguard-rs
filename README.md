@@ -12,6 +12,20 @@ The workspace contains the reusable `shallguard` library, the
 `cargo-shallguard` Cargo subcommand, and its internal procedural-macro crate.
 The project is licensed under the [MIT License](LICENSE).
 
+## Used in production
+
+- The migration workflow has been run once at scale — on the author's own
+  production workspace (a founder-run best case, not an independent
+  benchmark): 3 crates, 535 requirements across 16 areas.
+- The first check reported 576 traceability warnings; the ratchet ended
+  with an empty committed baseline and every area hardened.
+- The migration surfaced real defects a green test suite had been hiding:
+  a vacuous authorization test, an end-to-end test missing its core
+  component, assertion-free mocks, and two silently write-only metric
+  fields.
+- Full numbers and caveats in the
+  [migration case study](docs/MIGRATION.md#case-study-a-production-network-service-workspace).
+
 ## Why now: the human stays in the loop
 
 Coding agents — and colleagues working with them — produce compiling,
