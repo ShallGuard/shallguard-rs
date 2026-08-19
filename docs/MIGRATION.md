@@ -135,6 +135,14 @@ in the same merge request.
 
 ## Case study: a production network service workspace
 
+The migrated workspace is the author's own production system; read the
+numbers as a founder-run best case, not an independent benchmark. In
+particular, the two-day figure below was possible because the specification
+largely already existed in the author's head — a team migrating unfamiliar
+code should expect the human SHALL review, not the agent work, to be the
+pacing constraint, for the reason stated above: a wrong requirement
+recorded as truth is worse than none.
+
 This process was used to migrate a production Rust workspace (three member
 crates — a network service, a routing library, and a protocol crate) whose
 two behavioral crates carried **535 requirements across 16 areas** in two
@@ -166,7 +174,9 @@ What the migration surfaced — and why the honesty rules exist:
    authorization test (asserting on input the parser rejects, so the
    assertion never fired), an end-to-end test with the core component
    missing, and mocks that asserted nothing. Each was fixed or honestly
-   downgraded — never anchored as-is.
+   downgraded — never anchored as-is. These are exactly the patterns
+   [issue #13](https://github.com/sigi64/shallguard/issues/13) proposes to
+   detect deterministically; the migration found them empirically first.
 2. **Anchoring surfaces real drift.** Two metric fields had silently become
    write-only after a refactor; the requirement forced an explicit
    keep-or-retire decision instead of continued rot.
