@@ -219,11 +219,11 @@ fn lint_block(block: &[&str], spec: &DocSpec, line: usize) -> Vec<FormatDiagnost
     if verified.trim().is_empty() {
         messages.push("`*Verified:*` segment must name verification evidence".to_string());
     }
-    if !['✅', '🔬', '👁', '⏳']
+    if !['✅', '', '', '⏳']
         .iter()
         .any(|indicator| verified.contains(*indicator))
     {
-        messages.push("`*Verified:*` must contain ✅, 🔬, 👁, or ⏳ evidence status".to_string());
+        messages.push("`*Verified:*` must contain ✅, , , or ⏳ evidence status".to_string());
     }
     diagnostics(spec, line, messages)
 }

@@ -53,9 +53,9 @@ pub struct Requirement {
     /// Concrete evidence citations parsed from the *Verified:* segment:
     /// file spans, each optionally followed by test-function spans.
     pub evidence: Vec<Evidence>,
-    /// `🔬` end-to-end evidence claimed.
+    /// `` end-to-end evidence claimed.
     pub e2e: bool,
-    /// `👁` code-review-only evidence.
+    /// `` code-review-only evidence.
     pub review_only: bool,
     /// `⏳` pending evidence.
     pub pending: bool,
@@ -191,8 +191,8 @@ fn parse_chunk(
         retired,
         automated: verified_text.contains('\u{2705}'), // ✅
         evidence,
-        e2e: verified_text.contains('\u{1F52C}'), // 🔬
-        review_only: verified_text.contains('\u{1F441}'), // 👁
+        e2e: verified_text.contains('\u{1F52C}'), // 
+        review_only: verified_text.contains('\u{1F441}'), // 
         pending: verified_text.contains('\u{23F3}'), // ⏳
     }
 }
@@ -306,7 +306,7 @@ mod tests {
   zeroed **only if** its routing domain appears in the request.
   *Enforced:* `core:src/router/tasks/config_manager.rs`
   (`update_goal_weights_with_scope`) · *Verified:* ✅ regression test ·
-  🔬 e2e flux-cli differential
+   e2e flux-cli differential
 - **REQ-AUTH-022** — If the user-cache is unavailable, the service SHALL
   fall back automatically to direct MySQL loading.
   *Enforced:* not implemented — the initial load retries and then fails
@@ -314,7 +314,7 @@ mod tests {
 - **REQ-CM-021** — *(retired into REQ-CM-019 — whitelist support.)*
 - **REQ-OP-001** — Something with a directory reference.
   *Enforced:* `src/router/optimizer/greedy_heuristics/` ·
-  *Verified:* 👁 code review only
+  *Verified:*  code review only
 
 Prose citing `tests/basic.rs` and a symbol span `update_goal_weights`.
 ";

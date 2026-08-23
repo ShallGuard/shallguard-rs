@@ -1,0 +1,12 @@
+fix: Remove emoji evidence
+
+- docs\MIGRATION.md
+- docs\USER_STORIES_AND_REQUIREMENTS.md
+- docs\skill\SKILL.md
+- src\bundle.rs
+- src\docs.rs
+- src\requirement_format.rs
+
+Fixes #14
+
+Signed-off-by: Vedant Madane <6527493+VedantMadane@users.noreply.github.com>

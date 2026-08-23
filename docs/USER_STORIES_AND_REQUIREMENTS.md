@@ -27,7 +27,7 @@ requirements. A system requirement has this form:
 > **REQ-\<AREA\>-\<NNN\>** — normative statement using RFC 2119 keywords
 > (**SHALL**, **SHALL NOT**, or **MAY**), stated so that it is testable.
 > *Enforced:* implementation reference or `not implemented` plan ·
-> *Verified:* evidence (✅ automated test, 🔬 end-to-end validation, 👁 code
+> *Verified:* evidence (✅ automated test,  end-to-end validation,  code
 > review only, or ⏳ pending)
 
 IDs are stable, globally unique within the product, and never reused. Retired
@@ -450,7 +450,7 @@ rejects any traceability regression.
 - **REQ-TRACE-005** — The checker SHALL fail for malformed documents,
   duplicate IDs, unknown live anchor IDs, or nonexistent cited Rust paths.
   *Enforced:* `src/check.rs` (`run`, `analyze`), `src/docs.rs` (`parse_doc`) ·
-  *Verified:* 👁 code review only
+  *Verified:*  code review only
 - **REQ-TRACE-006** — An implemented requirement SHALL have its exact ID on an
   enforcement anchor in every documented enforcement file, and an automated
   requirement SHALL resolve to a test carrying its exact verification anchor.
@@ -613,7 +613,7 @@ or constant tests
   merge base of a target branch and SHALL compare it with the current working
   tree, including tracked modifications and deletions. *Enforced:*
   `src/impact.rs` (`analyze`, `resolve_revision`, `merge_base`,
-  `changed_files`) · *Verified:* 👁 code review only
+  `changed_files`) · *Verified:*  code review only
 - **REQ-IMP-002** — Git change parsing SHALL preserve non-UTF-8-safe field
   boundaries and rename source/destination identity by consuming NUL-terminated
   name-status output. *Enforced:* `src/impact.rs` (`parse_name_status`) ·
@@ -684,7 +684,7 @@ or constant tests
 - **REQ-TEST-004** — A resolved test identity SHALL include package, Cargo
   target kind/name, exact harness name, source path/function, and claimed
   requirement IDs. *Enforced:* `src/test_index.rs` (`CargoTestIdentity`,
-  `IndexedVerificationTest`) · *Verified:* 👁 code review only
+  `IndexedVerificationTest`) · *Verified:*  code review only
 - **REQ-TEST-005** — A reusable test catalog SHALL record source revision and
   working-tree state, and loading SHALL reject incompatible package filters or
   catalog identities rather than silently selecting another test. *Enforced:*
@@ -714,7 +714,7 @@ or constant tests
 - **REQ-COV-002** — Selected tests SHALL run under Rust LLVM instrumentation
   with isolated raw profiles per exact test while reusing compatible build
   output across the run. *Enforced:* `src/coverage_llvm.rs` (`prepare`,
-  `collect_test`, `clean_profiles`) · *Verified:* 👁 code review only
+  `collect_test`, `clean_profiles`) · *Verified:*  code review only
 - **REQ-COV-003** — LLVM export parsing SHALL retain workspace-local executable
   line/column regions and counts, deduplicate repeated instantiations, and
   reject unknown export forms or paths outside the repository. *Enforced:*
@@ -740,7 +740,7 @@ or constant tests
   identities, test outcomes, LLVM evidence, enforcement sites, and requirement
   status, and SHALL remain available when one or more selected tests fail.
   *Enforced:* `src/coverage.rs` (`CoverageArtifact`), `cli:src/main.rs`
-  (`run_coverage`) · *Verified:* 👁 code review only
+  (`run_coverage`) · *Verified:*  code review only
 - **REQ-COV-007** — A future patch-exercise result SHALL report whether cited
   tests execute changed executable regions inside impacted enforcement scopes
   and SHALL keep this result separate from whole-scope enforcement reach.
@@ -762,7 +762,7 @@ or constant tests
 - **REQ-CAP-001** — Bundle generation SHALL produce one independently
   reviewable capsule for each selected impacted requirement and a manifest that
   maps requirement IDs to capsule files. *Enforced:* `src/bundle.rs`
-  (`generate`, `BundleManifest`) · *Verified:* 👁 code review only
+  (`generate`, `BundleManifest`) · *Verified:*  code review only
 - **REQ-CAP-002** — A capsule SHALL include the full normative statement and
   clauses, enforcement and verification declarations, impact reasons, related
   tests, available coverage, changed source, and current source for every
@@ -791,7 +791,7 @@ or constant tests
 - **REQ-CAP-006** — Bundle generation SHALL be deterministic for identical
   source and inputs and SHALL exclude unrelated repository content unless it is
   explicitly related and bounded by the capsule schema. *Enforced:*
-  `src/bundle.rs` (`generate`, `build_capsule`) · *Verified:* 👁 code review only
+  `src/bundle.rs` (`generate`, `build_capsule`) · *Verified:*  code review only
 
 ## Semantic Review User Stories
 
@@ -994,7 +994,7 @@ or constant tests
   bundle, and review-input stages SHALL treat repository source and Git history
   as read-only; only explicit `fmt` MAY modify a requirement document.
   *Enforced:* `cli:src/main.rs`, `src/impact.rs`, `src/test_index.rs`,
-  `src/coverage.rs`, `src/bundle.rs`, `src/review.rs` · *Verified:* 👁 code
+  `src/coverage.rs`, `src/bundle.rs`, `src/review.rs` · *Verified:*  code
   review only
 - **REQ-SEC-002** — Any path read from an artifact, capsule, cache, or provider
   response SHALL be normalized and SHALL NOT escape its configured root through
