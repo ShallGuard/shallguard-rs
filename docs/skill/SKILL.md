@@ -42,9 +42,9 @@ cargo install cargo-shallguard --version <pinned-version> --locked
   automated test, `[e2e]` an end-to-end or production validation,
   `[review]` a code review only, `[pending]` pending. The emoji ✅, 🔬, 👁,
   and ⏳ are optional aliases. `cargo shallguard fmt` adds the keyword
-  before an emoji and keeps the emoji, for example `[test] ✅`. Only `[test]` requires a `#[verifies]` anchor and a
-  citation with a file and a function. The check compares the `[test]`
-  claim with the anchor.
+  before an emoji and keeps the emoji, for example `[test] ✅`. Only
+  `[test]` requires a `#[verifies]` anchor and a citation with a file and
+  a function. The check compares the `[test]` claim with the anchor.
 
 ShallGuard finds anchors in the syntax of the code. **A comment is never an
 anchor.** A `REQ-...` string in a comment or in a string literal does
