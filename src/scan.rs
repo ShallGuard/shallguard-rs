@@ -26,8 +26,6 @@ use serde::{Deserialize, Serialize};
 use syn::spanned::Spanned as _;
 use syn::visit::Visit;
 
-use crate::oracle::{self, OracleClass};
-
 /// An `#[shallguard::enforces]` attribute or `shallguard::enforces_here!` invocation.
 pub struct EnforcementAnchor {
     /// Workspace-relative Rust source file.
@@ -93,8 +91,6 @@ pub struct VerificationAnchor {
     /// Inline module path inside the source file.
     pub inline_modules: Vec<String>,
     pub ids: Vec<String>,
-    /// Syntactic classification of the test body's failure paths.
-    pub oracle: OracleClass,
 }
 
 /// A structurally invalid anchor (e.g. `#[shallguard::verifies]` off a test).
@@ -329,8 +325,8 @@ fn walk_items(
                     if let syn::ImplItem::Fn(f) = ii {
                         collect_fn_attrs(
                             &f.attrs,
-                            &f.sig,
-                            &f.block,
+                            &f.sig.ident,
+                            source_range(f.block.span()),
                             file,
                             inline_modules,
                             id_re,
@@ -342,8 +338,8 @@ fn walk_items(
             syn::Item::Fn(f) => {
                 collect_fn_attrs(
                     &f.attrs,
-                    &f.sig,
-                    &f.block,
+                    &f.sig.ident,
+                    source_range(f.block.span()),
                     file,
                     inline_modules,
                     id_re,
@@ -483,15 +479,13 @@ fn collect_item_attrs(
 #[shallguard::enforces("REQ-TRACE-004")]
 fn collect_fn_attrs(
     attrs: &[syn::Attribute],
-    sig: &syn::Signature,
-    block: &syn::Block,
+    ident: &syn::Ident,
+    scope: SourceRange,
     file: &Path,
     inline_modules: &[String],
     id_re: &Regex,
     anchors: &mut Anchors,
 ) {
-    let ident = &sig.ident;
-    let scope = source_range(block.span());
     let is_test = attrs.iter().any(|a| {
         a.path()
             .segments
@@ -531,14 +525,12 @@ fn collect_fn_attrs(
                         ),
                     });
                 } else if let Some((line, ids)) = attr_ids(attr, id_re) {
-                    let suppression = oracle_suppression(attr);
                     anchors.verification.push(VerificationAnchor {
                         file: file.to_path_buf(),
                         line,
                         test_fn: ident.to_string(),
                         inline_modules: inline_modules.to_vec(),
                         ids,
-                        oracle: oracle::classify(attrs, sig, block, suppression.as_deref()),
                     });
                 }
             }
@@ -576,29 +568,6 @@ fn source_range(span: proc_macro2::Span) -> SourceRange {
         end_line: end.line,
         end_column: end.column + 1,
     }
-}
-
-/// Extracts an `oracle = "<class>"` opt-out from a `#[shallguard::verifies]`
-/// attribute's argument tokens.
-fn oracle_suppression(attr: &syn::Attribute) -> Option<String> {
-    let syn::Meta::List(list) = &attr.meta else {
-        return None;
-    };
-    let trees: Vec<proc_macro2::TokenTree> = list.tokens.clone().into_iter().collect();
-    for window in trees.windows(3) {
-        if let [
-            proc_macro2::TokenTree::Ident(name),
-            proc_macro2::TokenTree::Punct(eq),
-            proc_macro2::TokenTree::Literal(value),
-        ] = window
-            && *name == "oracle"
-            && eq.as_char() == '='
-        {
-            let raw = value.to_string();
-            return Some(raw.trim_matches('"').to_string());
-        }
-    }
-    None
 }
 
 fn attr_ids(attr: &syn::Attribute, id_re: &Regex) -> Option<(usize, Vec<String>)> {
