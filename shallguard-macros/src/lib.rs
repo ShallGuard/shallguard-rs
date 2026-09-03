@@ -390,7 +390,6 @@ pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
                 && is_test
                 && parsed.oracle.is_none()
                 && !has_should_panic(&fun.attrs)
-                && !can_fail_via_return(&fun.sig)
             {
                 reject_definitely_vacuous(&fun, &parsed.ids, &mut errors);
             }
@@ -471,19 +470,6 @@ fn has_should_panic(attrs: &[syn::Attribute]) -> bool {
         .any(|attr| attr.path().is_ident("should_panic"))
 }
 
-/// Whether the return type can carry a failure out of the test. Only an
-/// absent or unit return type cannot; `Result`, aliases of it, and
-/// `ExitCode` all can, and the token scan cannot see through aliases —
-/// so any explicit non-unit return type skips the front line entirely.
-fn can_fail_via_return(sig: &syn::Signature) -> bool {
-    match &sig.output {
-        syn::ReturnType::Default => false,
-        syn::ReturnType::Type(_, ty) => {
-            !matches!(&**ty, syn::Type::Tuple(tuple) if tuple.elems.is_empty())
-        }
-    }
-}
-
 /// Compile-time front line for the deterministic vacuity check: rejects
 /// only the zero-false-positive subset — a body whose tokens contain no
 /// failure-path candidate at all, or only trivial assertions. Anything
@@ -549,10 +535,6 @@ fn scan_body_tokens(tokens: proc_macro2::TokenStream, scan: &mut FrontLineScan) 
                     {
                         if assert_args_trivial(&name, group.stream()) {
                             scan.trivial_assertion = true;
-                            // The argument expressions still run: an
-                            // unwrap inside token-identical sides is a
-                            // real failure path.
-                            scan_body_tokens(group.stream(), scan);
                         } else {
                             scan.candidate = true;
                         }
