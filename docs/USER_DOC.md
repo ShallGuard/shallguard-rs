@@ -66,7 +66,7 @@ Two commands have more prerequisites:
 
 ## What the deterministic gate does and does not prove
 
-The check is the command `cargo shallguard check`. The check proves four
+The check is the command `cargo shallguard check`. The check proves five
 things:
 
 - **Link integrity.** Every requirement resolves to its anchors. Every anchor
@@ -76,13 +76,17 @@ things:
 - **Evidence-class consistency.** The evidence class on the *Verified:* line
   agrees with the anchors that exist.
 - **Monotone debt.** The committed baseline can only become smaller.
+- **An evidence floor.** The check rejects a cited test that cannot fail.
+  Such a test has no failure path, or it has only assertions that always
+  pass. The compiler rejects the certain cases. The check reports the other
+  cases as findings. The report counts and lists every `oracle` opt-out.
 
 The check does not prove two things:
 
 - **Test sharpness.** An `#[enforces]` attribute survives an edit that
-  removes the behavior below it. A cited test can pass without a real test
-  of the requirement, and a test that cannot fail is not detected. Execution
-  coverage, human review, and semantic review address this layer.
+  removes the behavior below it. A test above the evidence floor can still
+  pass without a real test of the requirement. Execution coverage, human
+  review, and semantic review address this layer.
 - **Requirement quality.** A person decides if a requirement is a good
   requirement. [Issue #12](https://github.com/shallguard/shallguard-rs/issues/12)
   discusses this point.
