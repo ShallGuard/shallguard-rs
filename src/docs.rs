@@ -339,7 +339,7 @@ Prose citing `tests/basic.rs` and a symbol span `update_goal_weights`.
         assert!(hrs.automated && hrs.e2e && !hrs.pending);
         assert_eq!(
             hrs.verified_text,
-            "[test] regression test · [e2e] e2e flux-cli differential"
+            "[test] regression test · [e2e] 🔬 e2e flux-cli differential"
         );
         assert_eq!(
             hrs.enforced_paths,

@@ -25,7 +25,7 @@ Type "clear"
 Enter
 Type "# Step 2/4: an agent drafts SHALL contracts from the code and history"
 Enter
-Type "# — a human reviews every line; evidence starts honest: [pending]"
+Type "# — a human reviews every line; evidence starts honest: [pending] ⏳"
 Enter
 Type "bat docs/REQUIREMENTS.md"
 Enter

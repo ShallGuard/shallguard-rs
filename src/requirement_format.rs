@@ -256,10 +256,10 @@ fn format_block(block: &[&str]) -> Vec<String> {
     formatted
 }
 
-/// Rewrites emoji evidence aliases after `*Verified:*` to their keywords.
+/// Adds the keyword next to every emoji evidence alias after `*Verified:*`.
 ///
-/// Text before the verification segment is returned unchanged, so an emoji
-/// in a statement is not touched.
+/// The emoji stays in the document. Text before the verification segment is
+/// returned unchanged, so an emoji in a statement is not touched.
 #[shallguard::enforces("REQ-SPEC-008")]
 fn canonicalize_evidence_marks(block: &[&str]) -> Vec<String> {
     let mut in_verified = false;
@@ -423,7 +423,7 @@ mod tests {
 
     #[shallguard::verifies("REQ-SPEC-007", "REQ-SPEC-008")]
     #[test]
-    fn rewrites_emoji_aliases_to_canonical_keywords() {
+    fn adds_canonical_keywords_next_to_emoji_aliases() {
         let input = "- **REQ-AA-001** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs` (`apply`) · *Verified:* ✅ `src/lib.rs` (`test_apply`) ·\n  🔬 differential run\n- **REQ-AA-002** — The service SHALL not fail.\n  *Enforced:* not implemented · *Verified:* ⏳ pending\n";
 
         let formatted = format_text(input, &spec());
@@ -433,18 +433,16 @@ mod tests {
             "{:?}",
             formatted.diagnostics
         );
-        assert!(
-            formatted
-                .text
-                .contains("*Verified:* [test] `src/lib.rs` (`test_apply`) ·")
-        );
-        assert!(formatted.text.contains("[e2e] differential run"));
-        assert!(formatted.text.contains("*Verified:* [pending] pending"));
-        assert!(
-            !['✅', '🔬', '⏳']
-                .iter()
-                .any(|emoji| formatted.text.contains(*emoji))
-        );
+        let joined = formatted
+            .text
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(joined.contains("*Verified:* [test] ✅ `src/lib.rs` (`test_apply`) ·"));
+        assert!(joined.contains("[e2e] 🔬 differential run"));
+        assert!(joined.contains("*Verified:* [pending] ⏳ pending"));
+        let twice = format_text(&formatted.text, &spec());
+        assert_eq!(twice.text, formatted.text, "the rewrite is idempotent");
         verify_semantic_equivalence(input, &formatted.text, &spec())
             .expect("an alias and its keyword have the same parsed meaning");
 

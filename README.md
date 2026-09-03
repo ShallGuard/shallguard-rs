@@ -69,7 +69,8 @@ ShallGuard has three parts and one check:
    the form `REQ-<AREA>-<NNN>`. Each requirement has an *Enforced:* line that
    names its source locations and a *Verified:* line that names its evidence
    class and its tests. The evidence classes are ASCII keywords: `[test]`,
-   `[e2e]`, `[review]`, and `[pending]`.
+   `[e2e]`, `[review]`, and `[pending]`. An emoji next to the keyword is
+   optional.
 2. **Anchors in code.** Attributes and macros mark the code that makes a
    requirement true and the tests that verify it. Each anchor names the
    requirement IDs it serves.
@@ -173,7 +174,7 @@ source_root = "."
 
 ```markdown
 - **REQ-HRS-002** — The scheduler SHALL never emit a zero worker floor.
-  *Enforced:* `src/floor.rs` (`floor`) · *Verified:* [test] `src/floor.rs`
+  *Enforced:* `src/floor.rs` (`floor`) · *Verified:* [test] ✅ `src/floor.rs`
   (`floor_never_returns_zero`)
 ```
 

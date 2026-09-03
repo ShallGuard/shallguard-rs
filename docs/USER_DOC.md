@@ -106,10 +106,12 @@ ASCII keyword:
 The keyword is the canonical form. It survives editors, copy and paste, and
 diff tools, and `grep` finds it. The emoji is an optional alias with the same
 meaning. The parser and the lint accept both forms. The command
-`cargo shallguard fmt` rewrites an emoji to its keyword. The commands
+`cargo shallguard fmt` adds the keyword before an emoji that has no keyword,
+and it keeps the emoji next to the keyword, for example `[test] ✅`. A
+document with only keywords stays as it is. The commands
 `cargo shallguard fmt --check` and `cargo shallguard lint` report a document
-that still contains an emoji as non-canonical. To migrate an existing
-document, run `cargo shallguard fmt` once and commit the result.
+with an emoji that lacks its keyword as non-canonical. To migrate an
+existing document, run `cargo shallguard fmt` once and commit the result.
 
 ## Requirement ID concurrency
 

@@ -4,7 +4,8 @@
 //! for example `[test]`. The keyword survives editors, copy and paste,
 //! diff tools, and screen readers, and `grep` finds it. The four emoji
 //! that older documents use are accepted as aliases of the same classes.
-//! `cargo shallguard fmt` rewrites an alias to its keyword.
+//! `cargo shallguard fmt` adds the keyword before an emoji that has no
+//! keyword yet, and it keeps the emoji next to the keyword.
 
 /// One evidence class that a *Verified:* segment can claim.
 #[shallguard::enforces("REQ-SPEC-007")]
@@ -80,16 +81,24 @@ impl EvidenceMark {
             .any(|mark| mark.is_claimed_in(text))
     }
 
-    /// Rewrites every emoji alias in the text to its canonical keyword.
+    /// Adds the canonical keyword before every emoji alias whose keyword is
+    /// absent from the text, and keeps the emoji next to the keyword.
     ///
-    /// A variation selector after an emoji is removed with the emoji.
+    /// Text that already contains the keyword is returned unchanged for that
+    /// mark, so the rewrite is idempotent. A variation selector after an
+    /// emoji is removed.
     #[must_use]
     pub fn canonicalize(text: &str) -> String {
         let mut canonical = text.to_string();
         for mark in EvidenceMark::ALL {
-            let with_selector = format!("{}{VARIATION_SELECTOR}", mark.emoji());
-            canonical = canonical.replace(&with_selector, mark.keyword());
-            canonical = canonical.replace(mark.emoji(), mark.keyword());
+            if canonical.contains(mark.keyword()) {
+                continue;
+            }
+            let emoji = mark.emoji().to_string();
+            let with_selector = format!("{emoji}{VARIATION_SELECTOR}");
+            let paired = format!("{} {emoji}", mark.keyword());
+            canonical = canonical.replace(&with_selector, &emoji);
+            canonical = canonical.replace(&emoji, &paired);
         }
         canonical
     }
@@ -115,13 +124,20 @@ mod tests {
         for mark in EvidenceMark::ALL {
             let keyword_text = format!("{} `src/lib.rs` (`t`)", mark.keyword());
             let emoji_text = format!("{} `src/lib.rs` (`t`)", mark.emoji());
+            let paired_text = format!("{} {} `src/lib.rs` (`t`)", mark.keyword(), mark.emoji());
             assert!(mark.is_claimed_in(&keyword_text), "{mark:?} keyword");
             assert!(mark.is_claimed_in(&emoji_text), "{mark:?} emoji");
             assert_eq!(
                 EvidenceMark::canonicalize(&emoji_text),
-                keyword_text,
-                "{mark:?} canonical form"
+                paired_text,
+                "{mark:?} canonical form keeps the emoji"
             );
+            assert_eq!(
+                EvidenceMark::canonicalize(&paired_text),
+                paired_text,
+                "{mark:?} canonical form is stable"
+            );
+            assert_eq!(EvidenceMark::canonicalize(&keyword_text), keyword_text);
         }
         assert!(!EvidenceMark::any_claimed_in("code review"));
         assert!(!EvidenceMark::Test.is_claimed_in("[e2e] differential"));
@@ -133,7 +149,7 @@ mod tests {
         let text = "\u{1F441}\u{FE0F} code review only";
         assert_eq!(
             EvidenceMark::canonicalize(text),
-            "[review] code review only"
+            "[review] \u{1F441} code review only"
         );
         let already = "[test] `src/lib.rs` (`t`) [pending]";
         assert_eq!(EvidenceMark::canonicalize(already), already);
