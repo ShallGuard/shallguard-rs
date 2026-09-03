@@ -1,145 +1,172 @@
 # Contributing to ShallGuard
 
-Thank you for helping improve ShallGuard. Contributions may include code,
-tests, requirements, documentation, design proposals, bug reports, and English
-wording improvements.
+Thank you for your help with ShallGuard. This page tells you how to
+contribute. A contribution can be code, tests, requirements, documentation,
+a design proposal, a bug report, or an English wording improvement. The
+[glossary](docs/GLOSSARY.md) defines each technical term.
 
-Please follow the [Code of Conduct](CODE_OF_CONDUCT.md) in all project spaces.
+Follow the [Code of Conduct](CODE_OF_CONDUCT.md) in all project spaces.
 
 ## Project direction
 
-ShallGuard exists to keep software behavior understandable and auditable as
-LLM-assisted development makes producing code faster. Features that improve the
-development process in this environment are especially welcome, provided that
-they preserve deterministic checks, honest evidence, and human control over
-the specification.
+ShallGuard exists to keep software behavior understandable and auditable.
+Development with a large language model (LLM) makes code faster to produce.
+A feature that improves the development process in this environment is
+welcome. The feature must keep three properties:
 
-ShallGuard also welcomes proposals to extend its principles beyond Rust. In
-particular, integrations for Python, JavaScript, TypeScript, Go, and other
-languages with reliable test-discovery and coverage tooling are in scope.
+- The checks give the same result each time.
+- The evidence is honest.
+- A person controls the specification.
+
+ShallGuard also welcomes proposals that extend its principles beyond Rust.
+Integrations for Python, JavaScript, TypeScript, Go, Java, C#/.NET, and
+other languages are in scope. The language must have reliable tools for test
+discovery and for coverage.
 
 ## Requirements-first development
 
-ShallGuard dogfoods its own requirements workflow. Every new feature or
-intentional behavior change must be specified and delivered as one coherent
-change:
+ShallGuard uses its own requirements workflow. Every new feature and every
+intended behavior change must arrive as one change with these parts:
 
-1. Add or update a user story and testable requirement in
-   [`docs/USER_STORIES_AND_REQUIREMENTS.md`](docs/USER_STORIES_AND_REQUIREMENTS.md)
-   before the final implementation pass.
-2. Implement the behavior and anchor the code that enforces the requirement
+1. Add or update a user story and a testable requirement in
+   [`docs/USER_STORIES_AND_REQUIREMENTS.md`](docs/USER_STORIES_AND_REQUIREMENTS.md).
+   Do this before the final implementation pass.
+2. Implement the behavior. Anchor the code that makes the requirement true
    with `#[shallguard::enforces]` or `shallguard::enforces_here!`.
-3. Add a test that exercises the contract and anchor it with
+3. Add a test that verifies the requirement. Anchor the test with
    `#[shallguard::verifies]`.
-4. Claim automated evidence only after that test exists and would fail if the
-   contract were violated.
-5. Run the deterministic ShallGuard checks before submitting the change.
+4. Claim automated evidence only after that test exists. The test must fail
+   when the requirement is violated.
+5. Run the ShallGuard checks before you submit the change.
 
-Do not add baseline entries for new work. The committed baseline is empty, and
-all requirement areas are hardened. Requirement IDs are stable: retire an ID
-instead of deleting or reusing it.
+Do not add baseline entries for new work. The committed baseline is empty,
+and all requirement areas are hard. Requirement IDs are stable. Retire an ID
+instead of a deletion or a reuse.
 
-Refactoring, formatting, and documentation corrections that do not change
-product behavior do not need artificial product requirements. Changes to
-normative requirement wording need special care: a purely editorial change
-must preserve meaning, while a semantic change must be treated as a behavior
-change and kept consistent with its code and evidence.
+A refactor, a format change, or a documentation correction does not change
+the behavior of the product. Such a change does not need an artificial
+requirement. A change to the text of a requirement needs special care. An
+editorial change must keep the meaning. A change of meaning is a behavior
+change. Keep it consistent with the code and the evidence.
+
+## Documentation style (mandatory)
+
+Write all documents in ASD-STE100 (Simplified Technical English). Write for
+a reader without previous knowledge. The rules are in
+[`docs/WRITING_STYLE.md`](docs/WRITING_STYLE.md). The most important rules
+are:
+
+- Use short sentences with one topic. Use the active voice and the present
+  tense.
+- Use "must" for a rule and "can" for a possibility. Do not use "should".
+- Explain each technical term the first time you use it, or link to the
+  glossary.
+- Use one word for one thing.
+
+One exception applies. A requirement statement keeps its RFC 2119 form with
+SHALL, SHALL NOT, or MAY. ShallGuard needs that form.
 
 ## Use the ShallGuard agent skill
 
-When working with a coding agent, we strongly recommend installing and using
-the repository's [ShallGuard skill](docs/skill/SKILL.md). See the
-[installation instructions](README.md#ai-agent-skill) for Codex and Claude
-Code. Tell the agent to use the skill before it changes behavior, requirements,
-anchors, verification tests, or code near an existing anchor.
+If you work with a coding agent, install and use the
+[ShallGuard skill](docs/skill/SKILL.md). The
+[README](README.md#ai-agent-skill) gives the installation steps for Codex
+and Claude Code. Tell the agent to use the skill before it changes behavior,
+requirements, anchors, verification tests, or code near an anchor.
 
-The skill teaches agents to read the requirement before changing its enforcing
-code, follow the requirements-first sequence, preserve stable IDs, anchor
-honest evidence, and fix checker failures at their source. This helps prevent
-an agent from making a change appear successful by weakening the specification
-or bypassing traceability.
+The skill teaches the agent to read the requirement before it changes the
+code that makes the requirement true. The agent then follows the
+requirements-first sequence, keeps the IDs stable, anchors honest evidence,
+and fixes each check failure at its source. This prevents an agent from a
+false success through a weaker specification or a bypass of traceability.
 
-In particular, an agent must never:
+An agent must never:
 
-- Delete or move an anchor merely to silence a checker or review finding.
-- Weaken, broaden, or reword a requirement merely to match the implementation
-  or make a deterministic check or semantic review pass.
-- Fabricate a test citation, verification anchor, or other evidence.
-- Downgrade evidence or add baseline debt merely to avoid implementing or
-  testing the required behavior.
+- Delete or move an anchor only to remove a check finding or a review
+  finding.
+- Weaken, widen, or reword a requirement only to match the implementation
+  or to make a check or a semantic review pass.
+- Invent a test citation, a verification anchor, or other evidence.
+- Downgrade evidence or add baseline debt only to avoid the implementation
+  or the test of the required behavior.
 
-When an implementation conflicts with a requirement, fix the implementation or
-its evidence. If the intended product behavior has genuinely changed, update
-the requirement explicitly as a reviewed specification decision and keep its
-implementation and evidence consistent in the same change. A passing tool
-result is never more important than preserving the intended contract.
+When an implementation conflicts with a requirement, fix the implementation
+or its evidence. If the intended product behavior has changed, update the
+requirement as a reviewed specification decision. Keep the implementation
+and the evidence consistent in the same change. A passing tool result is
+never more important than the intended requirement.
 
 ## LLM-assisted contributions
 
-LLM-assisted code and prose are welcome. Much of ShallGuard's English text has
-itself been drafted, reworded, or corrected with LLM assistance because English
-is not the maintainer's native language.
+Code and text with LLM help are welcome. Much of the English text of
+ShallGuard was drafted, reworded, or corrected with LLM help, because
+English is not the native language of the maintainer.
 
-The person submitting a contribution remains accountable for its correctness,
-security, licensing, and maintainability, regardless of which tools helped
-produce it. In particular:
+The person who submits a contribution is responsible for its correctness,
+security, licensing, and maintainability. This applies whichever tools
+helped to produce it. In particular:
 
-- Generated tests, citations, requirement anchors, and review findings must be
-  checked before they are presented as evidence.
-- Secrets, private source code, and other restricted information must not be
-  sent to external model providers without authorization.
-- Model verdicts remain advisory. Deterministic checks and human review retain
-  authority over acceptance.
-- Deterministic ShallGuard checks must not require network access or a model.
+- Examine each generated test, citation, requirement anchor, and review
+  finding before you present it as evidence.
+- Do not send secrets, private source code, or other restricted information
+  to an external model provider without authorization.
+- Model verdicts are advisory. The checks and the human review decide about
+  acceptance.
+- The ShallGuard checks must not need network access or a model.
 
-Using an LLM is neither a reason to reject a contribution nor a substitute for
-understanding it.
+The use of an LLM is not a reason to reject a contribution. It is also not a
+replacement for an understanding of the contribution.
 
 ## Additional language support
 
-A language integration does not need to imitate Rust attributes or macros, but
-it should preserve ShallGuard's core guarantees:
+A language integration does not need to imitate the Rust attributes or
+macros. It must keep the core guarantees of ShallGuard:
 
 - Stable requirement identities.
-- Traceable enforcement and verification evidence.
-- Honest, ecosystem-native test discovery and execution.
-- Integration with the ecosystem's coverage tooling where available.
-- Deterministic, machine-readable checks and versioned artifacts.
-- A clear distinction between execution coverage and proof of correctness.
-- No network or model dependency in deterministic gates.
+- Traceable enforcement evidence and verification evidence.
+- Honest test discovery and test execution with the native tools of the
+  ecosystem.
+- Integration with the coverage tools of the ecosystem, where they exist.
+- Machine-readable checks with the same result each time, and versioned
+  artifacts.
+- A clear difference between execution coverage and proof of correctness.
+- No network dependency and no model dependency in a gate.
 
-Before implementing a substantial language integration, a design proposal
-should explain its enforcement-anchor mechanism, test identity model, coverage
-strategy, configuration and artifact compatibility, and deterministic trust
-boundary. The integration itself must follow the requirements-first workflow.
+Before you implement a large language integration, write a design proposal.
+The proposal must explain the enforcement-anchor mechanism, the test
+identity model, the coverage strategy, the compatibility of configuration
+and artifacts, and the trust boundary of the checks. The integration itself
+must follow the requirements-first workflow.
 
-Repository organization and build orchestration for multiple languages are not
-yet predetermined. They should be discussed before adopting a layout or adding
-a new build system. The proposal should address:
+The repository layout and the build orchestration for several languages are
+not decided yet. Discuss them before you adopt a layout or add a build
+system. The proposal must answer these questions:
 
-- Whether ShallGuard remains one multi-language repository or uses separate
-  repositories for language-specific integrations.
-- Which functionality and artifact schemas are shared, and which parts should
-  be implemented as ecosystem-native packages or tools.
-- How Cargo and language-specific build systems are invoked locally and in CI,
-  including whether a common top-level task runner is useful.
-- How compiler, runtime, package-manager, and dependency versions are pinned
-  and reproduced from a clean checkout.
-- How unit, integration, fixture, coverage, and cross-language compatibility
-  tests are organized and owned.
-- How CI selects the checks affected by a change without allowing one language
-  integration to hide failures in another.
-- How packages and shared artifact schemas are versioned, released, and tested
-  for backward compatibility.
+- Does ShallGuard stay one repository for all languages, or does each
+  language integration get its own repository?
+- Which functionality and which artifact schemas are shared? Which parts
+  are packages or tools native to the ecosystem?
+- How do Cargo and the language-specific build systems run, on a local
+  machine and in CI? Is a common top-level task runner useful?
+- How are the versions of compilers, runtimes, package managers, and
+  dependencies pinned and reproduced from a clean copy of the repository?
+- How are unit, integration, fixture, coverage, and cross-language
+  compatibility tests organized, and who owns them?
+- How does CI select the checks that a change affects, without a way for one
+  language integration to hide failures in another?
+- How are packages and shared artifact schemas versioned, released, and
+  tested for backward compatibility?
 
-The goal is not to impose one universal build system. Contributors in each
-ecosystem should be able to use familiar tools, while maintainers retain a
-clear, reproducible way to run the complete repository test suite and verify
-that all language integrations implement compatible ShallGuard semantics.
+The goal is not one universal build system. A contributor in each ecosystem
+must be able to use familiar tools. A maintainer must keep a clear,
+reproducible way to run the complete test suite of the repository and to
+verify that all language integrations implement compatible ShallGuard
+semantics.
 
 ## Development checks
 
-Run the checks relevant to the change. The complete repository check is:
+Run the checks that apply to your change. The complete check of the
+repository is:
 
 ```bash
 cargo build --workspace
@@ -151,31 +178,34 @@ cargo shallguard-dev fmt --check
 cargo shallguard-dev check
 ```
 
-After editing the requirement specification, always run both ShallGuard
-commands without restricting them to one document. This lets
-`shallguard.toml` select and cross-check the complete specification.
+After an edit of the requirement specification, always run both ShallGuard
+commands without a document argument. Then `shallguard.toml` selects the
+complete specification and cross-checks it.
 
 ## Rust conventions
 
-- Prefer simple, deterministic APIs and explicit configuration.
-- Do not use `Result::unwrap()`; reserve `expect("BUG: ...")` for invariants.
-- Keep deterministic library behavior separate from terminal presentation and
-  provider execution.
-- Split focused modules before a source file grows beyond 1,000 lines.
+- Prefer simple APIs with the same result each time, and explicit
+  configuration.
+- Do not use `Result::unwrap()`. Use `expect("BUG: ...")` only for an
+  invariant.
+- Keep the library behavior separate from the terminal presentation and from
+  the provider execution.
+- Split a source file into focused modules before it grows beyond 1,000
+  lines.
 - Use versioned schemas for machine-readable artifacts.
-- Do not add network access or a model dependency to deterministic checks.
+- Do not add network access or a model dependency to a check.
 
 ## Pull requests
 
-Keep changes focused and explain the user problem they solve. Identify the
-requirements added or changed, describe the evidence, and mention important
-limitations or follow-up work. For a substantial feature or language
-integration, opening a design discussion before implementation is encouraged.
+Keep each change focused. Explain the user problem that the change solves.
+Name the requirements that you added or changed. Describe the evidence.
+Mention important limits and follow-up work. For a large feature or a
+language integration, open a design discussion before the implementation.
 
 Do not claim that tests, coverage, or an LLM verdict prove more than they
-actually demonstrate. Clear pending evidence is preferable to a false claim of
-completed verification.
+show. A clear pending mark is better than a false claim of complete
+verification.
 
-When the gate or the workflow produces friction during development, append a
-one-line entry to [docs/FRICTION.md](docs/FRICTION.md) in the same change set
-instead of working around it silently.
+When the gate or the workflow causes friction during your work, add a
+one-line entry to [docs/FRICTION.md](docs/FRICTION.md) in the same change
+set. Do not work around the friction in silence.

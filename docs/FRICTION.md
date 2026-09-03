@@ -1,12 +1,14 @@
 # Friction log
 
-Contract: one line per entry, written at the moment of annoyance, no
-rationalizing. Each entry eventually resolves to exactly one of:
-bug / lint idea / SKILL.md rule / feature-removal candidate /
-accepted-cost — append the resolution to the line, never delete it.
-Friction is appended in the same change set as the work that produced
-it; working around friction silently is the failure mode this file
-exists to prevent.
+This file records each moment when the gate or the workflow made the work
+harder. A contributor adds one line at the moment of the annoyance, without
+an explanation. Each entry later gets exactly one resolution: bug, lint
+idea, SKILL.md rule, feature-removal candidate, or accepted cost. Add the
+resolution to the end of the line. Never delete a line.
+
+Add the friction entry in the same change set as the work that caused it.
+This file exists to prevent one failure: a contributor who works around the
+friction in silence.
 
 - 2026-08-19 `review`: a stale local-review directory blocks
   feature-by-feature review work; it must be removed by hand between

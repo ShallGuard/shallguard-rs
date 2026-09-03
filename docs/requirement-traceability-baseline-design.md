@@ -2,54 +2,80 @@
 
 **Status:** Implemented; initial debt inventory pending
 
-This document specifies how existing traceability gaps are grandfathered while
-new gaps are rejected immediately. Modified baselined requirements are handled
-by the merge-request impact check described below.
-It is a component of
+This document specifies how ShallGuard accepts the existing traceability gaps
+and rejects each new gap immediately. Traceability is the relationship between
+a requirement, the code that enforces it, and the tests that verify it. A gap
+is a missing anchor or missing evidence for a requirement. An anchor is a mark
+in the Rust code that links the code or a test to a requirement. The baseline
+records the accepted gaps. The baseline is a file that the repository owns.
+
+The gaps that the baseline accepts are the debt. The check is the ShallGuard
+tool run that examines the traceability. A hard error makes the check fail. A
+warning does not make the check fail.
+
+The merge request (MR) impact check handles a requirement that has a gap in
+the baseline and that a change modifies. A merge request (MR) is a proposed
+change that a reviewer examines before it is merged. The section "Interaction
+with MR impact" describes this check.
+
+This document is a component of
 [Requirement Assurance Design](requirement-assurance-design.md).
 
-The baseline complements the existing area ratchet. It does not weaken areas
-that are already hard.
+The baseline adds to the existing area ratchet. An area is a group of
+requirements that share the same ID prefix. The area ratchet is the existing
+mechanism that promotes an area from warnings to hard errors. In a hard area,
+the check reports each gap as a hard error. The baseline does not weaken an
+area that is already hard.
 
 ## 1. Problem
 
-Several requirement areas still report anchor or automated-evidence gaps as
-warnings while their historical requirements are audited. An area-only ratchet
-has two undesirable properties during that migration:
+Several requirement areas still report gaps as warnings. These gaps are
+missing anchors or missing automated evidence. The areas report warnings
+while a person audits their historical requirements. During this migration, a
+ratchet that works only on areas has 2 unwanted properties:
 
-- a new requirement can add another warning in an unhardened area;
-- a modified historical requirement needs explicit MR-level scrutiny when it
-  retains an old exception.
+- A new requirement can add one more warning in an area that is not hard.
+- A modified historical requirement needs an explicit examination at the MR
+  level when it keeps an old accepted gap.
 
-A count threshold is not sufficient. One old gap could be fixed while a new gap
-is introduced, leaving the count unchanged.
+A limit on the number of gaps is not sufficient. A change can fix one old gap
+and add one new gap at the same time. The number of gaps then does not
+change.
 
-The baseline identifies the exact accepted gap. It intentionally contains no
-content hashes that authors would need to maintain.
+The baseline identifies the exact accepted gap. The baseline contains no
+content hashes. This is intentional. A content hash is a fingerprint of a
+text. Authors would have to update the hashes after each edit.
 
 ## 2. Goals
 
-- Preserve known historical gaps temporarily.
-- Reject every new gap regardless of requirement area.
-- Let MR impact analysis reject edits to requirements with inherited gaps.
-- Reject regressions after a gap has been fixed.
-- Make baseline debt visible, reviewable, and monotonically removable.
-- Keep already-hard areas fully hard.
-- Require no baseline churn for ordinary requirement edits or Markdown reflow.
+- Keep the known historical gaps for a limited time.
+- Reject every new gap in every requirement area.
+- Let the MR impact analysis reject an edit to a requirement that has an
+  inherited gap. An inherited gap is a gap that the baseline accepts.
+- Reject a gap that comes back after a person fixed it.
+- Make the debt in the baseline visible. Let a reviewer examine it. Let the
+  debt only decrease.
+- Keep each area that is already hard fully hard.
+- Do not require a change to the baseline after an ordinary edit to a
+  requirement or after a change of the line breaks in the Markdown.
 
 ## 3. Non-goals
 
-- Automatically accepting a new exception.
-- Hiding known gaps from normal reports.
-- Replacing the area ratchet.
-- Fingerprinting requirement text, implementation code, or test bodies.
-- Proving that a historical evidence claim is honest.
-- Detecting behavior added without any requirement; that remains an impact and
-  review concern.
+The design does not do these things:
+
+- Accept a new baseline entry automatically.
+- Hide a known gap from the normal reports.
+- Replace the area ratchet.
+- Make a fingerprint of the requirement text, the implementation code, or the
+  test bodies.
+- Prove that a historical evidence claim is honest.
+- Detect behavior that a change adds without a requirement. This stays a
+  concern for the impact analysis and for the review.
 
 ## 4. Baseline file
 
-The proposed file is `.shallguard/baseline.toml`:
+The proposed file is `.shallguard/baseline.toml`. TOML is a plain text
+format for configuration files. This is an example of the file:
 
 ```toml
 schema = 1
@@ -67,91 +93,113 @@ requirement = "REQ-CF-009"
 kind = "evidence-citation"
 ```
 
-Each entry permits one missing traceability dimension for one active
-requirement.
+Each entry permits one kind of gap for one active requirement.
 
-Recognized initial kinds:
+The check recognizes these initial kinds:
 
 | Kind | Meaning |
 |------|---------|
-| `enforcement-anchor` | Enforced file has no matching enforcement anchor |
+| `enforcement-anchor` | The enforced file has no enforcement anchor that matches the requirement |
 | `verification-anchor` | Automated requirement has no matching `#[shallguard::verifies]` test |
-| `evidence-citation` | Automated evidence lacks a concrete resolvable test citation |
+| `evidence-citation` | The automated evidence does not cite a concrete test that the check can find |
 
-An entry does not suppress unknown IDs, duplicate requirements, dead paths,
-malformed anchors, or invalid evidence tests.
+An entry does not hide these errors:
+
+- an unknown requirement ID
+- a duplicate requirement
+- a dead path
+- a malformed anchor
+- an invalid evidence test
 
 ## 5. No stored fingerprint
 
-Baseline identity is only `(requirement ID, gap kind)`. This keeps the file
-stable and ensures that editing requirement prose never creates hash-update
-work.
+The identity of a baseline entry is only `(requirement ID, gap kind)`. This
+keeps the file stable. An edit to the prose of a requirement never creates
+work to update a hash.
 
-The trade-off is explicit: a head-only check cannot tell whether a baselined
-requirement was modified. The MR impact phase compares base and head
-requirement chunks directly. If a changed requirement still has any baselined
-gap, that MR check fails and asks the author to complete its traceability. This
-preserves the modified-requirement ratchet without persistent hashes.
+This design has an explicit cost. Git is the version control system that
+stores the repository. The base is the version of the repository before a
+change. The head is the version of the repository with the change. A check
+that examines only the head cannot know whether a change modified a
+requirement that has a gap in the baseline.
+
+The MR impact phase compares the requirement text in the base and in the head
+directly. If a changed requirement still has a gap in the baseline, the MR
+check fails. The check asks the author to complete the traceability of the
+requirement. This keeps the ratchet for modified requirements without stored
+hashes.
 
 ## 6. Check algorithm
 
-For every current traceability gap:
+The check does these steps for every current gap:
 
-1. Determine requirement ID and gap kind.
-2. If the requirement's area is already hard, report the normal hard error;
-   baseline entries cannot exempt it.
-3. Look up an exact baseline entry by `(requirement, kind)`.
-4. No entry means a new regression and is a hard error.
-5. An exact match is known debt and remains a warning.
+1. Find the requirement ID and the gap kind.
+2. If the area of the requirement is already hard, report the normal hard
+   error. A baseline entry cannot exempt the gap.
+3. Find the exact baseline entry by `(requirement, kind)`.
+4. If there is no entry, the gap is a new regression. A regression is a gap
+   that has no entry in the baseline. Report a hard error.
+5. If there is an exact match, the gap is known debt. Report a warning.
 
-Then inspect every baseline entry:
+A stale entry is an entry that no longer matches a real gap. Then the check
+examines every baseline entry:
 
-1. Missing requirement means stale baseline and is a hard error.
-2. Retired requirement means stale baseline and is a hard error.
-3. Gap no longer exists means the entry is stale and is a hard error asking the
-   author to remove it.
-4. Duplicate or unknown gap kind is a hard baseline-format error.
-5. Entry for an already-hard area is a hard policy error.
+1. If the requirement does not exist, the entry is stale. Report a hard
+   error.
+2. If the requirement is retired, the entry is stale. Report a hard error.
+3. If the gap no longer exists, the entry is stale. Report a hard error that
+   asks the author to remove the entry.
+4. If the entry is a duplicate, or if the gap kind is unknown, report a hard
+   error for the baseline format.
+5. If the entry is for an area that is already hard, report a hard policy
+   error.
 
-Stale entries must fail rather than remain harmless. Otherwise a fixed
-requirement could later regress under its old exception.
+A stale entry must cause a failure. It must not stay in the file as a
+harmless entry. If a stale entry stays, a fixed requirement can get the same
+gap again later. The old entry then hides the new gap.
 
 ## 7. State transitions
 
 | Previous state | Head state | Result |
 |----------------|------------|--------|
-| Baselined gap | Same gap | Warning: known debt |
-| Baselined gap | Requirement changed in an MR | MR impact check requires the gap to be fixed |
-| Baselined gap | Gap fixed, entry remains | Hard: remove stale entry |
-| Baselined gap | Gap fixed, entry removed | Pass |
-| No gap | New gap | Hard regression |
-| No requirement | New incomplete requirement | Hard regression |
-| Active requirement | Retired, entry remains | Hard: remove stale entry |
-| Warning area | Area promoted hard | Baseline entries forbidden |
+| Gap in the baseline | The same gap | Warning. The gap is known debt. |
+| Gap in the baseline | An MR changes the requirement | The MR impact check requires a fix for the gap. |
+| Gap in the baseline | The gap is fixed and the entry remains | Hard error. Remove the stale entry. |
+| Gap in the baseline | The gap is fixed and the entry is removed | Pass |
+| No gap | A new gap | Hard error. The gap is a regression. |
+| No requirement | A new requirement that has a gap | Hard error. The gap is a regression. |
+| Active requirement | The requirement is retired and the entry remains | Hard error. Remove the stale entry. |
+| Warning area | The area becomes hard | Baseline entries are not permitted. |
 
 ## 8. Maintenance commands
 
-The normal tool supports only monotonic maintenance:
+The normal tool supports only monotonic maintenance. Monotonic means that the
+maintenance can remove an entry but can never add an entry. These are the
+commands:
 
 ```text
 shallguard baseline check
 shallguard baseline prune
 ```
 
-`baseline prune` may remove entries for gaps that are now fixed or requirements
-that are retired. It must never add entries.
+The `baseline prune` command can remove an entry for a gap that is now fixed.
+It can also remove an entry for a requirement that is retired. It must never
+add an entry.
 
-The implementation also has a bootstrap-only `baseline init` command. It uses
-create-new file semantics and refuses to run once a baseline file exists.
+The implementation also has a `baseline init` command for the first setup
+only. The command creates a new file. If a baseline file already exists, the
+command refuses to run.
 
-The initial baseline is created once as part of introducing this policy and is
-reviewed as a complete debt inventory. There is intentionally no routine
-`baseline update` command: adding or refreshing an exception must be a visible
-manual policy change.
+A person creates the initial baseline once, when the project introduces this
+policy. A reviewer examines the initial baseline as a complete inventory of
+the debt. There is no routine `baseline update` command. This is intentional.
+A person who adds or refreshes a baseline entry must make a visible manual
+change to the policy.
 
 ## 9. Reporting
 
-Known debt and regressions are reported separately:
+The check reports known debt and regressions separately. This is an example
+of the report:
 
 ```text
 traceability baseline
@@ -160,80 +208,97 @@ traceability baseline
   new regressions:    0
 ```
 
-Every known-gap warning includes:
+Every warning for a known gap includes these items:
 
-- requirement ID and title;
-- gap kind;
-- owning document location;
-- marker that the gap is grandfathered;
-- remediation target.
+- the requirement ID and the title
+- the gap kind
+- the location in the document that owns the requirement
+- a marker that says that the gap is an accepted historical gap
+- the target of the remediation
 
-The area coverage table remains unchanged so baseline debt cannot disappear
-from the visible totals.
+The area coverage table does not change. Thus the baseline debt cannot
+disappear from the visible totals.
 
 ## 10. Interaction with MR impact
 
-The baseline is evaluated against head state independently of Git diff, so it
-cannot be bypassed by an unusual base selection.
+The check evaluates the baseline against the head state. It does not use the
+Git diff for this. A Git diff is the list of differences between the base and
+the head. Thus an unusual choice of the base cannot bypass the baseline.
 
-Impact analysis adds context:
+The impact analysis adds this context:
 
-- changed baselined requirement, which is a deterministic hard finding until
-  its inherited gaps are fixed;
-- source change in a baselined enforcement file;
-- test change related to baselined automated evidence;
-- baseline file modification.
+- a changed requirement that has a gap in the baseline. This is a
+  deterministic hard finding until the inherited gaps are fixed.
+  Deterministic means that the same input always gives the same result.
+- a change to a source file that enforces a requirement with a gap in the
+  baseline
+- a change to a test that is related to automated evidence with a gap in the
+  baseline
+- a modification of the baseline file
 
-Any baseline modification is surfaced prominently in the MR summary and review
-bundle. An LLM may review the rationale, but deterministic baseline matching is
-authoritative.
+The MR summary and the review bundle show every modification of the baseline
+prominently. A large language model (LLM) is an AI model that reads and
+writes text. An LLM can review the reason for the modification. The
+deterministic matching of the baseline is authoritative.
 
 ## 11. Merge and conflict behavior
 
-The baseline is sorted by requirement ID then gap kind. Stable formatting keeps
-parallel cleanup changes mergeable.
+The tool sorts the baseline by requirement ID and then by gap kind. The
+stable format lets Git merge parallel cleanup changes.
 
-If two branches fix the same gap, both may remove the same entry; ordinary Git
-conflict resolution is sufficient. A branch that changes a requirement while
-another fixes its gap must rebase and complete traceability under the new head
-state.
+A branch is a separate line of changes in Git. If 2 branches fix the same
+gap, both can remove the same entry. The ordinary Git conflict resolution is
+sufficient.
+
+One branch can change a requirement while another branch fixes the gap of
+that requirement. The first branch must then rebase. A rebase moves the
+changes of a branch on top of the newest state. The first branch must then
+complete the traceability under the new head state.
 
 ## 12. Rollout
 
-1. Generate the proposed initial entries from current warning gaps.
-2. Review counts by area and gap kind.
-3. Verify every entry matches one current warning and no hard-area requirement.
-4. Commit baseline and enforcement logic together.
-5. Make new and stale entries hard in the same MR.
-6. Continue area-by-area anchor work; prune entries as each gap is fixed.
-7. Remove the baseline mechanism when the file becomes empty, or keep the empty
-   file as an explicit no-debt policy marker.
+1. Generate the proposed initial entries from the current warning gaps.
+2. Review the counts by area and by gap kind.
+3. Verify that every entry matches one current warning. Verify that no entry
+   matches a requirement in a hard area.
+4. Commit the baseline and the enforcement logic together.
+5. Make new entries and stale entries hard errors in the same MR.
+6. Continue the anchor work area by area. Prune an entry when its gap is
+   fixed.
+7. Remove the baseline mechanism when the file becomes empty. As an
+   alternative, keep the empty file as an explicit marker that there is no
+   debt.
 
 ## 13. Testing strategy
 
-Unit and fixture tests cover:
+A fixture test uses a prepared example input. Unit tests and fixture tests
+cover these cases:
 
-- exact known gap remains a warning;
-- new gap fails;
-- fixed gap with stale entry fails;
-- removed stale entry passes;
-- retired and missing requirements fail;
-- duplicate entries and unknown kinds fail;
-- hard-area entries fail;
-- `baseline prune` only removes entries;
-- deterministic sorting and serialization.
+- An exact known gap stays a warning.
+- A new gap fails.
+- A fixed gap with a stale entry fails.
+- A removed stale entry passes.
+- A retired requirement and a missing requirement fail.
+- A duplicate entry and an unknown kind fail.
+- An entry for a hard area fails.
+- The `baseline prune` command only removes entries.
+- The sorting and the serialization are deterministic. Serialization is the
+  conversion of the entries to the text of the file.
 
-The Phase 1 MR-impact fixtures separately cover modified baselined
-requirements.
+The MR impact fixtures from Phase 1 cover modified requirements with a gap in
+the baseline. These fixtures are separate.
 
-One repository integration test pins the expected known-gap totals so accidental
-large baseline changes are conspicuous in review.
+One integration test in the repository pins the expected totals of known
+gaps. Thus a large accidental change to the baseline is easy to see in a
+review.
 
 ## 14. Security and integrity
 
-The baseline is trusted repository policy and is reviewed like CI configuration.
-It must not be downloaded from CI artifacts or generated from the current gaps
-at runtime. The checker reads only the committed file and validates every field.
+The baseline is trusted policy of the repository. Reviewers examine it in the
+same way as the continuous integration (CI) configuration. The tool must not
+download the baseline from CI artifacts. The tool must not generate the
+baseline from the current gaps at run time. The check reads only the
+committed file. The check validates every field.
 
-An MR that changes the baseline should receive a dedicated finding even when all
-entries are syntactically valid.
+We recommend a dedicated finding for an MR that changes the baseline. This
+applies also when all entries have a valid syntax.

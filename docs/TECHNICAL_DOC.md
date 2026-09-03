@@ -1,25 +1,36 @@
 # ShallGuard technical documentation
 
+This page describes the structure of the ShallGuard repository. It is for a
+developer who changes ShallGuard itself. The [glossary](GLOSSARY.md) defines
+each technical term.
+
 ## Architecture
 
-The repository is a Rust workspace with three packages: the root `shallguard`
-library, the `cargo-shallguard` executable package, and the internal
-`shallguard-macros` procedural macro package.
+The repository is a Rust workspace with three packages:
 
-- The library parses requirement Markdown and Rust syntax and produces typed
-  reports and versioned artifacts.
-- The CLI discovers the invoked Cargo workspace and adapts library results to
-  terminal output and files.
-- The library re-exports the anchor macros under its public `shallguard::`
-  namespace. The internal macro crate validates requirement ID syntax at
-  compile time while emitting annotated Rust items unchanged.
-- Git, Cargo, LLVM, and optional model providers are invoked as local
-  subprocesses. There is no long-running runtime or network service.
+- the `shallguard` library at the root,
+- the `cargo-shallguard` executable package,
+- the internal `shallguard-macros` procedural-macro package.
 
-The detailed architecture preflight and dependency contract live in
-[the requirements specification](USER_STORIES_AND_REQUIREMENTS.md#architecture-preflight).
+Each package has one role:
+
+- The library parses the requirement Markdown and the Rust syntax. It
+  produces typed reports and versioned artifacts.
+- The executable finds the Cargo workspace from which you run it. It turns
+  the library results into terminal output and files.
+- The library exports the anchor macros under its public `shallguard::`
+  namespace. The internal macro crate validates the syntax of each
+  requirement ID at compile time. It emits the annotated Rust item without a
+  change.
+- Git, Cargo, LLVM, and the optional model providers run as local
+  subprocesses. There is no long-running process and no network service.
+
+The [requirements specification](USER_STORIES_AND_REQUIREMENTS.md#architecture-preflight)
+holds the detailed architecture preflight and the dependency contract.
 
 ## Build and validation
+
+Run these commands to validate the repository:
 
 ```bash
 cargo fmt --all -- --check
@@ -34,21 +45,29 @@ cargo package --locked --list -p shallguard
 cargo package --locked --list -p cargo-shallguard
 ```
 
-Package verification for `shallguard` and `cargo-shallguard` additionally
-requires their version-matched dependencies to exist in the target registry;
-release them in dependency order: macros, library, then CLI.
-The complete manual procedure is documented in [RELEASING.md](RELEASING.md).
-An installed-binary smoke test must run `cargo shallguard` from a separate
-fixture workspace so compile-time source paths cannot accidentally become
-repository discovery inputs.
+The package verification of `shallguard` and `cargo-shallguard` needs their
+dependencies with the matching version in the target registry. Release the
+packages in dependency order: the macros, then the library, then the
+executable. The [release procedure](RELEASING.md) describes the complete
+manual steps.
+
+A smoke test of the installed binary must run `cargo shallguard` from a
+separate fixture workspace. This makes sure that a source path from compile
+time cannot become an input for repository discovery.
 
 ## State and data
 
-The tool owns no database. It writes only explicitly selected artifacts,
-coverage work files, review checkpoints, and cache entries. Artifacts bind
-results to revisions, configuration, schema versions, and content digests.
+The tool owns no database. It writes only these files:
+
+- the artifacts that you select,
+- the work files of the coverage command,
+- the checkpoints of the review command,
+- the cache entries.
+
+Each artifact binds its result to a revision, a configuration, a schema
+version, and a content digest.
 
 ## Release status
 
-The packages are licensed under MIT and explicitly allow publication only to
+The packages use the MIT license. Their manifests permit publication only to
 crates.io. Rust 1.89 is the tested minimum supported Rust version.

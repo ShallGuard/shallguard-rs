@@ -5,17 +5,22 @@ description: Use when working in a Rust repository that uses ShallGuard requirem
 
 # ShallGuard requirement traceability
 
-ShallGuard machine-checks the link between numbered Markdown requirements,
-Rust enforcement sites, and verification tests. In a repo that uses it, the
-requirements documents are the specification of the codebase and every
-behavior change must keep the three-way link intact. `cargo shallguard check`
-is the gate.
+This manual is for a coding agent that works in a repository that uses
+ShallGuard. It is self-contained.
 
-Detect usage: `shallguard.toml` at the Cargo repository root. That file names
-the requirement documents and their source roots; read it first to learn
-which documents own which code.
+ShallGuard checks the link between three things: numbered requirements in
+Markdown documents, the Rust code that makes each requirement true, and the
+tests that verify it. In a repository that uses ShallGuard, the requirement
+documents are the specification of the codebase. Every behavior change must
+keep the three-way link intact. The command `cargo shallguard check` is the
+gate. This manual calls it the check.
 
-Install the CLI matching the repo's pinned `shallguard` macro-crate version:
+You detect ShallGuard by the file `shallguard.toml` at the root of the Cargo
+repository. That file names the requirement documents and their source
+roots. Read it first. It tells you which document owns which code.
+
+Install the command with the same version as the `shallguard` crate that the
+repository pins:
 
 ```bash
 cargo install cargo-shallguard --version <pinned-version> --locked
@@ -23,96 +28,113 @@ cargo install cargo-shallguard --version <pinned-version> --locked
 
 ## The model
 
-- **Requirement**: `REQ-<AREA>-<NNN>` in a selected Markdown document. A
-  testable RFC 2119 statement (SHALL / SHALL NOT / MAY) plus an
-  `*Enforced:*` line (file + symbol implementing it) and a `*Verified:*`
-  line (evidence class). IDs are stable forever: retired, never reused.
-- **Enforcement anchor**: `#[enforces("REQ-X-NNN")]` attribute or
-  `enforces_here!("REQ-X-NNN")` statement macro in code.
-- **Verification anchor**: `#[verifies("REQ-X-NNN")]` on a test function.
-- **Evidence classes** on `*Verified:*` lines: `✅` (automated, anchored
-  test), `🔬` (end-to-end/production validation), `👁` (code review only),
-  `⏳` (pending). Only `✅` requires — and is cross-checked against — a
-  `#[verifies]` anchor and a concrete file+function citation.
+- **Requirement.** A requirement has the ID `REQ-<AREA>-<NNN>` and lives in
+  a selected Markdown document. It has three parts: a testable statement in
+  RFC 2119 form (SHALL / SHALL NOT / MAY), an `*Enforced:*` line that names
+  the file and the symbol that implements it, and a `*Verified:*` line that
+  names the evidence class. An ID is stable forever. A retired ID is never
+  used again.
+- **Enforcement anchor.** The attribute `#[enforces("REQ-X-NNN")]` on a code
+  item, or the statement macro `enforces_here!("REQ-X-NNN")` inside a block.
+- **Verification anchor.** The attribute `#[verifies("REQ-X-NNN")]` on a
+  test function.
+- **Evidence classes** on a `*Verified:*` line: `✅` an anchored automated
+  test, `🔬` an end-to-end or production validation, `👁` a code review
+  only, `⏳` pending. Only `✅` requires a `#[verifies]` anchor and a
+  citation with a file and a function. The check compares the `✅` claim
+  with the anchor.
 
-Anchors are found syntactically. **Comments are never anchors**: a
-`REQ-...` string in a comment or string literal is inert — it neither
-satisfies traceability nor is validated.
+ShallGuard finds anchors in the syntax of the code. **A comment is never an
+anchor.** A `REQ-...` string in a comment or in a string literal does
+nothing. It does not satisfy traceability, and the check does not validate
+it.
 
 ## Workflow: requirements first
 
-For **new behavior**, in this order, all in the same change set:
+For **new behavior**, do these steps in this order, all in the same change
+set:
 
-1. **Draft the requirement before implementing.** Next free
-   `REQ-<AREA>-NNN` in the owning document: SHALL statement, `*Enforced:*`
-   target, `*Verified:*` ⏳ (pending). Exploration/spikes may precede the
-   draft, but the final implementation pass starts from the written
-   requirement. New behavior without a requirement is an incomplete change.
-   If a merge or rebase collides on the number, the rebasing branch
-   renumbers to the next free ID — IDs become stable at merge to the
-   default branch, not at draft time, and `cargo shallguard check` catches
-   any rename missed between document and anchors.
-2. **Implement and anchor the enforcement site.**
-3. **Write the test, anchor it with `#[verifies]`**, and only then flip
-   ⏳ to ✅ with a citation naming the exact test file and function:
+1. **Write the requirement before the implementation.** Use the next free
+   `REQ-<AREA>-NNN` in the document that owns the area. Write the SHALL
+   statement, the `*Enforced:*` target, and `*Verified:*` ⏳ (pending). You
+   can explore before you write the requirement. The final implementation
+   pass starts from the written requirement. New behavior without a
+   requirement is an incomplete change. If a merge or a rebase collides on
+   the number, the branch that rebases takes the next free ID. An ID becomes
+   stable when the change merges into the default branch, not at draft
+   time. The check catches a rename that reaches the document but not the
+   anchors.
+2. **Implement the behavior and anchor the enforcement site.**
+3. **Write the test and anchor it with `#[verifies]`.** Only then change ⏳
+   to ✅, with a citation that names the exact test file and function:
 
    ```markdown
    *Verified:* ✅ `prefix:tests/file.rs` (`test_fn_name`)
    ```
 
-4. **Run the gate** (below) before claiming the work done.
+4. **Run the gate** before you report the work as done. The gate is
+   described below.
 
-**Modifying code near an anchor**: read the referenced requirement FIRST.
-Behavior changes → update the requirement text in the same change. Code
-merely moves → the anchor moves with it.
+**If you change code near an anchor,** read the requirement first. If the
+behavior changes, update the requirement text in the same change. If the
+code only moves, move the anchor with it.
 
-**Removing behavior**: mark the requirement `*(retired ...)*` in the
-document (never delete the entry, never reuse the ID) and remove its
-anchors.
+**If you remove behavior,** mark the requirement as `*(retired ...)*` in the
+document and remove its anchors. Never delete the entry. Never use the ID
+again.
 
 ## Anchor rules
 
-- `#[enforces("REQ-X-NNN")]` on items: functions, structs, enums, consts,
-  statics. One item may enforce several requirements; one requirement may
-  be anchored at several sites.
-- **Field/variant anchors**: individual struct fields and enum variants may
-  carry `#[enforces("...")]`, but only if the containing struct/enum itself
-  carries `#[enforces]` (bare, or with IDs) as its **first** attribute —
-  above any `#[derive]`. The container attribute strips the field-level
-  anchors before derives see them; wrong ordering breaks compilation.
-- `enforces_here!("REQ-X-NNN")` for branches, match arms, and statement
-  sequences — sites an attribute cannot reach. Place it as the first
-  statement inside the relevant block; wrap a bare match-arm expression in
-  `{ }` if needed. It expands to nothing.
-- `#[verifies("REQ-X-NNN", ...)]` is valid only on functions carrying a
-  recognized test attribute (`#[test]`, `#[tokio::test]`, or any attribute
-  path ending in `test`). It **rejects `#[ignore]`d tests** at compile time
-  and in the checker. There is no statement form for verification.
-- `#[verifies]` also rejects, at compile time, test bodies that definitely
-  cannot fail: no failure-path tokens at all, or only constant assertions
-  that provably always pass. A test whose oracle genuinely lives outside
-  its body (a compile-fail harness, an external checker) opts out visibly
-  with `oracle = "panic"` / `"compile"` / `"external"` — the check report
-  counts and lists every suppression.
-- A single test claiming 6 or more requirements is flagged as an outlier.
-- Anchor ID format is validated at build time — a typo like `REQ-HSR-002`
-  is a compile error, so `cargo build` is a cheap first sanity check.
-- Place `#[enforces]` on the item that actually implements the SHALL
-  statement, not on the nearest public function.
+- Put `#[enforces("REQ-X-NNN")]` on an item: a function, a struct, an enum,
+  a const, or a static. One item can enforce several requirements. One
+  requirement can have anchors at several sites.
+- **Field and variant anchors.** A struct field or an enum variant can carry
+  `#[enforces("...")]`. This works only if the struct or enum itself carries
+  `#[enforces]` as its **first** attribute, above any `#[derive]`. The
+  container attribute can be bare or can list IDs. The container attribute
+  removes the field-level anchors before the derives see them. A wrong order
+  breaks the compilation.
+- Use `enforces_here!("REQ-X-NNN")` for a branch, a match arm, or a sequence
+  of statements. An attribute cannot reach these places. Put the macro as
+  the first statement inside the block. If a match arm is a bare expression,
+  wrap it in `{ }`. The macro expands to nothing.
+- `#[verifies("REQ-X-NNN", ...)]` is valid only on a function with a
+  recognized test attribute: `#[test]`, `#[tokio::test]`, or any attribute
+  path that ends in `test`. It **rejects a test with `#[ignore]`** at
+  compile time and in the check. There is no statement form for
+  verification.
+- `#[verifies]` also rejects, at compile time, a test body that cannot fail.
+  This is a body with no failure-path tokens at all, or a body with only
+  constant assertions that always pass. A test can have its oracle outside
+  its body, for example a compile-fail harness or an external checker. Such
+  a test opts out in a visible way with `oracle = "panic"`, `"compile"`, or
+  `"external"`. The check report counts and lists every opt-out.
+- The check flags one test that claims 6 or more requirements as an
+  outlier.
+- The compiler validates the format of each anchor ID. A typo like
+  `REQ-HSR-002` is a compile error. The command `cargo build` is a cheap
+  first sanity check.
+- Put `#[enforces]` on the item that implements the SHALL statement. Do not
+  put it on the nearest public function.
 
-## Evidence honesty (hard rules)
+## Evidence honesty
 
-- **Read the test before anchoring it.** `#[verifies]` goes only on a test
-  that would FAIL if the requirement were violated — not one that merely
-  executes the enforcing code path.
-- Never write ✅ in a document without a resolving `#[verifies]` anchor and
-  a citation naming the exact test file and function. Never fabricate a
-  plausible-looking citation.
-- No targeted test? Use the honest class: 🔬, 👁, or ⏳. A ⏳ is a to-do
-  item, not a failure; a false ✅ is a failure.
-- Never weaken or vague-ify a requirement's text to make a check pass.
+These rules are hard rules.
 
-## The gate — run before claiming done
+- **Read the test before you anchor it.** Put `#[verifies]` only on a test
+  that FAILS when the requirement is violated. A test that only runs the
+  enforcing code path is not enough.
+- Never write ✅ in a document without a `#[verifies]` anchor that resolves
+  and a citation that names the exact test file and function. Never invent
+  a citation that looks plausible.
+- If no targeted test exists, use the honest class: 🔬, 👁, or ⏳. A ⏳ is a
+  to-do item, not a failure. A false ✅ is a failure.
+- Never weaken the text of a requirement, and never make it vague, to make
+  a check pass.
+
+## The gate
+
+Run these commands before you report the work as done:
 
 ```bash
 cargo shallguard check          # full traceability cross-check
@@ -121,55 +143,54 @@ cargo shallguard fmt            # fix doc formatting (never hand-wrap
                                 # requirement blocks yourself)
 ```
 
-- Run `check` with **no document arguments** so `shallguard.toml` selects
-  every document: a single-document run scans only that document's crates
-  and falsely reports cross-crate anchors as missing.
-- `fmt` refuses to write if any selected document is malformed, touches
-  only requirement list blocks, and verifies formatting changed no
-  statement or evidence semantics.
-- After fixing or retiring a baselined gap:
-  `cargo shallguard baseline prune`, then commit the removal together with
-  the fix. A stale baseline entry is itself a failure.
-- If the consuming repo has no ShallGuard CI job yet, the local run IS the
-  gate — never skip it because "CI will catch it".
-- If the repository keeps a friction log (`docs/FRICTION.md`): when the
-  gate or the workflow produces friction while you work, append a one-line
-  entry there in the same change set — never work around friction
-  silently.
+- Run `check` with **no document argument**, so that `shallguard.toml`
+  selects every document. A run with one document scans only the crates of
+  that document, and it reports cross-crate anchors as missing.
+- The `fmt` command refuses to write if a selected document is malformed.
+  It changes only requirement list blocks. It verifies that the format
+  change did not change the meaning of a statement or of the evidence.
+- After you fix or retire a gap that is in the baseline, run
+  `cargo shallguard baseline prune`. Commit the removal together with the
+  fix. A stale baseline entry is itself a failure.
+- If the repository has no ShallGuard CI job yet, the local run IS the
+  gate. Never skip it because "CI will catch it".
+- If the repository has a friction log at `docs/FRICTION.md`, use it. When
+  the gate or the workflow causes friction while you work, add a one-line
+  entry in the same change set. Never work around friction in silence.
 
 ## Never do
 
-- Never edit the baseline file (`.shallguard/baseline.toml`) by hand and
-  never try to add entries — there is no baseline-update command; new debt
+- Never edit the baseline file `.shallguard/baseline.toml` by hand. Never
+  try to add an entry. There is no command that adds an entry. New debt
   cannot be accepted, only fixed. The baseline is a ratchet.
 - Never remove an anchor, delete or reword a requirement, or downgrade
-  evidence just to silence a checker failure — fix what the failure points
-  at.
-- Never mark an anchored test `#[ignore]`.
-- Never invent or guess a REQ ID — an ID referenced in code that no
-  document defines is a hard failure.
-- Never add `oracle = "<class>"` to silence a vacuity finding when the
-  test does not genuinely match that class — that is evidence fabrication.
-- Never reuse a retired requirement ID.
+  evidence only to remove a check failure. Fix what the failure points at.
+- Never mark an anchored test with `#[ignore]`.
+- Never invent or guess a requirement ID. An ID in code that no document
+  defines is a hard failure.
+- Never add `oracle = "<class>"` to remove a vacuity finding when the test
+  does not match that class. That is evidence fabrication.
+- Never use a retired requirement ID again.
 
-## Responding to `check` failures
+## Respond to `check` failures
 
 | Failure | Correct response |
 |---|---|
-| ID in code not defined in any document | Add the requirement, or fix the typo — never delete the anchor blindly |
-| Duplicate requirement IDs | Renumber the newer one and its anchors |
-| ✅ claim with no anchored test | Write and anchor the test, or downgrade honestly to ⏳ |
-| Vacuous-evidence finding (test cannot fail) | Assert an actual output of the enforcement site, or downgrade the document line honestly — never launder a trivial assertion through indirection |
-| ✅ citation names no concrete test file/function | Complete the citation with the real file and function |
-| Cited path does not exist | Fix the citation to the real file — never fabricate a path |
-| Enforced file carries no anchor with the ID | Anchor the real enforcement site — never move the anchor to a file that merely mentions the code |
-| Stale baseline entry | `cargo shallguard baseline prune`, commit the removal |
-| Document stops parsing | Fix the document structure; `fmt --check` pinpoints structural lint errors |
+| An ID in code is not defined in any document | Add the requirement, or fix the typo. Never delete the anchor without a reason. |
+| Two requirements have the same ID | Renumber the newer one and its anchors. |
+| A ✅ claim has no anchored test | Write and anchor the test, or downgrade honestly to ⏳. |
+| A vacuous-evidence finding says the test cannot fail | Assert a real output of the enforcement site, or downgrade the document line honestly. Never hide a trivial assertion behind indirection. |
+| A ✅ citation names no real test file or function | Complete the citation with the real file and function. |
+| A cited path does not exist | Fix the citation to the real file. Never invent a path. |
+| The cited enforcement file has no anchor with the ID | Anchor the real enforcement site. Never move the anchor to a file that only mentions the code. |
+| A baseline entry is stale | Run `cargo shallguard baseline prune` and commit the removal. |
+| The document does not parse | Fix the document structure. The command `fmt --check` points at the structural error. |
 
-## Adopting ShallGuard in a new repository
+## Adopt ShallGuard in a new repository
 
-1. Create `shallguard.toml` at the Cargo repository root. Minimal shape
-   (all paths repository-relative; loader rejects unknown fields):
+1. Create `shallguard.toml` at the root of the Cargo repository. This is the
+   minimal shape. All paths are relative to the repository. The loader
+   rejects unknown fields:
 
    ```toml
    schema = 1
@@ -195,30 +216,31 @@ cargo shallguard fmt            # fix doc formatting (never hand-wrap
    root = "target/shallguard"
    ```
 
-   For a virtual workspace, add one `[[documents]]` entry per
-   specification with `source_root` set to the owning package directory.
-   ShallGuard scans `src/` and `tests/` beneath every source root and
-   mapped prefix.
-2. Write the requirement document: numbered `REQ-<AREA>-NNN` entries with
-   SHALL statements and Enforced/Verified lines; run
-   `cargo shallguard fmt` to normalize structure.
-3. Anchor existing code and tests honestly (see rules above). Only add
-   `shallguard` as a dependency of crates that carry anchors.
-4. If adopting around existing code with unavoidable historical gaps,
-   create the baseline **once** and commit it:
-   `cargo shallguard baseline init`. Prefer an empty baseline; each entry
-   is debt that blocks editing that requirement's text until resolved.
-5. Set an area's `hard_enforcement` / `hard_verification` to `true` as
-   soon as that dimension has no historical gaps. Hardened areas cannot be
-   baselined and the ratchet only moves forward.
-6. Wire `cargo shallguard check` and `cargo shallguard fmt --check` into
-   CI once a build image with `cargo-shallguard` is available; until then
-   the local run is the gate.
+   In a virtual workspace, add one `[[documents]]` entry for each
+   requirement document. Set `source_root` to the directory of the package
+   that owns the document. ShallGuard scans `src/` and `tests/` below every
+   source root and every prefix.
+2. Write the requirement document. Use numbered `REQ-<AREA>-NNN` entries
+   with SHALL statements and with Enforced and Verified lines. Run
+   `cargo shallguard fmt` to normalize the structure.
+3. Anchor the existing code and tests honestly. Follow the rules above. Add
+   `shallguard` as a dependency only to the crates that carry anchors.
+4. If the existing code has gaps that you cannot avoid, create the baseline
+   **once** with `cargo shallguard baseline init` and commit it. An empty
+   baseline is best. Each entry is debt. The entry blocks edits of the text
+   of that requirement until the gap is resolved.
+5. Set `hard_enforcement` or `hard_verification` of an area to `true` as
+   soon as the area has no gap of that kind. A hard area cannot go into the
+   baseline. The ratchet only moves forward.
+6. Add `cargo shallguard check` and `cargo shallguard fmt --check` to CI
+   when a build image with `cargo-shallguard` is available. Until then, the
+   local run is the gate.
 
-## Analysis and review pipeline (on request only)
+## Analysis and review pipeline
 
-These commands are for change review and evidence audits — not gates. Do
-not run them on every edit; `coverage` and `review` are expensive.
+Run these commands only on request. They are for change review and for
+evidence audits. They are not gates. Do not run them on every edit. The
+`coverage` and `review` commands are expensive.
 
 ```bash
 # Which requirements does this diff touch? Direct, transitive (one
@@ -251,5 +273,5 @@ cargo shallguard review --cache-dir .cache/shallguard-review
 cargo shallguard clean
 ```
 
-Model verdicts from `review` are advisory. Deterministic gates
-(`check`, `fmt --check`) never depend on network access or a model.
+The verdicts from `review` are advisory. The gates `check` and
+`fmt --check` never depend on network access or on a model.
