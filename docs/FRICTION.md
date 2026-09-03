@@ -12,10 +12,10 @@ friction in silence.
 
 - 2026-08-19 `review`: a stale local-review directory blocks
   feature-by-feature review work; it must be removed by hand between
-  runs → bug ([#7](https://github.com/sigi64/shallguard/issues/7))
+  runs → bug ([#7](https://github.com/shallguard/shallguard-rs/issues/7))
 - 2026-08-19 `cli`: only `review show` produces colored output; every
   other command is monochrome, so reports read inconsistently → bug
-  ([#8](https://github.com/sigi64/shallguard/issues/8))
+  ([#8](https://github.com/shallguard/shallguard-rs/issues/8))
 - 2026-08-19 `check`: a test written ahead of its requirement's ⏳→✅ flip
   cannot carry its `#[verifies]` anchor without a stale-anchor warning, so
   the anchor and the flip must land in the same change → accepted-cost

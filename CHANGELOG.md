@@ -41,6 +41,6 @@ follows [Semantic Versioning](https://semver.org/).
 - Public `shallguard::enforces`, `shallguard::verifies`, and
   `shallguard::enforces_here!` anchor API.
 
-[Unreleased]: https://github.com/sigi64/shallguard/compare/v0.1.1...HEAD
-[0.1.1]: https://github.com/sigi64/shallguard/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/sigi64/shallguard/releases/tag/v0.1.0
+[Unreleased]: https://github.com/shallguard/shallguard-rs/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/shallguard/shallguard-rs/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/shallguard/shallguard-rs/releases/tag/v0.1.0

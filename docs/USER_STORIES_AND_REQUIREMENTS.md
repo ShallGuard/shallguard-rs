@@ -62,7 +62,7 @@ The areas are:
 - **Type:** developer tool composed of a Cargo external subcommand, reusable
   deterministic library, and supporting procedural macros.
 - **Owner/repository:** standalone ShallGuard project at
-  `https://github.com/sigi64/shallguard`.
+  `https://github.com/shallguard/shallguard-rs`.
 - **New artifact or extension:** extraction and generalization of an existing
   internal implementation.
 - **User/operator/developer/service audience:** Rust developers, reviewers, CI

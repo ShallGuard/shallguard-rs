@@ -88,7 +88,7 @@ The check does not prove two things:
   pass without a real test of the requirement. Execution coverage, human
   review, and semantic review address this layer.
 - **Requirement quality.** A person decides if a requirement is a good
-  requirement. [Issue #12](https://github.com/sigi64/shallguard/issues/12)
+  requirement. [Issue #12](https://github.com/shallguard/shallguard-rs/issues/12)
   discusses this point.
 
 ## Evidence marks

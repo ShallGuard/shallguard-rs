@@ -197,7 +197,7 @@ honesty rules:
    component. They found mocks with no assertions. Each test was fixed or
    honestly downgraded. No test was anchored as it was. These are the
    patterns that
-   [issue #13](https://github.com/sigi64/shallguard/issues/13) proposes to
+   [issue #13](https://github.com/shallguard/shallguard-rs/issues/13) proposes to
    detect with a deterministic check. The migration found them by hand
    first.
 2. **Anchors show real drift.** Two metric fields had become write-only

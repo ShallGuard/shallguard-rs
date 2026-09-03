@@ -1,7 +1,7 @@
 # shallguard-macros
 
 This crate implements the procedural macros of
-[ShallGuard](https://github.com/sigi64/shallguard).
+[ShallGuard](https://github.com/shallguard/shallguard-rs).
 
 Your application must depend on the `shallguard` crate. That crate exports
 the public anchor API:
