@@ -8,11 +8,13 @@ use super::*;
 use crate::bundle::MANIFEST_SCHEMA;
 
 fn metadata() -> CapsuleMetadata {
+    // One cited line range; a `Vec` because a file can cite several ranges.
+    let cited_lines = 10..=20;
     CapsuleMetadata {
         requirement_id: "REQ-ZZ-001".to_string(),
         capsule_digest: "sha256:capsule".to_string(),
         clauses: BTreeSet::from(["REQ-ZZ-001/C1".to_string()]),
-        citation_ranges: BTreeMap::from([("src/lib.rs".to_string(), vec![10..=20])]),
+        citation_ranges: BTreeMap::from([("src/lib.rs".to_string(), vec![cited_lines])]),
     }
 }
 
