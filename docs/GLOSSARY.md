@@ -42,8 +42,6 @@ one meaning. The documents use the same word for the same thing.
 | Baseline | A committed file that lists the gaps that existed when a repository adopted ShallGuard. The baseline can only become smaller. |
 | Ratchet | The rule that the number of gaps can only go down. The check rejects each new gap. |
 | Hard area | An area with a policy that does not accept any gap in the baseline. |
-| Vacuous test | A test that cannot fail. ShallGuard rejects a vacuous test as evidence. |
-| Oracle | The part of a test that decides if the test passes or fails. A test can declare an oracle outside its body with the `oracle` option. |
 | Impact | The relation between a Git change and a requirement. The impact can be direct, transitive, or structural. |
 | Coverage | Execution evidence from the LLVM tools. It shows if a verification test reached an enforcement site. Coverage does not prove that the code is correct. |
 | Capsule | A bounded, reproducible bundle that holds one requirement, its code, its changes, and its evidence for a review. |

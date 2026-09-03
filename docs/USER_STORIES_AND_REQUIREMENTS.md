@@ -497,7 +497,8 @@ rejects any traceability regression.
 
 ### US-TRACE-002: Vacuity-Resistant Automated Evidence
 
-**Status:** Implemented
+**Status:** Planned. The implementation is kept on the branch
+`feature/evidence-floor` and is not part of a release yet.
 
 **As a** maintainer  
 **I want** `[test]` evidence rejected when the cited test cannot fail  
@@ -509,81 +510,58 @@ or constant tests
 - **REQ-TRACE-009** — A `#[verifies]` test body containing no failure path —
   no assertion macro, no `panic!`/`todo!`/`unreachable!` invocation, no
   `unwrap`/`expect`/`unwrap_err`/`expect_err` call, and no `?` operator in a
-  `Result`-returning test — SHALL be reported as vacuous evidence.
-  *Enforced:* `src/oracle.rs` (`classify`) · *Verified:* [test] ✅ `src/oracle.rs`
-  (`empty_and_assertion_free_bodies_are_vacuous`,
-  `real_failure_paths_classify_as_present`,
-  `question_mark_without_result_return_is_not_a_failure_path`,
-  `failure_paths_inside_macro_arguments_are_seen`,
-  `not_equals_comparisons_are_not_failure_paths`)
+  `Result`-returning test — SHALL be reported as vacuous evidence. *Enforced:* not
+  implemented — kept on the branch
+  `feature/evidence-floor` · *Verified:* [pending] ⏳
 - **REQ-TRACE-010** — A constant assertion that provably always passes
   (`assert!(true)`, `assert_eq!(1, 1)`, `assert_ne!(0, 1)`) SHALL NOT count
   as a failure path; a constant assertion that always fails
   (`assert!(false)`, `assert_eq!(0, 1)`) SHALL count as an unconditional
-  failure path. *Enforced:* `src/oracle.rs` (`assertion_is_trivial`) ·
-  *Verified:* [test] ✅ `src/oracle.rs` (`literal_only_assertions_are_trivial`,
-  `always_failing_constant_asserts_are_failure_paths`)
+  failure path. *Enforced:* not implemented — kept on the branch
+  `feature/evidence-floor` · *Verified:* [pending] ⏳
 - **REQ-TRACE-011** — An `assert_eq!` or `assert_ne!` SHALL count as
   vacuous only when both compared sides are literal; token-identical
   non-literal sides (impure calls, floating-point values) MAY fail at
-  runtime and SHALL classify as evidence present. *Enforced:*
-  `src/oracle.rs` (`assertion_is_trivial`) · *Verified:* [test] ✅ `src/oracle.rs`
-  (`identical_non_literal_sides_classify_as_present`)
+  runtime and SHALL classify as evidence present. *Enforced:* not implemented — kept on
+  the branch
+  `feature/evidence-floor` · *Verified:* [pending] ⏳
 - **REQ-TRACE-012** — `#[should_panic]` without an `expected` message on a
   `#[verifies]` test whose body offers no other failure path SHALL be
-  reported as weak evidence. *Enforced:* `src/oracle.rs` (`classify`) ·
-  *Verified:* [test] ✅ `src/oracle.rs`
-  (`bare_should_panic_is_weak_and_expected_is_present`),
-  `src/check_evidence.rs` (`weak_anchors_are_reported_even_beside_solid_evidence`)
+  reported as weak evidence. *Enforced:* not implemented — kept on the branch
+  `feature/evidence-floor` · *Verified:* [pending] ⏳
 - **REQ-TRACE-013** — A requirement whose only `[test]` citation resolves to a
   vacuous test SHALL be counted as lacking automated verification, and
   vacuous and weak findings SHALL flow through the ratcheted baseline as
   distinct gap kinds, so pre-existing cases in adopting repositories are
   grandfatherable and ratcheted; advisory weak-evidence findings SHALL NOT
-  be recorded by baseline initialization. *Enforced:*
-  `src/check_evidence.rs` (`evaluate_verification`), `src/check.rs`
-  (`gap_is_hard`, `baseline_entries`), `src/baseline.rs` (`GapKind`) ·
-  *Verified:* [test] ✅ `src/check_evidence.rs`
-  (`sole_vacuous_evidence_demotes_the_requirement`,
-  `redundant_vacuous_evidence_keeps_the_requirement_anchored`),
-  `src/check_tests.rs` (`vacuous_evidence_flows_through_the_baseline_like_other_kinds`,
-  `weak_evidence_is_advisory_unless_strict_oracle`,
-  `advisory_kinds_are_not_recorded_by_baseline_init`), `src/baseline.rs`
-  (`evidence_gap_kinds_round_trip_through_baseline`)
+  be recorded by baseline initialization. *Enforced:* not implemented — kept on the
+  branch
+  `feature/evidence-floor` · *Verified:* [pending] ⏳
 - **REQ-TRACE-014** — An explicit `#[verifies("REQ-...", oracle = "<class>")]`
   opt-out SHALL suppress vacuity reporting for that test and SHALL be
   counted and listable in the check report; suppression SHALL NOT be
-  silent. *Enforced:* `src/oracle.rs` (`classify`), `src/scan.rs`
-  (`oracle_argument`), `src/check_report.rs` (`render_summary`) ·
-  *Verified:* [test] ✅ `src/oracle.rs` (`suppression_is_recorded_not_silent`),
-  `src/check_report.rs` (`suppressed_oracles_are_listed_in_the_summary`),
-  `src/scan_tests.rs` (`raw_string_oracle_classes_decode_to_their_value`)
+  silent. *Enforced:* not implemented — kept on the branch
+  `feature/evidence-floor` · *Verified:* [pending] ⏳
 - **REQ-TRACE-015** — Vacuity analysis SHALL be purely syntactic and
   deterministic, SHALL NOT execute tested code, and SHALL classify any
   construct the classifier does not fully understand as evidence present
-  rather than vacuous. *Enforced:* `src/oracle.rs` (`classify`) ·
-  *Verified:* [test] ✅ `src/oracle.rs` (`unknown_constructs_classify_as_present`,
-  `err_return_and_result_aliases_classify_as_present`,
-  `third_party_assert_macros_classify_as_present`)
+  rather than vacuous. *Enforced:* not implemented — kept on the branch
+  `feature/evidence-floor` · *Verified:* [pending] ⏳
 - **REQ-TRACE-016** — `#[verifies]` SHALL reject at compile time a test body
   containing no failure-path candidate tokens at all, or only constant
   `assert` -family invocations that provably always pass; the error SHALL
   name the offending requirement IDs and reference the evidence-honesty
   rules, and any body the token scan cannot fully classify SHALL compile —
-  the deterministic check remains authoritative. *Enforced:* `src/lib.rs`
-  (`verifies`) · *Verified:* [test] ✅ `macros:tests/front_line.rs`
-  (`front_line_rejects_vacuity_and_enforces_oracle_classes`)
+  the deterministic check remains authoritative. *Enforced:* not implemented — kept on
+  the branch
+  `feature/evidence-floor` · *Verified:* [pending] ⏳
 - **REQ-TRACE-017** — The `oracle` opt-out SHALL accept only the closed
   value set `panic`, `compile`, and `external`: an unknown value SHALL be
   rejected at compile time with the accepted list, and the deterministic
   checker SHALL NOT treat an unknown class as a suppression and SHALL
-  report it. *Enforced:* `src/lib.rs` (`verifies`), `src/scan.rs`
-  (`collect_fn_attrs`, `oracle_argument`) · *Verified:* [test] ✅
-  `macros:tests/front_line.rs`
-  (`front_line_rejects_vacuity_and_enforces_oracle_classes`),
-  `src/scan_tests.rs` (`unknown_oracle_class_is_not_a_suppression`,
-  `duplicate_and_non_string_oracle_values_are_invalid`), `src/oracle.rs`
-  (`oracle_class_set_is_pinned`)
+  report it. *Enforced:* not implemented — kept on the branch
+  `feature/evidence-floor` · *Verified:* [pending] ⏳
+
 
 ## Baseline and Ratchet User Stories
 

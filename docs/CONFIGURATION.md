@@ -92,19 +92,3 @@ An area has two policy fields, `hard_enforcement` and `hard_verification`.
 Set a field to `true` when the area has no gap of that kind. A hard area
 cannot go into the baseline.
 
-An area can also set `strict_oracle = true`. The default is `false`. The
-check examines the body of each `#[shallguard::verifies]` test. A vacuous
-test is a test that cannot fail. The check always reports a vacuous test
-with the same severity as a missing verification anchor. Weak evidence is
-different. At the moment, weak evidence means a bare `#[should_panic]`
-attribute without an `expected` message. The check reports weak evidence as
-a warning. If the area sets `strict_oracle = true`, the check reports weak
-evidence as an error:
-
-```toml
-[areas.SAFE]
-label = "Safety"
-hard_enforcement = true
-hard_verification = true
-strict_oracle = true
-```
