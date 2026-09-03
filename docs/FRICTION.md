@@ -24,8 +24,3 @@ friction in silence.
   for its own compile-time behavior (it cannot invoke its own macros), so
   macro contracts anchor the re-export in `src/lib.rs` instead
   (REQ-TRACE-008 precedent) → accepted-cost
-- 2026-08-19 `lints`: the vacuity predicates exist twice (macro token
-  scan, classifier) plus a suppression parser; the macro-rejects-a-subset
-  invariant is guarded only by shared regression fixtures → lint idea
-  (a shared proc-macro2-only crate would create one authority, but that
-  is a new publishable crate — maintainer decision)

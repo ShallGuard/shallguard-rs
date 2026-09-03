@@ -156,11 +156,6 @@ const INNOCUOUS_MACROS: &[&str] = &[
     "env",
 ];
 
-/// The closed set of oracle opt-out classes; the `#[verifies]` macro
-/// rejects anything else at compile time and the scanner refuses to
-/// treat an unknown class as a suppression.
-pub const ORACLE_CLASSES: &[&str] = &["panic", "compile", "external"];
-
 /// Macros whose invocation always offers a failure path.
 const PANICKING_MACROS: &[&str] = &["panic", "todo", "unreachable", "unimplemented"];
 
