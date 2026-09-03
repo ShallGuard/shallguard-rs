@@ -1,17 +1,22 @@
 # ShallGuard user guide
 
+This guide is for a developer who installs and uses the `cargo shallguard`
+command in a Rust repository. The [glossary](GLOSSARY.md) defines each
+technical term.
+
 ## Purpose
 
-`cargo shallguard` connects numbered Markdown requirements to Rust enforcement
-sites and verification tests. It can:
+The command `cargo shallguard` connects numbered requirements in Markdown
+documents to the Rust code that makes them true and to the tests that verify
+them. The command can:
 
-- check traceability,
-- format requirement blocks,
-- analyze Git change impact,
-- enumerate exact Cargo tests,
+- examine the traceability of every requirement,
+- format the requirement blocks,
+- analyze the impact of a Git change,
+- list the exact Cargo tests behind the verification anchors,
 - collect LLVM execution evidence,
 - build review capsules,
-- run optional semantic review.
+- run an optional semantic review.
 
 ## Installation
 
@@ -21,7 +26,7 @@ Install the published Cargo subcommand:
 cargo install cargo-shallguard --version 0.1.1 --locked
 ```
 
-To install from a local checkout instead:
+Or install from a local copy of the repository:
 
 ```bash
 git clone <repository-url> shallguard
@@ -35,14 +40,14 @@ Confirm the installed release from any directory:
 cargo shallguard --version
 ```
 
-The top-level [README](../README.md) also shows how to pin an immutable Git
-revision. Re-run a source installation after changing the executable.
+The top-level [README](../README.md) also shows how to install from one fixed
+Git commit. If you change the executable, run the source installation again.
 
 ## Repository setup and usage
 
-Create `shallguard.toml` using the
-[configuration reference](CONFIGURATION.md), then run from anywhere within the
-configured Cargo repository:
+Create the file `shallguard.toml` with the help of the
+[configuration reference](CONFIGURATION.md). Then run the commands from any
+directory inside the configured Cargo repository:
 
 ```bash
 cargo shallguard fmt --check
@@ -52,56 +57,59 @@ cargo shallguard impact --target origin/main \
   --markdown requirement-impact.md
 ```
 
-Additional prerequisites:
+Two commands have more prerequisites:
 
-- `coverage` requires `cargo-llvm-cov`.
-- `review` requires the selected provider CLI and may send bounded source
-  capsules to that provider; provider authentication and data handling
-  remain outside this tool.
+- The `coverage` command needs the tool `cargo-llvm-cov`.
+- The `review` command needs the selected provider program. The command can
+  send bounded source capsules to that provider. The provider login and the
+  data handling of the provider are outside this tool.
 
 ## What the deterministic gate does and does not prove
 
-`cargo shallguard check` proves five things:
+The check is the command `cargo shallguard check`. The check proves five
+things:
 
-- **Link integrity** — every requirement resolves to its anchors and every
-  anchor to its requirement.
-- **Citation reality** — every ✅ claim names a real, non-ignored, anchored
-  test.
-- **Evidence-class consistency.**
-- **Monotone debt** — the committed baseline can only shrink.
-- **An evidence floor** — a cited test that cannot fail (no failure path,
-  or only provably always-passing assertions) is rejected, at compile time
-  for the certain cases and as check findings otherwise; every `oracle`
-  opt-out is counted and listed in the report.
+- **Link integrity.** Every requirement resolves to its anchors. Every anchor
+  resolves to its requirement.
+- **Citation reality.** Every ✅ claim names a real test. The test is not
+  ignored, and it carries a verification anchor.
+- **Evidence-class consistency.** The evidence class on the *Verified:* line
+  agrees with the anchors that exist.
+- **Monotone debt.** The committed baseline can only become smaller.
+- **An evidence floor.** The check rejects a cited test that cannot fail.
+  Such a test has no failure path, or it has only assertions that always
+  pass. The compiler rejects the certain cases. The check reports the other
+  cases as findings. The report counts and lists every `oracle` opt-out.
 
-It does not prove two things:
+The check does not prove two things:
 
-- **Test sharpness** — an `#[enforces]` attribute survives edits that gut
-  the behavior it annotates, and a test above the vacuity floor can still
-  pass without exercising the contract. Executable coverage, human review,
-  and semantic review address that layer.
-- **Requirement quality** — whether a SHALL statement is well-chosen stays
-  with the human reviewer, as discussed in
-  [issue #12](https://github.com/sigi64/shallguard/issues/12).
+- **Test sharpness.** An `#[enforces]` attribute survives an edit that
+  removes the behavior below it. A test above the evidence floor can still
+  pass without a real test of the requirement. Execution coverage, human
+  review, and semantic review address this layer.
+- **Requirement quality.** A person decides if a requirement is a good
+  requirement. [Issue #12](https://github.com/sigi64/shallguard/issues/12)
+  discusses this point.
 
 ## Requirement ID concurrency
 
-Requirement IDs become stable at merge to the default branch, not at draft
-time. When two branches draft the same next-free `REQ-<AREA>-<NNN>` and
-collide at merge or rebase:
+A requirement ID becomes stable when the change merges into the default
+branch. It is not stable at draft time. Two branches can draft the same next
+free `REQ-<AREA>-<NNN>` and collide at merge or rebase time. In that case:
 
-- the rebasing branch renumbers its requirement to the next free ID;
-- renumbering before merge is safe, because `cargo shallguard check` fails
-  on any rename missed between the document and the anchors — a
-  half-renamed requirement cannot pass the gate.
+- The branch that rebases renumbers its requirement to the next free ID.
+- A renumber before the merge is safe. The check fails on a rename that
+  reaches the document but not the anchors, or the reverse. A half-renamed
+  requirement cannot pass the check.
 
 ## Portability
 
-Workspace-root discovery works from single-package projects and virtual Cargo
-workspaces. The consuming repository's `shallguard.toml` owns all policy:
+The tool finds the workspace root in a single-package project and in a
+virtual Cargo workspace. The file `shallguard.toml` in your repository owns
+all the policy:
 
-- requirement documents,
-- source ownership and path prefixes,
-- area policies,
-- baseline and artifact locations,
-- review defaults.
+- the requirement documents,
+- the source ownership and the path prefixes,
+- the area policies,
+- the baseline location and the artifact location,
+- the review defaults.

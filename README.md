@@ -1,63 +1,86 @@
 # ShallGuard
 
-**Code got cheap. Trust didn't.** ShallGuard keeps humans in charge of *what*
-software must do — even when AI agents write most of it.
+ShallGuard is a tool for Rust projects. It keeps a written list of what the
+software must do, and it connects each item in that list to the code and the
+tests. If a link breaks, the build fails.
 
-Concretely, it is requirement-assurance tooling for Cargo projects: numbered
-system requirements written in Markdown stay connected to the Rust code that
-enforces them and the tests that verify them — and CI fails the moment that
-connection breaks.
+This page explains why the tool exists, how it works, and how you install and
+use it. The [glossary](docs/GLOSSARY.md) defines each technical term.
 
-An agent opens a merge request. It compiles, every test passes, CI is green.
-It has also deleted the test proving a critical invariant — or rewritten it
-into `assert!(true)` — and nothing in the pipeline notices.
+## The problem
 
-With ShallGuard, that invariant is a numbered SHALL statement in a Markdown
-document, anchored to the code that enforces it and the test that proves it:
+Code has become cheap to write. Trust has not. A coding agent is a program
+that uses a large language model to write code. Agents now write a large part
+of the code in many projects.
 
-- deleting the test or dropping the anchor fails `cargo shallguard check`;
-- the `assert!(true)` rewrite does not even compile;
-- the check flags remaining evidence that cannot fail.
+An agent opens a merge request. A merge request is a proposed change that a
+reviewer examines before it goes into the main branch. The change compiles.
+Every test passes. The continuous integration (CI) pipeline is green.
 
-No network, no model, no flakiness.
+The same change has also deleted the test that proves a critical rule. Or it
+has changed the test to `assert!(true)`. Nothing in the pipeline sees this.
 
-The whole development loop — contract, anchors, the gate, and the gate
-catching a deleted test — in one terminal session:
+## The solution
+
+With ShallGuard, the critical rule is a numbered requirement in a Markdown
+document. The requirement uses the word SHALL, as defined in the internet
+standard RFC 2119. The requirement points at the code that makes it true and
+at the test that proves it. The tool calls these links anchors.
+
+The command `cargo shallguard check` reads the document and the code. It
+fails in these cases:
+
+- Somebody deletes the test or removes the anchor.
+- Somebody changes the test so that it cannot fail. The `assert!(true)`
+  version does not compile.
+- A requirement claims a test as evidence, but no real test exists.
+
+The check needs no network and no language model. It gives the same result
+each time.
+
+This recording shows the full development loop in one terminal session. It
+shows a requirement, its anchors, the check, and the check that catches a
+deleted test:
 
 ![ShallGuard development workflow demo](docs/demo/dev-workflow.gif)
 
 ## Used in production
 
-- The migration workflow has been run once at scale — on the author's own
-  production workspace (a founder-run best case, not an independent
-  benchmark): 3 crates, 535 requirements across 16 areas.
-- The first check reported 576 traceability warnings; the ratchet ended
-  with an empty committed baseline and every area hardened.
-- The migration surfaced real defects a green test suite had been hiding:
-  a vacuous authorization test, an end-to-end test missing its core
-  component, assertion-free mocks, and two silently write-only metric
-  fields.
-- Full numbers and caveats in the
-  [migration case study](docs/MIGRATION.md#case-study-a-production-network-service-workspace).
+The migration workflow has run once at scale, on the author's own production
+workspace. The author owns that workspace, so read the numbers as a best case
+and not as an independent benchmark.
+
+- The workspace has 3 crates and 535 requirements in 16 areas.
+- The first check reported 576 traceability warnings.
+- At the end, the committed baseline was empty and every area was hard.
+- The migration found real defects that a green test suite had hidden: an
+  authorization test that could not fail, an end-to-end test without its
+  core component, mocks without assertions, and 2 metric fields that the
+  code wrote but never read.
+
+The [migration case study](docs/MIGRATION.md#case-study-a-production-network-service-workspace)
+gives the full numbers and their limits.
 
 ## How it works
 
-Three ingredients, one deterministic check:
+ShallGuard has three parts and one check:
 
-1. **Requirement documents** — Markdown files with numbered requirements
-   (`REQ-<AREA>-<NNN>`), each citing its *Enforced:* source locations and
-   *Verified:* tests.
-2. **Anchors in code** — attributes and macros that mark the enforcement
-   sites and verification tests with the requirement IDs they serve.
-3. **`cargo shallguard check`** — cross-checks documents against anchors and
-   fails on dangling references, unanchored requirements, or evidence claims
-   without a real test behind them.
+1. **Requirement documents.** Markdown files hold numbered requirements with
+   the form `REQ-<AREA>-<NNN>`. Each requirement has an *Enforced:* line that
+   names its source locations and a *Verified:* line that names its tests.
+2. **Anchors in code.** Attributes and macros mark the code that makes a
+   requirement true and the tests that verify it. Each anchor names the
+   requirement IDs it serves.
+3. **The check.** The command `cargo shallguard check` compares the documents
+   with the anchors. It fails when a reference points at nothing, when a
+   requirement has no anchor, or when a requirement claims evidence without a
+   real test.
 
-The gate also holds an evidence floor: a verification test that cannot fail
-is rejected — at compile time for the certain cases, as a check finding
-otherwise — and every `oracle` opt-out is counted and listed in the report
-(details in
-[what the deterministic gate does and does not prove](docs/USER_DOC.md#what-the-deterministic-gate-does-and-does-not-prove)).
+The check also applies an evidence floor. A verification test that cannot
+fail is rejected. The compiler rejects the certain cases. The check reports
+the other cases as findings. Each `oracle` opt-out is counted and listed in
+the report. The user guide explains
+[what the check proves and what it does not prove](docs/USER_DOC.md#what-the-deterministic-gate-does-and-does-not-prove).
 
 ```mermaid
 flowchart LR
@@ -74,25 +97,22 @@ flowchart LR
     CHECK -- "gap or stale reference" --> FAIL(["Nonzero exit — CI fails"])
 ```
 
-Deterministic checking needs no network access and no model. What the gate
-proves is the *link*, not the quality of the evidence behind it — the exact
-boundary is spelled out in
-[what the deterministic gate does and does not prove](docs/USER_DOC.md#what-the-deterministic-gate-does-and-does-not-prove).
+The check proves that the link exists. It does not prove the quality of the
+evidence behind the link.
 
-Optional subcommands add:
+Optional commands add more evidence:
 
-- executable coverage evidence (via `cargo-llvm-cov`),
-- Git change-impact analysis,
-- local LLM-assisted semantic review.
+- Execution coverage through the tool `cargo-llvm-cov`.
+- Impact analysis of a Git change.
+- Semantic review by a local language model. This review is advisory.
 
-## Why "ShallGuard"?
+## The name
 
-Requirement specifications written in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119)
-style use the normative keyword **SHALL** for mandatory behavior. ShallGuard
-*guards the SHALL statements*: every SHALL must point at the code that
-enforces it and the automated test offered as its evidence. The ratcheted
-check makes sure a guarded SHALL can never silently lose that evidence link
-again.
+A requirement written in RFC 2119 style uses the word **SHALL** for a
+mandatory behavior. ShallGuard guards the SHALL statements. Each SHALL must
+point at the code that makes it true and at the test that proves it. The
+check makes sure that a guarded SHALL cannot lose that link without a
+failure.
 
 ## Installation
 
@@ -102,13 +122,13 @@ Install the published Cargo subcommand:
 cargo install cargo-shallguard --version 0.1.1 --locked
 ```
 
-Or install from a local checkout:
+Or install from a local copy of this repository:
 
 ```bash
 cargo install --path cargo-shallguard
 ```
 
-Or pin the CLI to an immutable commit:
+Or install from one fixed Git commit:
 
 ```bash
 cargo install \
@@ -117,22 +137,25 @@ cargo install \
   --locked cargo-shallguard
 ```
 
-Coverage collection additionally requires `cargo-llvm-cov`. Semantic review
-requires a supported provider CLI such as Codex or Claude; deterministic
-checking does not require a model provider.
+The `coverage` command also needs the tool `cargo-llvm-cov`. The `review`
+command needs a supported provider program, for example Codex or Claude. The
+check does not need a provider.
 
 ## Quick start in your repository
 
-**1. Add the library dependency** (macros are re-exported through the public
-`shallguard` namespace — no direct macro-crate dependency needed):
+Follow these five steps.
+
+**1. Add the library dependency.** The library exports the anchor macros
+under the `shallguard` name. You do not need a direct dependency on the macro
+crate:
 
 ```toml
 [dependencies]
 shallguard = "0.1.1"
 ```
 
-**2. Create `shallguard.toml`** at the repository root — copy and adapt the
-[configuration reference](docs/CONFIGURATION.md):
+**2. Create the file `shallguard.toml`** at the root of the repository. Copy
+and adapt the [configuration reference](docs/CONFIGURATION.md):
 
 ```toml
 schema = 1
@@ -152,7 +175,7 @@ source_root = "."
   (`floor_never_returns_zero`)
 ```
 
-**4. Anchor it in Rust code:**
+**4. Anchor the requirement in Rust code:**
 
 ```rust
 /// Item-level enforcement: this function exists because the contract exists.
@@ -180,66 +203,69 @@ fn floor_never_returns_zero() {
 }
 ```
 
-The relation is many-to-many: one item may enforce several requirements, and
-one requirement may be enforced in several places. `#[verifies]` rejects
-non-test placements and `#[ignore]`d tests at compile time — evidence claims
-must be honest.
+The relation is many-to-many. One code item can enforce several
+requirements. One requirement can have anchors in several places. The
+`#[verifies]` attribute rejects a function that is not a test. It also
+rejects a test with the `#[ignore]` attribute. Both are compile errors.
 
-**5. Check it:**
+**5. Run the checks:**
 
 ```bash
 cargo shallguard fmt --check   # requirement-block formatting
 cargo shallguard check         # traceability gate
 ```
 
-**Adopting around existing code?** Create the baseline once, commit it, and
-shrink it over time — it is a ratchet, not an allowlist:
+### Adopt ShallGuard in an existing project
+
+An existing project has gaps. A gap is a requirement without an anchor or
+without automated evidence. Record the gaps once in a baseline file, commit
+the file, and make it smaller over time. The baseline is a ratchet. It is not
+a list of permitted exceptions:
 
 ```bash
 cargo shallguard baseline init    # record today's known gaps, once
 cargo shallguard baseline prune   # drop entries you have since resolved
 ```
 
-New gaps always fail; only the exact committed historical gaps are tolerated.
-Areas with no remaining gaps can be hardened (`hard_enforcement`,
-`hard_verification`) so they can never be baselined again.
+Each new gap fails the check. The check accepts only the gaps that the
+committed baseline records. When an area has no gaps left, set its policy to
+hard with `hard_enforcement` and `hard_verification`. A hard area cannot go
+into the baseline again.
 
-For a large existing codebase, [docs/MIGRATION.md](docs/MIGRATION.md) walks
-through the full agent-assisted migration:
+For a large existing codebase, the [migration guide](docs/MIGRATION.md)
+describes the full agent-assisted migration:
 
-- an agent recovers the SHALL contracts from the code,
-- a human reviews every statement,
-- the baseline records today's debt once,
-- an agent-in-the-loop ratchet pays it off batch by batch.
+- An agent recovers the requirements from the code.
+- A person reviews every requirement.
+- The baseline records the gaps once.
+- An agent pays off the gaps batch by batch, and a person verifies each batch.
 
-It includes a case study of a 535-requirement production workspace migrated
-this way.
+The guide includes a case study of a production workspace with 535
+requirements.
 
-## The philosophy and the review loop
+## The human stays in the loop
 
-### Why now: the human stays in the loop
+Coding agents, and people who work with them, produce merge requests faster
+than anyone can read them. The merge requests compile and pass the tests. No
+agent can decide what the system must do. ShallGuard turns that division of
+work into a loop that a machine checks:
 
-Coding agents — and colleagues working with them — produce compiling,
-test-passing merge requests faster than anyone can read them. What no agent
-can decide is what the system *must* do. ShallGuard turns that division of
-labor into a machine-checked loop:
-
-- **You own the specification.** Testable [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119)
-  contracts (*"the scheduler **SHALL** never emit a zero worker floor"*) live
-  in Markdown documents, versioned and reviewed like code.
-- **Anyone — or any agent — implements.** Every requirement must point at the
-  code that enforces it (`#[shallguard::enforces]`) and the automated test
-  cited as its evidence (`#[shallguard::verifies]`). New behavior arrives
-  with its contract in the same merge request.
-- **A deterministic gate protects the link.** `cargo shallguard check` fails
-  CI on dangling references, unanchored requirements, and evidence claims
-  with no real test behind them. No network, no model, no flakiness — and a
-  ratcheted baseline means traceability debt can only shrink.
-- **Review is assisted; the decision stays yours.** For each merge request,
-  map the diff to the impacted contracts, run exactly their anchored tests,
-  and optionally let a local agent argue whether the change still honors the
-  SHALL statements — advisory verdicts with counterexamples, never a merge
-  button.
+- **You own the specification.** You write testable requirements in Markdown
+  documents, for example "the scheduler SHALL never emit a zero worker
+  floor". The documents are versioned and reviewed like code.
+- **Anyone, or any agent, implements.** Each requirement must point at the
+  code that makes it true and at the automated test that proves it. New
+  behavior arrives with its requirement in the same merge request.
+- **The check protects the link.** The check fails the CI pipeline when a
+  reference points at nothing, when a requirement has no anchor, or when a
+  requirement claims evidence without a real test. The check needs no
+  network and no model. The baseline is a ratchet, so the number of gaps can
+  only go down.
+- **A tool assists the review. You make the decision.** For each merge
+  request, the tool maps the change to the affected requirements and runs
+  exactly their anchored tests. A local agent can also judge if the change
+  still satisfies each requirement. The agent gives an advisory verdict with
+  a counterexample. It never merges.
 
 ```mermaid
 flowchart LR
@@ -253,12 +279,12 @@ flowchart LR
     REV -- "gap found" --> IMPL
 ```
 
-### Reviewing a merge request
+### Review a merge request
 
-This is where the human-in-the-loop pays off. Whether the branch was written
-by a colleague, an agent, or a colleague using an agent, the requirement
-travels with the code in the same MR — spec, enforcement, and evidence are
-reviewed as one unit:
+The review is the point where the loop pays off. A colleague, an agent, or a
+colleague with an agent can write the branch. In all cases the requirement
+travels with the code in the same merge request. The reviewer examines the
+requirement, the enforcement code, and the evidence as one unit:
 
 ```mermaid
 sequenceDiagram
@@ -283,34 +309,37 @@ sequenceDiagram
     Rev->>CI: approve — spec, code, and evidence merge together
 ```
 
-Reviewing a colleague's branch looks like this — map the diff to the
-contracts it touches, read the contract, run exactly its anchored test:
+This recording shows the review of a colleague's branch. The reviewer maps
+the change to the requirements it touches, reads each requirement, and runs
+exactly its anchored test:
 
 ![ShallGuard review workflow demo](docs/demo/review-workflow.gif)
 
-The impact artifact answers the reviewer's first questions directly: *which
-contracts does this diff touch, and which anchored tests are bound to them?*
-Model verdicts from `review` are advisory only; provider or schema failures
-return nonzero, but a human decision merges the MR.
+The impact artifact answers the first two questions of a reviewer: which
+requirements does this change touch, and which anchored tests belong to
+them? The verdicts from the `review` command are advisory. A failure of the
+provider or of the response schema returns a nonzero exit code. A person
+decides if the merge request merges.
 
-## Semantic review: catching what green tests miss
+## Semantic review: catch what green tests miss
 
-`cargo shallguard review` chains the whole evidence pipeline — impact
-analysis, executable coverage via `cargo-llvm-cov`, a bounded review capsule
-— and hands the capsule to a local agent for a per-clause verdict.
+The command `cargo shallguard review` runs the full evidence pipeline. It
+runs the impact analysis, collects execution coverage with `cargo-llvm-cov`,
+builds a bounded review capsule, and gives the capsule to a local agent. The
+agent returns a verdict for each requirement.
 
-Here a colleague's new scheduling mode compiles, passes every test, and
-keeps the deterministic gate green, yet quietly bypasses the required worker
-floor. Coverage proves the anchored test *reaches* the code; only the
-semantic review notices the new match arm violates the SHALL contract —
-complete with a counterexample and a suggested fix:
+In this recording, a colleague adds a new scheduling mode. The code compiles,
+passes every test, and keeps the check green. The new code also bypasses the
+required worker floor. Coverage proves that the anchored test reaches the
+code. Only the semantic review sees that the new match arm violates the
+requirement. The review gives a counterexample and a suggested fix:
 
 ![ShallGuard semantic review demo](docs/demo/semantic-review.gif)
 
 ## CI integration
 
-Add the gate after your ordinary Rust checks — it is fast, deterministic, and
-needs no secrets:
+Add the check after your usual Rust checks. The check is fast. It gives the
+same result each time, and it needs no secrets:
 
 ```mermaid
 flowchart LR
@@ -325,7 +354,7 @@ flowchart LR
     SGC -- "requirement lost its anchor<br/>or evidence went stale" --> BLOCK(["pipeline fails —<br/>merge blocked"])
 ```
 
-GitHub Actions example:
+This is an example for GitHub Actions:
 
 ```yaml
 - name: Requirement assurance
@@ -335,43 +364,48 @@ GitHub Actions example:
     cargo shallguard check
 ```
 
-Because the baseline is committed and ratcheted, the gate is monotone: a
-branch can only keep the gap count equal or lower. Deleting a test, dropping
-an anchor, or renaming a cited file fails the pipeline immediately.
+The baseline is committed, and it is a ratchet. A branch can keep the number
+of gaps equal or make it lower. It cannot make it higher. If a change deletes
+a test, removes an anchor, or renames a cited file, the pipeline fails at
+once.
 
 ### Advisory Copilot pull-request review
 
-The repository also contains
-`.github/workflows/shallguard-review.yml`. It publishes an optional semantic
-review as an updated pull-request comment and retains the Markdown report plus
-the auditable local-review directory as a workflow artifact.
+This repository also contains the workflow file
+`.github/workflows/shallguard-review.yml`. The workflow publishes an optional
+semantic review as a pull-request comment and updates the comment on each
+run. It keeps the Markdown report and the local review directory as a
+workflow artifact.
 
-Credentials:
+The workflow needs credentials:
 
-- Organization repositories use the built-in job token with
-  `copilot-requests: write`; the organization must permit Copilot CLI
-  requests from Actions.
-- Where built-in Copilot requests are unavailable, add an optional
-  repository Actions secret named `COPILOT_GITHUB_TOKEN` containing a
-  user-owned fine-grained token with the Copilot Requests account
-  permission. The workflow prefers that secret and otherwise falls back to
-  the job token.
+- A repository in an organization uses the built-in job token with the
+  permission `copilot-requests: write`. The organization must permit Copilot
+  CLI requests from Actions.
+- If built-in Copilot requests are not available, add a repository Actions
+  secret with the name `COPILOT_GITHUB_TOKEN`. The secret holds a
+  fine-grained token that a user owns and that has the Copilot Requests
+  account permission. The workflow uses that secret first. If the secret is
+  absent, the workflow uses the job token.
 
-The advisory workflow deliberately has a different trust boundary from the
-required `Rust` workflow:
+The advisory workflow has a different trust boundary from the required
+`Rust` workflow:
 
-- A no-secret, read-only preparation job builds ShallGuard from the trusted
-  base revision, then uses that binary to analyze the pull-request merge and
-  create a bounded bundle. It does not execute pull-request Rust code.
-- A separate same-repository-only job checks out the trusted base revision,
-  gives Copilot only the frozen bundle prompt and schema, and disables Copilot
-  tools, remote delegation, custom instructions, and interactive prompts.
-- A publisher job upserts the comment. Missing credentials, unavailable
-  providers, invalid responses, and semantic verdicts remain advisory and do
-  not replace or weaken `cargo shallguard-dev fmt --check` or
-  `cargo shallguard-dev check` in `.github/workflows/rust.yml`.
+- A preparation job with no secrets and read-only access builds ShallGuard
+  from the trusted base revision. It uses that binary to analyze the
+  pull-request merge and to create a bounded bundle. It does not run Rust
+  code from the pull request.
+- A separate job runs only for branches in the same repository. It checks
+  out the trusted base revision and gives Copilot only the frozen bundle
+  prompt and schema. It disables Copilot tools, remote delegation, custom
+  instructions, and interactive prompts.
+- A publisher job creates or updates the comment. Missing credentials, an
+  unavailable provider, an invalid response, and the verdicts are all
+  advisory. They do not replace or weaken the two required commands
+  `cargo shallguard-dev fmt --check` and `cargo shallguard-dev check` in
+  `.github/workflows/rust.yml`.
 
-For any stored run, the same report can be rendered locally without invoking a
+You can show the report of any stored run on your machine without a
 provider:
 
 ```bash
@@ -381,25 +415,25 @@ cargo shallguard review show REQ-CLI-001 --format markdown
 
 ## AI agent skill
 
-In the loop above, agents do the implementing — and they are also the ones
-most tempted to satisfy the checker the wrong way:
+In the loop above, agents do the implementation. Agents are also the ones
+most likely to satisfy the check in the wrong way:
 
-- fabricated evidence citations,
-- anchors deleted to silence failures,
-- requirements reworded to match the code,
-- assertions gutted until the test cannot fail — that last one now rejected
-  at compile time or flagged by the check, a mechanism rather than a rule.
+- They invent evidence citations.
+- They delete anchors to remove failures.
+- They reword requirements to match the code.
+- They remove assertions until a test cannot fail. The compiler now rejects
+  the certain cases, and the check flags the others.
 
-[`docs/skill/SKILL.md`](docs/skill/SKILL.md) is a standalone,
-self-contained operating manual for agents: the requirements-first
-workflow, anchor placement rules, evidence-honesty rules, the commands that
-form the gate, and a failure-to-correct-response table.
+The file [`docs/skill/SKILL.md`](docs/skill/SKILL.md) is a self-contained
+manual for agents. It describes the requirements-first workflow, the rules
+for anchor placement, the rules for honest evidence, the commands of the
+check, and a table that maps each failure to the correct response.
 
-It is a single file with no external references, so installing it is one
-copy.
+The skill is one file with no external references. To install it, copy one
+file.
 
-**Claude Code** discovers skills automatically and loads this one when the
-agent works in a repository with a `shallguard.toml`:
+**Claude Code** finds skills automatically. It loads this skill when the
+agent works in a repository with a `shallguard.toml` file:
 
 ```bash
 # For all your projects (personal skill):
@@ -411,9 +445,9 @@ mkdir -p .claude/skills/shallguard
 cp <shallguard-checkout>/docs/skill/SKILL.md .claude/skills/shallguard/
 ```
 
-**Codex** [discovers skills automatically](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)
-from `.agents/skills` directories. Install the skill for all repositories or
-commit it into one consuming repository:
+**Codex** [finds skills automatically](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)
+in `.agents/skills` directories. Install the skill for all repositories, or
+commit it into one repository:
 
 ```bash
 # For all your projects (personal skill):
@@ -426,44 +460,45 @@ cp <shallguard-checkout>/docs/skill/SKILL.md \
   .agents/skills/shallguard/SKILL.md
 ```
 
-Codex loads the full instructions when the skill's description matches the
-task. It detects installed or updated skills automatically; restart Codex if a
-change does not appear.
+Codex loads the full instructions when the description of the skill matches
+the task. It finds new and changed skills automatically. If a change does not
+appear, restart Codex.
 
-The skill is versioned with this repository — when the consuming repo bumps
-its pinned `shallguard` release, refresh the installed copy from the
-matching tag.
+The skill has the same version as this repository. When your repository
+moves to a newer `shallguard` release, copy the skill again from the matching
+tag.
 
 ## Command reference
 
-From a ShallGuard source checkout, `cargo run -- <arguments>` runs the
-`cargo-shallguard` binary by default; for example, `cargo run -- --version`.
+In a copy of this repository, the command `cargo run -- <arguments>` runs
+the `cargo-shallguard` binary. For example, `cargo run -- --version` prints
+the version.
 
 | Command | Purpose |
 |---|---|
-| `cargo shallguard version` / `--version` | Print the installed CLI version without requiring a configured repository. |
-| `cargo shallguard check` | Cross-check requirements against code and test anchors (the CI gate). |
-| `cargo shallguard fmt [--check]` | Format (or verify formatting of) requirement blocks. |
-| `cargo shallguard lint` | Lint requirement documents without writing. |
-| `cargo shallguard baseline <check\|init\|prune>` | Manage the ratcheted gap baseline. |
-| `cargo shallguard impact --base <rev>\|--target <branch>` | Map a Git diff to impacted requirements and their tests (JSON/Markdown). |
-| `cargo shallguard test-index` | Enumerate the exact Cargo tests behind verification anchors. |
-| `cargo shallguard coverage` | Collect LLVM execution evidence for verification tests (needs `cargo-llvm-cov`). |
-| `cargo shallguard bundle` | Build a bounded, auditable source capsule for review. |
-| `cargo shallguard review` | Optional local LLM semantic review of impacted requirements (advisory verdicts). |
-| `cargo shallguard review show` | Inspect a stored review as terminal text or GitHub-flavored Markdown. |
+| `cargo shallguard version` / `--version` | Print the installed CLI version. This command does not need a configured repository. |
+| `cargo shallguard check` | Compare the requirements with the code anchors and the test anchors. This is the CI gate. |
+| `cargo shallguard fmt [--check]` | Format the requirement blocks, or verify their format. |
+| `cargo shallguard lint` | Examine the requirement documents without a write. |
+| `cargo shallguard baseline <check\|init\|prune>` | Manage the baseline of known gaps. |
+| `cargo shallguard impact --base <rev>\|--target <branch>` | Map a Git change to the affected requirements and their tests. Output is JSON or Markdown. |
+| `cargo shallguard test-index` | List the exact Cargo tests behind the verification anchors. |
+| `cargo shallguard coverage` | Collect LLVM execution evidence for the verification tests. Needs `cargo-llvm-cov`. |
+| `cargo shallguard bundle` | Build a bounded source capsule for a review. |
+| `cargo shallguard review` | Run an optional semantic review of the affected requirements with a local LLM. The verdicts are advisory. |
+| `cargo shallguard review show` | Show a stored review as terminal text or as GitHub-flavored Markdown. |
 | `cargo shallguard clean` | Remove the validated bundle at the configured artifact location. |
 
-The executable discovers the invoked Cargo repository through
-`cargo metadata` and reads repository-owned policy from `shallguard.toml`. It
-supports ordinary single-package repositories and virtual Cargo workspaces.
+The executable finds the Cargo repository with `cargo metadata`. It reads the
+policy of the repository from `shallguard.toml`. It supports a single-package
+repository and a virtual Cargo workspace.
 
-## Using `shallguard` as a library
+## Use `shallguard` as a library
 
-Besides the anchor macros, the crate exposes the deterministic analysis
-building blocks (`check`, `scan`, `impact`, `coverage`, `test_index`,
-`baseline`, `config`, `review_workflow`, …) for embedding requirement
-assurance into your own tooling:
+The crate exports the anchor macros. It also exports the analysis building
+blocks, for example `check`, `scan`, `impact`, `coverage`, `test_index`,
+`baseline`, `config`, and `review_workflow`. You can use them in your own
+tools:
 
 ```rust
 use shallguard::config::RepositoryConfig;
@@ -479,15 +514,17 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-Library behavior is deterministic and separated from terminal presentation
-and provider execution; long-running operations report progress through an
-optional callback instead of printing directly.
+The library gives the same result for the same input. It does not print to
+the terminal, and it does not run a provider. A long operation reports its
+progress through an optional callback.
 
-## Developing ShallGuard itself
+## Develop ShallGuard itself
 
-The workspace contains the reusable `shallguard` library, the
-`cargo-shallguard` Cargo subcommand, and its internal procedural-macro crate.
-The project is licensed under the [MIT License](LICENSE).
+The workspace contains the `shallguard` library, the `cargo-shallguard`
+Cargo subcommand, and the internal procedural-macro crate. The project uses
+the [MIT License](LICENSE).
+
+Run these commands before you submit a change:
 
 ```bash
 cargo fmt --all -- --check
@@ -498,16 +535,18 @@ cargo shallguard-dev fmt --check
 cargo shallguard-dev check
 ```
 
-This repository defines `cargo shallguard-dev` as a local alias for its
-in-tree binary; CI uses the same command. ShallGuard dogfoods itself: its
-committed baseline is empty and every requirement area is hardened, so newly
-introduced traceability gaps fail immediately.
+The alias `cargo shallguard-dev` runs the binary from this repository. CI
+uses the same command. ShallGuard uses itself. Its committed baseline is
+empty, and every requirement area is hard. A new gap fails at once.
 
-See the [user documentation](docs/USER_DOC.md),
-[technical documentation](docs/TECHNICAL_DOC.md),
-[migration guide](docs/MIGRATION.md),
-[release documentation](docs/RELEASING.md),
-[configuration reference](docs/CONFIGURATION.md),
-[glossary](docs/GLOSSARY.md), the
-[AI agent skill](docs/skill/SKILL.md), and the
-[requirements specification](docs/USER_STORIES_AND_REQUIREMENTS.md).
+The other documents are:
+
+- [User guide](docs/USER_DOC.md)
+- [Technical documentation](docs/TECHNICAL_DOC.md)
+- [Migration guide](docs/MIGRATION.md)
+- [Release procedure](docs/RELEASING.md)
+- [Configuration reference](docs/CONFIGURATION.md)
+- [Glossary](docs/GLOSSARY.md)
+- [Documentation style](docs/WRITING_STYLE.md)
+- [AI agent skill](docs/skill/SKILL.md)
+- [Requirements specification](docs/USER_STORIES_AND_REQUIREMENTS.md)

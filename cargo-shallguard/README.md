@@ -1,8 +1,8 @@
 # cargo-shallguard
 
-`cargo-shallguard` is the Cargo subcommand for
-[ShallGuard](https://github.com/sigi64/shallguard), a requirement-assurance
-tool for Rust repositories.
+`cargo-shallguard` is the Cargo subcommand of
+[ShallGuard](https://github.com/sigi64/shallguard). ShallGuard connects
+written requirements to the Rust code and the tests of a repository.
 
 Install the command from crates.io:
 
@@ -16,12 +16,12 @@ Confirm the installed version from any directory:
 cargo shallguard --version
 ```
 
-Then run checks from a repository containing `shallguard.toml`:
+Then run the checks in a repository that has a `shallguard.toml` file:
 
 ```bash
 cargo shallguard fmt --check
 cargo shallguard check
 ```
 
-See the [ShallGuard repository](https://github.com/sigi64/shallguard) for the
-configuration reference, complete command guide, and library API.
+The [ShallGuard repository](https://github.com/sigi64/shallguard) has the
+configuration reference, the complete command guide, and the library API.

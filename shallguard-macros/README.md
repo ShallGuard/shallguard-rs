@@ -1,10 +1,10 @@
 # shallguard-macros
 
-This is the procedural-macro implementation crate for
+This crate implements the procedural macros of
 [ShallGuard](https://github.com/sigi64/shallguard).
 
-Applications should depend on `shallguard`, which re-exports the public anchor
-API:
+Your application must depend on the `shallguard` crate. That crate exports
+the public anchor API:
 
 ```rust
 #[shallguard::enforces("REQ-RD-001")]
@@ -15,5 +15,5 @@ fn enforce_contract() {}
 fn contract_is_enforced() {}
 ```
 
-Do not add a direct dependency on `shallguard-macros` unless you are developing
-ShallGuard itself.
+Do not add a direct dependency on `shallguard-macros`. The only exception is
+work on ShallGuard itself.

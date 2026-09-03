@@ -1,8 +1,17 @@
 # Repository configuration
 
-ShallGuard reads `shallguard.toml` from the Cargo repository root discovered
-from the invocation directory. All paths are repository-relative; `.` is valid
-as a document source root for a single-package repository.
+This page describes the file `shallguard.toml`. The file holds the ShallGuard
+policy of one repository. The [glossary](GLOSSARY.md) defines each technical
+term.
+
+## Location and format
+
+ShallGuard finds the root of the Cargo repository from the directory where
+you run the command. It reads `shallguard.toml` from that root. All paths in
+the file are relative to the repository root. In a single-package repository,
+`.` is a valid source root for a document.
+
+This is a complete example:
 
 ```toml
 schema = 1
@@ -42,42 +51,55 @@ timeout_seconds = 300
 # local_provider = "ollama" # ollama or lmstudio, with Codex
 ```
 
-For a virtual workspace, add one `[[documents]]` entry per specification and
-set `source_root` to the owning package directory, such as `crates/router`.
-Prefix mappings may point to other package roots. ShallGuard scans `src/` and
-`tests/` beneath every selected source root and mapped prefix.
+A virtual Cargo workspace is a repository with several crates and no root
+crate. In a virtual workspace, add one `[[documents]]` entry for each
+requirement document. Set `source_root` to the directory of the crate that
+owns the document, for example `crates/router`. A prefix can point at
+another crate directory. ShallGuard scans the `src/` and `tests/`
+directories below every source root and every prefix.
 
-The configuration loader rejects unknown fields, unsupported schemas,
-absolute or parent-traversing paths, duplicate documents, missing documents or
-source roots, invalid area identifiers, and unsupported review-provider names.
+The configuration loader rejects these errors:
+
+- an unknown field,
+- an unsupported schema number,
+- an absolute path, or a path that goes to a parent directory,
+- a document that appears twice,
+- a document or a source root that does not exist,
+- an invalid area identifier,
+- an unsupported review provider name.
 
 ## Baseline lifecycle
 
-Repositories adopting ShallGuard around existing code may create the baseline
-once and commit it:
+A repository that adopts ShallGuard around existing code has gaps. A gap is a
+requirement without an enforcement anchor or without automated evidence.
+Create the baseline once, and commit it:
 
 ```bash
 cargo shallguard baseline init
 ```
 
-The baseline is a ratchet, not an allowlist to extend. New gaps fail checking.
-After adding honest enforcement or verification anchors, remove only resolved
-entries and commit the result with the anchors:
+The baseline is a ratchet. It is not a list of exceptions that you extend.
+Each new gap fails the check. After you add honest enforcement anchors or
+verification anchors, remove only the resolved entries. Commit the result
+together with the anchors:
 
 ```bash
 cargo shallguard baseline prune
 cargo shallguard check
 ```
 
-Set an area's `hard_enforcement` or `hard_verification` policy to `true` once
-that dimension has no historical gaps. Hardened areas cannot be baselined.
+An area has two policy fields, `hard_enforcement` and `hard_verification`.
+Set a field to `true` when the area has no gap of that kind. A hard area
+cannot go into the baseline.
 
-An area may additionally set `strict_oracle = true` (default `false`). The
-vacuity analysis of `#[shallguard::verifies]` test bodies always reports
-vacuous evidence (a test that cannot fail) with the severity of a missing
-verification anchor; weak evidence — currently a bare `#[should_panic]`
-without an `expected` message — stays an advisory warning unless the area
-opts into `strict_oracle`, which promotes weak-evidence findings to errors:
+An area can also set `strict_oracle = true`. The default is `false`. The
+check examines the body of each `#[shallguard::verifies]` test. A vacuous
+test is a test that cannot fail. The check always reports a vacuous test
+with the same severity as a missing verification anchor. Weak evidence is
+different. At the moment, weak evidence means a bare `#[should_panic]`
+attribute without an `expected` message. The check reports weak evidence as
+a warning. If the area sets `strict_oracle = true`, the check reports weak
+evidence as an error:
 
 ```toml
 [areas.SAFE]
