@@ -109,7 +109,6 @@ pub(crate) struct BaselineStats {
     pub(crate) new: usize,
 }
 
-#[shallguard::enforces("REQ-TRACE-014")]
 pub(crate) fn render_summary(
     stats: &BTreeMap<String, AreaStats>,
     anchors: &Anchors,
@@ -232,7 +231,7 @@ mod tests {
         }
     }
 
-    #[shallguard::verifies("REQ-TRACE-014")]
+    // Anchored to REQ-TRACE-014 once the compile-time opt-out lands.
     #[test]
     fn suppressed_oracles_are_listed_in_the_summary() {
         let anchors = Anchors {

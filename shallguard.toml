@@ -10,7 +10,6 @@ source_root = "."
 
 [prefixes]
 cli = "cargo-shallguard"
-macros = "shallguard-macros"
 
 [areas.CLI]
 label = "Command Line"

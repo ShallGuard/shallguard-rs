@@ -580,7 +580,6 @@ fn source_range(span: proc_macro2::Span) -> SourceRange {
 
 /// Extracts an `oracle = "<class>"` opt-out from a `#[shallguard::verifies]`
 /// attribute's argument tokens.
-#[shallguard::enforces("REQ-TRACE-014")]
 fn oracle_suppression(attr: &syn::Attribute) -> Option<String> {
     let syn::Meta::List(list) = &attr.meta else {
         return None;
