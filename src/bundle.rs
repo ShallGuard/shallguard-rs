@@ -1165,7 +1165,7 @@ mod tests {
             title: "Retain state".to_string(),
             statement: "- **REQ-ZZ-001** — The service SHALL retain state.".to_string(),
             enforced_text: "`src/lib.rs` (`retain_state`) ·".to_string(),
-            verified_text: " code review only".to_string(),
+            verified_text: "[review] code review only".to_string(),
             doc: "crate/docs/requirements.md".to_string(),
             line: 1,
             enforced_paths: vec![PathBuf::from("crate/src/lib.rs")],

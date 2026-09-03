@@ -8,7 +8,7 @@ use crate::scan::VerificationAnchor;
 pub(crate) enum VerificationOutcome<'a> {
     /// No test anchor cites the requirement at all.
     Missing,
-    /// Anchors exist, but every one of them is vacuous: the ✅ claim is
+    /// Anchors exist, but every one of them is vacuous: the `[test]` claim is
     /// demoted to lacking automated verification.
     Demoted(Vec<&'a VerificationAnchor>),
     /// At least one anchor stands as evidence. Every weak anchor is

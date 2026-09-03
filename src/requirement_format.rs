@@ -7,6 +7,7 @@ use regex::Regex;
 
 use crate::DocSpec;
 use crate::docs::parse_text;
+use crate::evidence_mark::EvidenceMark;
 
 const REQUIREMENT_LINE_WIDTH: usize = 88;
 
@@ -169,7 +170,7 @@ fn format_text(text: &str, spec: &DocSpec) -> FormattedText {
     }
 }
 
-#[shallguard::enforces("REQ-SPEC-001", "REQ-SPEC-002", "REQ-SPEC-004")]
+#[shallguard::enforces("REQ-SPEC-001", "REQ-SPEC-002", "REQ-SPEC-004", "REQ-SPEC-007")]
 fn lint_block(block: &[&str], spec: &DocSpec, line: usize) -> Vec<FormatDiagnostic> {
     let header_re = Regex::new(r"^- \*\*(REQ-([A-Z]{2,})-\d{3})\*\* — \S")
         .expect("BUG: invalid requirement header regex");
@@ -219,11 +220,11 @@ fn lint_block(block: &[&str], spec: &DocSpec, line: usize) -> Vec<FormatDiagnost
     if verified.trim().is_empty() {
         messages.push("`*Verified:*` segment must name verification evidence".to_string());
     }
-    if !['✅', '', '', '⏳']
-        .iter()
-        .any(|indicator| verified.contains(*indicator))
-    {
-        messages.push("`*Verified:*` must contain ✅, , , or ⏳ evidence status".to_string());
+    if !EvidenceMark::any_claimed_in(verified) {
+        messages.push(format!(
+            "`*Verified:*` must contain an evidence mark: {} (the emoji aliases are accepted)",
+            EvidenceMark::keyword_list()
+        ));
     }
     diagnostics(spec, line, messages)
 }
@@ -249,10 +250,34 @@ fn normalized_block(block: &[&str]) -> String {
 
 fn format_block(block: &[&str]) -> Vec<String> {
     let mut formatted = Vec::new();
-    for (index, line) in block.iter().enumerate() {
+    for (index, line) in canonicalize_evidence_marks(block).iter().enumerate() {
         wrap_existing_line(line.trim(), index == 0, &mut formatted);
     }
     formatted
+}
+
+/// Rewrites emoji evidence aliases after `*Verified:*` to their keywords.
+///
+/// Text before the verification segment is returned unchanged, so an emoji
+/// in a statement is not touched.
+#[shallguard::enforces("REQ-SPEC-008")]
+fn canonicalize_evidence_marks(block: &[&str]) -> Vec<String> {
+    let mut in_verified = false;
+    block
+        .iter()
+        .map(|line| {
+            if in_verified {
+                return EvidenceMark::canonicalize(line);
+            }
+            match line.split_once("*Verified:*") {
+                Some((head, tail)) => {
+                    in_verified = true;
+                    format!("{head}*Verified:*{}", EvidenceMark::canonicalize(tail))
+                }
+                None => (*line).to_string(),
+            }
+        })
+        .collect()
 }
 
 fn wrap_existing_line(line: &str, first_line: bool, output: &mut Vec<String>) {
@@ -336,7 +361,7 @@ mod tests {
     #[shallguard::verifies("REQ-SPEC-005")]
     #[test]
     fn formats_requirement_blocks_without_touching_surrounding_markdown() {
-        let input = "# Story\n\n- **REQ-AA-001** — The service SHALL retain a deliberately long value across every ordinary processing pass so the formatter has to wrap it.\n    *Enforced:* `src/lib.rs` (`apply`) · *Verified:* ✅ `src/lib.rs` (`test_apply`)\n\n| prose | stays |\n";
+        let input = "# Story\n\n- **REQ-AA-001** — The service SHALL retain a deliberately long value across every ordinary processing pass so the formatter has to wrap it.\n    *Enforced:* `src/lib.rs` (`apply`) · *Verified:* [test] `src/lib.rs` (`test_apply`)\n\n| prose | stays |\n";
 
         let formatted = format_text(input, &spec());
 
@@ -362,7 +387,7 @@ mod tests {
     #[shallguard::verifies("REQ-SPEC-005")]
     #[test]
     fn formatting_is_idempotent_and_semantically_equivalent() {
-        let input = "- **REQ-AA-001** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs` (`apply`) · *Verified:* ✅ `src/lib.rs` (`test_apply`)\n";
+        let input = "- **REQ-AA-001** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs` (`apply`) · *Verified:* [test] `src/lib.rs` (`test_apply`)\n";
         let once = format_text(input, &spec());
         let twice = format_text(&once.text, &spec());
 
@@ -396,6 +421,63 @@ mod tests {
         );
     }
 
+    #[shallguard::verifies("REQ-SPEC-007", "REQ-SPEC-008")]
+    #[test]
+    fn rewrites_emoji_aliases_to_canonical_keywords() {
+        let input = "- **REQ-AA-001** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs` (`apply`) · *Verified:* ✅ `src/lib.rs` (`test_apply`) ·\n  🔬 differential run\n- **REQ-AA-002** — The service SHALL not fail.\n  *Enforced:* not implemented · *Verified:* ⏳ pending\n";
+
+        let formatted = format_text(input, &spec());
+
+        assert!(
+            formatted.diagnostics.is_empty(),
+            "{:?}",
+            formatted.diagnostics
+        );
+        assert!(
+            formatted
+                .text
+                .contains("*Verified:* [test] `src/lib.rs` (`test_apply`) ·")
+        );
+        assert!(formatted.text.contains("[e2e] differential run"));
+        assert!(formatted.text.contains("*Verified:* [pending] pending"));
+        assert!(
+            !['✅', '🔬', '⏳']
+                .iter()
+                .any(|emoji| formatted.text.contains(*emoji))
+        );
+        verify_semantic_equivalence(input, &formatted.text, &spec())
+            .expect("an alias and its keyword have the same parsed meaning");
+
+        let before = parse_text(input, &spec());
+        let after = parse_text(&formatted.text, &spec());
+        assert!(before.requirements[0].automated && after.requirements[0].automated);
+        assert!(before.requirements[0].e2e && after.requirements[0].e2e);
+        assert!(before.requirements[1].pending && after.requirements[1].pending);
+    }
+
+    #[shallguard::verifies("REQ-SPEC-008")]
+    #[test]
+    fn check_reports_emoji_aliases_as_non_canonical() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let doc = dir
+            .path()
+            .join("crate/docs/USER_STORIES_AND_REQUIREMENTS.md");
+        std::fs::create_dir_all(doc.parent().expect("BUG: document has a parent")).expect("mkdir");
+        std::fs::write(
+            &doc,
+            "- **REQ-AA-001** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs` (`apply`) · *Verified:* ✅ `src/lib.rs` (`test_apply`)\n",
+        )
+        .expect("write document");
+
+        let report = check(dir.path(), &[spec()]).expect("check runs");
+
+        assert!(report.diagnostics.is_empty());
+        assert!(!report.is_clean());
+        assert_eq!(report.changed_documents.len(), 1);
+        let untouched = std::fs::read_to_string(&doc).expect("read document");
+        assert!(untouched.contains('✅'), "check must not write");
+    }
+
     #[shallguard::verifies("REQ-SPEC-004")]
     #[test]
     fn permits_retired_requirements_without_evidence_segments() {
@@ -417,7 +499,7 @@ mod tests {
             .expect("document directory creates");
         std::fs::write(
             &document,
-            "- **REQ-AA-001** — The service SHALL retain state.\n    *Enforced:* `src/lib.rs` (`apply`) · *Verified:* ✅ `src/lib.rs` (`test_apply`)\n",
+            "- **REQ-AA-001** — The service SHALL retain state.\n    *Enforced:* `src/lib.rs` (`apply`) · *Verified:* [test] `src/lib.rs` (`test_apply`)\n",
         )
         .expect("fixture writes");
 

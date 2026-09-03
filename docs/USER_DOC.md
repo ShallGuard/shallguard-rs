@@ -71,7 +71,7 @@ things:
 
 - **Link integrity.** Every requirement resolves to its anchors. Every anchor
   resolves to its requirement.
-- **Citation reality.** Every ✅ claim names a real test. The test is not
+- **Citation reality.** Every `[test]` claim names a real test. The test is not
   ignored, and it carries a verification anchor.
 - **Evidence-class consistency.** The evidence class on the *Verified:* line
   agrees with the anchors that exist.
@@ -90,6 +90,26 @@ The check does not prove two things:
 - **Requirement quality.** A person decides if a requirement is a good
   requirement. [Issue #12](https://github.com/sigi64/shallguard/issues/12)
   discusses this point.
+
+## Evidence marks
+
+Each requirement names its evidence class on its *Verified:* line with one
+ASCII keyword:
+
+| Keyword | Meaning | Emoji alias |
+|---|---|---|
+| `[test]` | An anchored automated test backs the requirement. | ✅ |
+| `[e2e]` | An end-to-end or production validation backs the requirement. | 🔬 |
+| `[review]` | Only a code review backs the requirement. | 👁 |
+| `[pending]` | The evidence is pending. | ⏳ |
+
+The keyword is the canonical form. It survives editors, copy and paste, and
+diff tools, and `grep` finds it. The emoji is an optional alias with the same
+meaning. The parser and the lint accept both forms. The command
+`cargo shallguard fmt` rewrites an emoji to its keyword. The commands
+`cargo shallguard fmt --check` and `cargo shallguard lint` report a document
+that still contains an emoji as non-canonical. To migrate an existing
+document, run `cargo shallguard fmt` once and commit the result.
 
 ## Requirement ID concurrency
 

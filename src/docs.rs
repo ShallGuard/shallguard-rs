@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use regex::Regex;
 
+use crate::evidence_mark::EvidenceMark;
+
 use crate::DocSpec;
 
 /// One concrete piece of automated evidence cited in a *Verified:* line:
@@ -48,16 +50,16 @@ pub struct Requirement {
     pub not_implemented: bool,
     /// Retired requirement — exempt from all checks except uniqueness.
     pub retired: bool,
-    /// `✅` automated-test evidence claimed.
+    /// `[test]` automated-test evidence claimed.
     pub automated: bool,
     /// Concrete evidence citations parsed from the *Verified:* segment:
     /// file spans, each optionally followed by test-function spans.
     pub evidence: Vec<Evidence>,
-    /// `` end-to-end evidence claimed.
+    /// `[e2e]` end-to-end evidence claimed.
     pub e2e: bool,
-    /// `` code-review-only evidence.
+    /// `[review]` code-review-only evidence.
     pub review_only: bool,
-    /// `⏳` pending evidence.
+    /// `[pending]` pending evidence.
     pub pending: bool,
 }
 
@@ -121,7 +123,7 @@ pub(crate) fn parse_text(text: &str, spec: &DocSpec) -> ParsedDoc {
     }
 }
 
-#[shallguard::enforces("REQ-SPEC-003", "REQ-SPEC-004")]
+#[shallguard::enforces("REQ-SPEC-003", "REQ-SPEC-004", "REQ-SPEC-007")]
 fn parse_chunk(
     spec: &DocSpec,
     id: String,
@@ -183,17 +185,19 @@ fn parse_chunk(
         title: statement_title(chunk),
         statement: normalize_requirement_text(statement_text),
         enforced_text: normalize_requirement_text(enforced_text),
-        verified_text: normalize_requirement_text(verified_text),
+        // The stored text uses the canonical keyword marks, so an emoji
+        // alias in the source never changes the parsed meaning.
+        verified_text: EvidenceMark::canonicalize(&normalize_requirement_text(verified_text)),
         doc: spec.path.clone(),
         line,
         enforced_paths,
         not_implemented,
         retired,
-        automated: verified_text.contains('\u{2705}'), // ✅
+        automated: EvidenceMark::Test.is_claimed_in(verified_text),
         evidence,
-        e2e: verified_text.contains('\u{1F52C}'), // 
-        review_only: verified_text.contains('\u{1F441}'), // 
-        pending: verified_text.contains('\u{23F3}'), // ⏳
+        e2e: EvidenceMark::EndToEnd.is_claimed_in(verified_text),
+        review_only: EvidenceMark::ReviewOnly.is_claimed_in(verified_text),
+        pending: EvidenceMark::Pending.is_claimed_in(verified_text),
     }
 }
 
@@ -305,8 +309,8 @@ mod tests {
 - **REQ-HRS-002** — A goal absent from the request SHALL be implicitly
   zeroed **only if** its routing domain appears in the request.
   *Enforced:* `core:src/router/tasks/config_manager.rs`
-  (`update_goal_weights_with_scope`) · *Verified:* ✅ regression test ·
-   e2e flux-cli differential
+  (`update_goal_weights_with_scope`) · *Verified:* [test] regression test ·
+  🔬 e2e flux-cli differential
 - **REQ-AUTH-022** — If the user-cache is unavailable, the service SHALL
   fall back automatically to direct MySQL loading.
   *Enforced:* not implemented — the initial load retries and then fails
@@ -314,12 +318,12 @@ mod tests {
 - **REQ-CM-021** — *(retired into REQ-CM-019 — whitelist support.)*
 - **REQ-OP-001** — Something with a directory reference.
   *Enforced:* `src/router/optimizer/greedy_heuristics/` ·
-  *Verified:*  code review only
+  *Verified:* [review] code review only
 
 Prose citing `tests/basic.rs` and a symbol span `update_goal_weights`.
 ";
 
-    #[shallguard::verifies("REQ-SPEC-001", "REQ-SPEC-003")]
+    #[shallguard::verifies("REQ-SPEC-001", "REQ-SPEC-003", "REQ-SPEC-007")]
     #[test]
     fn parses_requirements_and_segments() {
         let doc = parse_text(SAMPLE, &spec());
@@ -333,6 +337,10 @@ Prose citing `tests/basic.rs` and a symbol span `update_goal_weights`.
             "A goal absent from the request SHALL be implicitly zeroed only..."
         );
         assert!(hrs.automated && hrs.e2e && !hrs.pending);
+        assert_eq!(
+            hrs.verified_text,
+            "[test] regression test · [e2e] e2e flux-cli differential"
+        );
         assert_eq!(
             hrs.enforced_paths,
             vec![PathBuf::from(

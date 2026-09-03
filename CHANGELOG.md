@@ -5,6 +5,14 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Added ASCII evidence marks `[test]`, `[e2e]`, `[review]`, and `[pending]`
+  as the canonical form on `*Verified:*` lines. The emoji ✅, 🔬, 👁, and ⏳
+  stay valid as optional aliases. `cargo shallguard fmt` rewrites an alias
+  to its keyword, and `fmt --check` reports a document with an alias as
+  non-canonical, so run `fmt` once after the upgrade (#14).
+- Rewrote every document in Simplified Technical English and added
+  `docs/WRITING_STYLE.md` with the mandatory rules.
+
 ## [0.1.1] - 2026-08-17
 
 - Added repository-independent `version`, `--version`, and expanded `help`
