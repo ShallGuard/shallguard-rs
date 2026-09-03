@@ -33,7 +33,8 @@ one meaning. The documents use the same word for the same thing.
 | Verification anchor | The attribute `#[shallguard::verifies]` on a Rust test. It marks a test that gives evidence for a requirement. |
 | Verification test | A test that carries a verification anchor. |
 | Evidence | The proof that a requirement is true. Each requirement names its evidence class on its *Verified:* line. |
-| Evidence class | One of four marks: ✅ an anchored automated test, 🔬 an end-to-end or production validation, 👁 a code review only, ⏳ pending. |
+| Evidence class | One of four classes: `[test]` an anchored automated test, `[e2e]` an end-to-end or production validation, `[review]` a code review only, `[pending]` pending. |
+| Evidence mark | The keyword that names an evidence class on a *Verified:* line, for example `[test]`. The emoji ✅, 🔬, 👁, and ⏳ are optional aliases of the four keywords. |
 | Citation | The file and the symbol that a requirement names on its *Enforced:* or *Verified:* line. |
 | Traceability | The link between a requirement, its enforcement anchors, and its verification anchors. |
 | Check | The command `cargo shallguard check`. It examines the traceability of every requirement and fails when a link is broken. |

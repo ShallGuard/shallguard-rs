@@ -16,7 +16,7 @@
 //! Ratcheted checks (warning only for exact committed baseline entries,
 //! otherwise a hard error; already-hard areas cannot be baselined):
 //! - a requirement whose *Enforced:* files carry no anchor of its ID;
-//! - a requirement with automated-test evidence (`✅`) that no test
+//! - a requirement with automated-test evidence (`[test]`) that no test
 //!   anchor claims to verify;
 //! - automated evidence that does not resolve to its cited test.
 //!
@@ -35,6 +35,7 @@ pub mod coverage;
 mod coverage_llvm;
 mod coverage_markdown;
 pub mod docs;
+pub mod evidence_mark;
 pub mod impact;
 mod impact_dependency;
 pub mod oracle;

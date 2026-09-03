@@ -27,8 +27,12 @@ requirements. A system requirement has this form:
 > **REQ-\<AREA\>-\<NNN\>** — normative statement using RFC 2119 keywords
 > (**SHALL**, **SHALL NOT**, or **MAY**), stated so that it is testable.
 > *Enforced:* implementation reference or `not implemented` plan ·
-> *Verified:* evidence (✅ automated test,  end-to-end validation,  code
-> review only, or ⏳ pending)
+> *Verified:* evidence mark (`[test]` automated test, `[e2e]` end-to-end
+> validation, `[review]` code review only, or `[pending]` pending)
+
+The evidence marks are ASCII keywords. The emoji ✅, 🔬, 👁, and ⏳ are
+accepted as aliases of the same four classes. `cargo shallguard fmt` rewrites
+an alias to its keyword.
 
 IDs are stable, globally unique within the product, and never reused. Retired
 requirements remain in the document and are marked retired. `not implemented`
@@ -174,7 +178,8 @@ rejects any traceability regression.
   invocation as `cargo shallguard` and direct binary invocation without changing
   command semantics, and its help output SHALL summarize the basic anchored
   development workflow and change-review workflow. *Enforced:*
-  `cli:src/main.rs` (`normalized_args`), `cli:src/cli_help.rs` (`print`) · *Verified:* ✅
+  `cli:src/main.rs` (`normalized_args`), `cli:src/cli_help.rs` (`print`) · *Verified:*
+  [test]
   `cli:src/cli_tests.rs` (`removes_cargo_external_subcommand_argument`),
   `cli:tests/external_subcommand.rs`
   (`installed_informational_commands_work_without_repository`)
@@ -182,7 +187,7 @@ rejects any traceability regression.
   traceability check, while `cargo shallguard review` SHALL default to Codex,
   the configured target branch, executable coverage, and configured artifact
   paths. *Enforced:* `cli:src/main.rs` (`main`, `run_review`),
-  `cli:src/cli_review.rs` (`parse_review_args`) · *Verified:* ✅
+  `cli:src/cli_review.rs` (`parse_review_args`) · *Verified:* [test]
   `cli:src/cli_tests.rs`
   (`leaves_repository_review_defaults_for_configuration`)
 - **REQ-CLI-003** — Long-running coverage and review commands SHALL report the
@@ -195,7 +200,7 @@ rejects any traceability regression.
   remain ANSI-free. *Enforced:* `cli:src/cli_color.rs`,
   `cli:src/cli_review_show.rs`, `cli:src/cli_progress.rs`,
   `src/review_progress.rs`,
-  `src/review_workflow.rs` · *Verified:* ✅ `src/review_progress.rs`
+  `src/review_workflow.rs` · *Verified:* [test] `src/review_progress.rs`
   (`provider_status_includes_position_description_and_elapsed_time`),
   `cli:src/cli_color.rs` (`color_requires_an_interactive_non_ci_terminal`),
   `cli:src/cli_review_show_tests.rs`
@@ -206,7 +211,7 @@ rejects any traceability regression.
   SHALL default beneath the configured artifact root and SHALL permit explicit
   output overrides. *Enforced:* `src/config.rs` (`RepositoryConfig`),
   `cli:src/main.rs` (`run_bundle`, `run_coverage`, `run_review`) ·
-  *Verified:* ✅ `src/config.rs`
+  *Verified:* [test] `src/config.rs`
   (`loads_single_package_repository_configuration`),
   `cli:src/cli_tests.rs` (`leaves_bundle_output_for_repository_configuration`,
   `parses_local_review_options`)
@@ -214,7 +219,7 @@ rejects any traceability regression.
   explicit paths or stdout, while terminal prose SHALL remain a human interface
   with no compatibility guarantee. *Enforced:* `src/impact.rs`,
   `src/test_index.rs`, `src/coverage.rs`, `src/bundle.rs`, `src/review.rs` ·
-  *Verified:* ✅ `src/impact.rs`
+  *Verified:* [test] `src/impact.rs`
   (`json_artifact_uses_versioned_schema_and_configuration`)
 
 ### US-CLI-002: Discover the Installed Version
@@ -231,7 +236,7 @@ rejects any traceability regression.
   SHALL print `cargo-shallguard <version>` using the binary package version and
   exit successfully, and the `version`, `--version`, and `help` forms SHALL NOT
   require ShallGuard repository discovery or configuration. *Enforced:*
-  `cli:src/main.rs` (`main`) · *Verified:* ✅
+  `cli:src/main.rs` (`main`) · *Verified:* [test]
   `cli:tests/external_subcommand.rs`
   (`installed_informational_commands_work_without_repository`)
 
@@ -253,7 +258,7 @@ rejects any traceability regression.
   blank lines. *Enforced:*
   `src/review_show.rs` (`inspect_stored_review`),
   `cli:src/cli_review_show.rs` (`parse_review_show_args`,
-  `render_stored_review`) · *Verified:* ✅ `src/review_show_tests.rs`
+  `render_stored_review`) · *Verified:* [test] `src/review_show_tests.rs`
   (`reads_completed_current_attempt_and_preserves_the_artifact`),
   `cli:src/cli_review_show_tests.rs`
   (`renders_summary_and_requested_evidence_details`)
@@ -264,7 +269,7 @@ rejects any traceability regression.
   severity and citations, missing evidence, context limitations, failure
   information, and retained result path.
   *Enforced:* `cli:src/cli_review_show.rs` (`parse_review_show_args`,
-  `render_stored_review`) · *Verified:* ✅ `src/review_show_tests.rs`
+  `render_stored_review`) · *Verified:* [test] `src/review_show_tests.rs`
   (`reads_completed_current_attempt_and_preserves_the_artifact`,
   `partial_run_lists_pending_units_and_checks_requested_ids`),
   `cli:src/cli_review_show_tests.rs`
@@ -276,7 +281,7 @@ rejects any traceability regression.
   attempts, and SHALL use the manifest-selected current attempt rather than
   silently choosing an older attempt. *Enforced:* `src/review_show.rs`
   (`inspect_stored_review`), `cli:src/cli_review_show.rs`
-  (`render_stored_review`) · *Verified:* ✅ `src/review_show_tests.rs`
+  (`render_stored_review`) · *Verified:* [test] `src/review_show_tests.rs`
   (`reads_completed_current_attempt_and_preserves_the_artifact`,
   `partial_run_lists_pending_units_and_checks_requested_ids`,
   `distinguishes_unavailable_and_invalid_attempts`)
@@ -285,7 +290,7 @@ rejects any traceability regression.
   artifact schema versions, manifest/result identity, digests, and contained
   paths before presenting stored content. *Enforced:* `src/review_show.rs`
   (`inspect_stored_review`), `cli:src/cli_review_show.rs` (`run`) · *Verified:*
-  ✅ `src/review_show_tests.rs`
+  [test] `src/review_show_tests.rs`
   (`reads_completed_current_attempt_and_preserves_the_artifact`,
   `rejects_tampered_result_digest`)
 - **REQ-CLI-011** — Advisory `violated`, `insufficient_evidence`, and
@@ -296,7 +301,7 @@ rejects any traceability regression.
   `review --resume` for continuation. *Enforced:* `src/review_show.rs`
   (`inspect_stored_review`), `src/review_workflow.rs`
   (`require_new_review_output`), `cli:src/cli_review_show.rs`
-  (`parse_review_show_args`, `run`, `render_stored_review`) · *Verified:* ✅
+  (`parse_review_show_args`, `run`, `render_stored_review`) · *Verified:* [test]
   `src/review_show_tests.rs`
   (`partial_run_lists_pending_units_and_checks_requested_ids`,
   `distinguishes_unavailable_and_invalid_attempts`,
@@ -325,7 +330,7 @@ rejects any traceability regression.
   are supplied, and SHALL escape provider-controlled content so it cannot create
   active HTML or user mentions. *Enforced:*
   `cli:src/cli_review_show.rs` (`ReviewShowFormat`,
-  `render_stored_review_markdown`) · *Verified:* ✅
+  `render_stored_review_markdown`) · *Verified:* [test]
   `cli:src/cli_review_show_tests.rs`
   (`parses_and_renders_markdown_without_terminal_sequences`,
   `markdown_details_escape_provider_controlled_content`)
@@ -337,7 +342,7 @@ rejects any traceability regression.
   the response through the same strict schema and citation rules as other
   providers. *Enforced:* `src/review.rs` (`ReviewProvider`),
   `src/review_provider.rs` (`invoke_provider`, `command_spec`,
-  `provider_environment_allowed`, `parse_provider_response`) · *Verified:* ✅
+  `provider_environment_allowed`, `parse_provider_response`) · *Verified:* [test]
   `src/review_tests.rs` (`parses_provider_names`,
   `copilot_command_is_headless_and_toolless`,
   `provider_environment_excludes_unrelated_ci_secrets`,
@@ -351,7 +356,7 @@ rejects any traceability regression.
   `shallguard-dev fmt --check` and `shallguard-dev check` validation steps SHALL
   remain in the required Rust workflow. *Enforced:*
   `.github/workflows/shallguard-review.yml`, `.github/workflows/rust.yml` ·
-  *Verified:* ✅ `cli:tests/github_advisory_workflow.rs`
+  *Verified:* [test] `cli:tests/github_advisory_workflow.rs`
   (`advisory_review_is_isolated_from_the_required_deterministic_gate`)
 
 ## Specification User Stories
@@ -371,29 +376,29 @@ rejects any traceability regression.
   `SHALL`, `SHALL NOT`, or `MAY`; requirement IDs SHALL be unique across every
   selected document. *Enforced:* `src/docs.rs` (`parse_text`),
   `src/requirement_format.rs` (`lint_block`), `src/check.rs` (`analyze`) ·
-  *Verified:* ✅ `src/docs.rs` (`parses_requirements_and_segments`),
+  *Verified:* [test] `src/docs.rs` (`parses_requirements_and_segments`),
   `src/requirement_format.rs` (`rejects_missing_segments_and_evidence_status`)
 - **REQ-SPEC-002** — Every active requirement SHALL contain exactly one
   enforcement segment followed by `·` and exactly one verification segment
   carrying at least one recognized evidence indicator. *Enforced:*
-  `src/requirement_format.rs` (`lint_block`) · *Verified:* ✅
+  `src/requirement_format.rs` (`lint_block`) · *Verified:* [test]
   `src/requirement_format.rs` (`rejects_missing_segments_and_evidence_status`)
 - **REQ-SPEC-003** — Automated evidence SHALL cite a concrete Rust test file
   and SHOULD cite its test function; when a function is named, deterministic
   checking SHALL bind the claim to that exact path and function. *Enforced:*
   `src/docs.rs` (`Evidence`, `parse_chunk`), `src/check.rs` (`analyze`) ·
-  *Verified:* ✅ `src/docs.rs` (`parses_requirements_and_segments`)
+  *Verified:* [test] `src/docs.rs` (`parses_requirements_and_segments`)
 - **REQ-SPEC-004** — Retired requirement IDs SHALL remain reserved and MAY omit
   active enforcement and verification segments; retired IDs SHALL NOT satisfy
   live anchors. *Enforced:* `src/docs.rs` (`parse_chunk`),
   `src/requirement_format.rs` (`lint_block`), `src/check.rs` (`analyze`) ·
-  *Verified:* ✅ `src/requirement_format.rs`
+  *Verified:* [test] `src/requirement_format.rs`
   (`permits_retired_requirements_without_evidence_segments`)
 - **REQ-SPEC-005** — `cargo shallguard fmt` SHALL format only requirement list
   blocks, preserve surrounding Markdown, prove parsed semantic equivalence,
   write atomically, and refuse all writes when any selected document has a
   lint failure. *Enforced:* `src/requirement_format.rs` (`format`,
-  `verify_semantic_equivalence`, `write_atomic`) · *Verified:* ✅
+  `verify_semantic_equivalence`, `write_atomic`) · *Verified:* [test]
   `src/requirement_format.rs`
   (`formats_requirement_blocks_without_touching_surrounding_markdown`,
   `formatting_is_idempotent_and_semantically_equivalent`,
@@ -402,9 +407,27 @@ rejects any traceability regression.
   perform non-mutating structural and canonical-format validation and SHALL
   return nonzero for malformed or non-canonical selected documents.
   *Enforced:* `cli:src/main.rs` (`parse_format_args`, `run_format`),
-  `src/requirement_format.rs` (`check`) · *Verified:* ✅ `cli:src/cli_tests.rs`
+  `src/requirement_format.rs` (`check`) · *Verified:* [test] `cli:src/cli_tests.rs`
   (`parses_requirement_format_modes_and_documents`,
   `rejects_unknown_requirement_format_flags`)
+- **REQ-SPEC-007** — The verification segment SHALL declare each evidence class
+  with an ASCII keyword mark (`[test]`, `[e2e]`, `[review]`, or `[pending]`);
+  the parser and the lint SHALL accept the emoji ✅, 🔬, 👁, and ⏳ as aliases
+  of the same classes. *Enforced:* `src/evidence_mark.rs` (`EvidenceMark`),
+  `src/docs.rs` (`parse_chunk`), `src/requirement_format.rs` (`lint_block`) ·
+  *Verified:* [test] `src/evidence_mark.rs`
+  (`recognizes_keywords_and_emoji_aliases`,
+  `canonicalize_removes_variation_selectors_and_keeps_keywords`), `src/docs.rs`
+  (`parses_requirements_and_segments`), `src/requirement_format.rs`
+  (`rewrites_emoji_aliases_to_canonical_keywords`)
+- **REQ-SPEC-008** — `cargo shallguard fmt` SHALL rewrite every emoji alias in a
+  verification segment to its canonical keyword without a change of the parsed
+  evidence classes; `cargo shallguard fmt --check` and `cargo shallguard lint`
+  SHALL report a selected document that still contains an alias as
+  non-canonical. *Enforced:* `src/requirement_format.rs`
+  (`canonicalize_evidence_marks`) · *Verified:* [test]
+  `src/requirement_format.rs` (`rewrites_emoji_aliases_to_canonical_keywords`,
+  `check_reports_emoji_aliases_as_non_canonical`)
 
 ## Traceability User Stories
 
@@ -420,14 +443,14 @@ rejects any traceability regression.
 
 - **REQ-TRACE-001** — Rust anchor discovery SHALL parse source with `syn` and
   SHALL ignore anchor-like text in comments and string literals. *Enforced:*
-  `src/scan.rs` (`scan`, `walk_items`) · *Verified:* ✅ `src/scan_tests.rs`
+  `src/scan.rs` (`scan`, `walk_items`) · *Verified:* [test] `src/scan_tests.rs`
   (`comments_are_never_anchors`, `anchor_text_inside_strings_is_invisible`)
 - **REQ-TRACE-002** — `#[shallguard::enforces]` SHALL be recognized on
   supported Rust items, impl functions, struct fields, and enum variants, and
   the scanner SHALL retain each anchor's source scope and
   executable/structural kind.
   *Enforced:* `src/scan.rs` (`walk_items`, `collect_item_attrs`,
-  `collect_fn_attrs`) · *Verified:* ✅ `src/scan_tests.rs`
+  `collect_fn_attrs`) · *Verified:* [test] `src/scan_tests.rs`
   (`attribute_anchors_record_executable_and_structural_scopes`,
   `field_and_variant_attributes_are_anchors`,
   `enforces_attribute_on_items_and_impl_fns`)
@@ -436,7 +459,7 @@ rejects any traceability regression.
   SHALL own the smallest enclosing executable block available to the syntax
   scanner.
   *Enforced:* `src/scan.rs` (`MacroVisitor`), `src/impact.rs`
-  (`EnforcementCollector`) · *Verified:* ✅ `src/scan_tests.rs`
+  (`EnforcementCollector`) · *Verified:* [test] `src/scan_tests.rs`
   (`enforces_here_macro_in_statement_and_item_position`,
   `enforces_here_nested_in_another_macro_body_is_found`), `src/impact.rs`
   (`branch_anchor_only_owns_its_enclosing_block`,
@@ -445,30 +468,30 @@ rejects any traceability regression.
   evidence only on a syntactically recognized, non-ignored test function; an
   ordinary or ignored function carrying the attribute SHALL be reported
   invalid. *Enforced:*
-  `src/scan.rs` (`collect_fn_attrs`) · *Verified:* ✅ `src/scan_tests.rs`
+  `src/scan.rs` (`collect_fn_attrs`) · *Verified:* [test] `src/scan_tests.rs`
   (`verifies_attribute_needs_an_enabled_test`)
 - **REQ-TRACE-005** — The checker SHALL fail for malformed documents,
   duplicate IDs, unknown live anchor IDs, or nonexistent cited Rust paths.
   *Enforced:* `src/check.rs` (`run`, `analyze`), `src/docs.rs` (`parse_doc`) ·
-  *Verified:*  code review only
+  *Verified:* [review] code review only
 - **REQ-TRACE-006** — An implemented requirement SHALL have its exact ID on an
   enforcement anchor in every documented enforcement file, and an automated
   requirement SHALL resolve to a test carrying its exact verification anchor.
   *Enforced:* `src/check.rs` (`analyze`, `enforced_path_has_anchor`) ·
-  *Verified:* ✅ `src/check_tests.rs`
+  *Verified:* [test] `src/check_tests.rs`
   (`requires_an_anchor_in_every_documented_enforcement_file`)
 - **REQ-TRACE-007** — Anchor relations SHALL be many-to-many: one site MAY
   claim multiple requirements and one requirement MAY have multiple
   enforcement or verification sites without losing individual site identity.
   *Enforced:* `src/scan.rs` (`Anchor`, `Anchors`), `src/check.rs` (`analyze`) ·
-  *Verified:* ✅ `src/test_index_tests.rs`
+  *Verified:* [test] `src/test_index_tests.rs`
   (`merges_repeated_attributes_on_one_test`)
 - **REQ-TRACE-008** — The `shallguard` library SHALL expose enforcement,
   branch-enforcement, and verification anchors as `#[shallguard::enforces]`,
   `shallguard::enforces_here!`, and `#[shallguard::verifies]`, so consumers
   SHALL NOT need a direct dependency on the implementation macro crate.
   *Enforced:* `src/lib.rs` (`enforces`, `enforces_here`, `verifies`) ·
-  *Verified:* ✅ `tests/public_anchor_api.rs`
+  *Verified:* [test] `tests/public_anchor_api.rs`
   (`public_namespace_exposes_all_anchor_macros`)
 
 ### US-TRACE-002: Vacuity-Resistant Automated Evidence
@@ -476,7 +499,7 @@ rejects any traceability regression.
 **Status:** Implemented
 
 **As a** maintainer  
-**I want** ✅ evidence rejected when the cited test cannot fail  
+**I want** `[test]` evidence rejected when the cited test cannot fail  
 **So that** a green traceability report cannot be earned by assertion-free
 or constant tests
 
@@ -486,7 +509,7 @@ or constant tests
   no assertion macro, no `panic!`/`todo!`/`unreachable!` invocation, no
   `unwrap`/`expect`/`unwrap_err`/`expect_err` call, and no `?` operator in a
   `Result`-returning test — SHALL be reported as vacuous evidence.
-  *Enforced:* `src/oracle.rs` (`classify`) · *Verified:* ✅ `src/oracle.rs`
+  *Enforced:* `src/oracle.rs` (`classify`) · *Verified:* [test] `src/oracle.rs`
   (`empty_and_assertion_free_bodies_are_vacuous`,
   `real_failure_paths_classify_as_present`,
   `question_mark_without_result_return_is_not_a_failure_path`,
@@ -497,21 +520,21 @@ or constant tests
   as a failure path; a constant assertion that always fails
   (`assert!(false)`, `assert_eq!(0, 1)`) SHALL count as an unconditional
   failure path. *Enforced:* `src/oracle.rs` (`assertion_is_trivial`) ·
-  *Verified:* ✅ `src/oracle.rs` (`literal_only_assertions_are_trivial`,
+  *Verified:* [test] `src/oracle.rs` (`literal_only_assertions_are_trivial`,
   `always_failing_constant_asserts_are_failure_paths`)
 - **REQ-TRACE-011** — An `assert_eq!` or `assert_ne!` SHALL count as
   vacuous only when both compared sides are literal; token-identical
   non-literal sides (impure calls, floating-point values) MAY fail at
   runtime and SHALL classify as evidence present. *Enforced:*
-  `src/oracle.rs` (`assertion_is_trivial`) · *Verified:* ✅ `src/oracle.rs`
+  `src/oracle.rs` (`assertion_is_trivial`) · *Verified:* [test] `src/oracle.rs`
   (`identical_non_literal_sides_classify_as_present`)
 - **REQ-TRACE-012** — `#[should_panic]` without an `expected` message on a
   `#[verifies]` test whose body offers no other failure path SHALL be
   reported as weak evidence. *Enforced:* `src/oracle.rs` (`classify`) ·
-  *Verified:* ✅ `src/oracle.rs`
+  *Verified:* [test] `src/oracle.rs`
   (`bare_should_panic_is_weak_and_expected_is_present`),
   `src/check_evidence.rs` (`weak_anchors_are_reported_even_beside_solid_evidence`)
-- **REQ-TRACE-013** — A requirement whose only ✅ citation resolves to a
+- **REQ-TRACE-013** — A requirement whose only `[test]` citation resolves to a
   vacuous test SHALL be counted as lacking automated verification, and
   vacuous and weak findings SHALL flow through the ratcheted baseline as
   distinct gap kinds, so pre-existing cases in adopting repositories are
@@ -519,7 +542,7 @@ or constant tests
   be recorded by baseline initialization. *Enforced:*
   `src/check_evidence.rs` (`evaluate_verification`), `src/check.rs`
   (`gap_is_hard`, `baseline_entries`), `src/baseline.rs` (`GapKind`) ·
-  *Verified:* ✅ `src/check_evidence.rs`
+  *Verified:* [test] `src/check_evidence.rs`
   (`sole_vacuous_evidence_demotes_the_requirement`,
   `redundant_vacuous_evidence_keeps_the_requirement_anchored`),
   `src/check_tests.rs` (`vacuous_evidence_flows_through_the_baseline_like_other_kinds`,
@@ -531,14 +554,14 @@ or constant tests
   counted and listable in the check report; suppression SHALL NOT be
   silent. *Enforced:* `src/oracle.rs` (`classify`), `src/scan.rs`
   (`oracle_argument`), `src/check_report.rs` (`render_summary`) ·
-  *Verified:* ✅ `src/oracle.rs` (`suppression_is_recorded_not_silent`),
+  *Verified:* [test] `src/oracle.rs` (`suppression_is_recorded_not_silent`),
   `src/check_report.rs` (`suppressed_oracles_are_listed_in_the_summary`),
   `src/scan_tests.rs` (`raw_string_oracle_classes_decode_to_their_value`)
 - **REQ-TRACE-015** — Vacuity analysis SHALL be purely syntactic and
   deterministic, SHALL NOT execute tested code, and SHALL classify any
   construct the classifier does not fully understand as evidence present
   rather than vacuous. *Enforced:* `src/oracle.rs` (`classify`) ·
-  *Verified:* ✅ `src/oracle.rs` (`unknown_constructs_classify_as_present`,
+  *Verified:* [test] `src/oracle.rs` (`unknown_constructs_classify_as_present`,
   `err_return_and_result_aliases_classify_as_present`,
   `third_party_assert_macros_classify_as_present`)
 - **REQ-TRACE-016** — `#[verifies]` SHALL reject at compile time a test body
@@ -547,14 +570,14 @@ or constant tests
   name the offending requirement IDs and reference the evidence-honesty
   rules, and any body the token scan cannot fully classify SHALL compile —
   the deterministic check remains authoritative. *Enforced:* `src/lib.rs`
-  (`verifies`) · *Verified:* ✅ `macros:tests/front_line.rs`
+  (`verifies`) · *Verified:* [test] `macros:tests/front_line.rs`
   (`front_line_rejects_vacuity_and_enforces_oracle_classes`)
 - **REQ-TRACE-017** — The `oracle` opt-out SHALL accept only the closed
   value set `panic`, `compile`, and `external`: an unknown value SHALL be
   rejected at compile time with the accepted list, and the deterministic
   checker SHALL NOT treat an unknown class as a suppression and SHALL
   report it. *Enforced:* `src/lib.rs` (`verifies`), `src/scan.rs`
-  (`collect_fn_attrs`, `oracle_argument`) · *Verified:* ✅
+  (`collect_fn_attrs`, `oracle_argument`) · *Verified:* [test]
   `macros:tests/front_line.rs`
   (`front_line_rejects_vacuity_and_enforces_oracle_classes`),
   `src/scan_tests.rs` (`unknown_oracle_class_is_not_a_suppression`,
@@ -576,25 +599,25 @@ or constant tests
 - **REQ-BASE-001** — A historical baseline entry SHALL identify only a
   requirement ID and gap kind and SHALL NOT contain a requirement-content
   fingerprint. *Enforced:* `src/baseline.rs` (`BaselineEntry`, `GapKey`) ·
-  *Verified:* ✅ `src/baseline.rs` (`serialization_is_sorted_and_round_trips`)
+  *Verified:* [test] `src/baseline.rs` (`serialization_is_sorted_and_round_trips`)
 - **REQ-BASE-002** — An exact historical gap MAY remain a visible warning, but
   any gap absent from the committed baseline SHALL be a hard regression.
-  *Enforced:* `src/check.rs` (`apply_baseline`, `record_gap`) · *Verified:* ✅
+  *Enforced:* `src/check.rs` (`apply_baseline`, `record_gap`) · *Verified:* [test]
   `src/check_tests.rs` (`exact_baseline_gap_is_known_warning`,
   `unbaselined_gap_is_a_regression`)
 - **REQ-BASE-003** — Areas configured as fully hardened SHALL NOT accept
   baseline exceptions. *Enforced:* `src/check.rs` (`gap_is_hard`),
   `src/config.rs` (`RepositoryConfig::area_is_hard`) ·
-  *Verified:* ✅ `src/check_tests.rs` (`hard_area_cannot_be_baselined`)
+  *Verified:* [test] `src/check_tests.rs` (`hard_area_cannot_be_baselined`)
 - **REQ-BASE-004** — A resolved or retired gap SHALL make its baseline entry
   stale and fail checking until `baseline prune` removes it; pruning SHALL
   remove only resolved entries. *Enforced:* `src/check.rs`
-  (`apply_baseline`, `prune_baseline`) · *Verified:* ✅ `src/check_tests.rs`
+  (`apply_baseline`, `prune_baseline`) · *Verified:* [test] `src/check_tests.rs`
   (`fixed_gap_makes_entry_stale`, `prune_mode_accepts_resolved_entry_for_removal`)
 - **REQ-BASE-005** — Change impact SHALL reject manual baseline growth after
   initialization and SHALL reject modification of a requirement that still
   carries historical debt. *Enforced:* `src/impact.rs` (`compare_baseline`,
-  `compare_requirement_documents`) · *Verified:* ✅ `src/impact.rs`
+  `compare_requirement_documents`) · *Verified:* [test] `src/impact.rs`
   (`changed_requirement_with_baseline_debt_is_policy_error`)
 
 ## Change Impact User Stories
@@ -613,36 +636,36 @@ or constant tests
   merge base of a target branch and SHALL compare it with the current working
   tree, including tracked modifications and deletions. *Enforced:*
   `src/impact.rs` (`analyze`, `resolve_revision`, `merge_base`,
-  `changed_files`) · *Verified:*  code review only
+  `changed_files`) · *Verified:* [review] code review only
 - **REQ-IMP-002** — Git change parsing SHALL preserve non-UTF-8-safe field
   boundaries and rename source/destination identity by consuming NUL-terminated
   name-status output. *Enforced:* `src/impact.rs` (`parse_name_status`) ·
-  *Verified:* ✅ `src/impact.rs`
+  *Verified:* [test] `src/impact.rs`
   (`parses_nul_terminated_name_status_with_rename`)
 - **REQ-IMP-003** — Rust item comparison SHALL use normalized syntax that
   ignores comments, formatting, documentation attributes, and traceability
   metadata while retaining behavior-bearing tokens. *Enforced:*
   `src/impact.rs` (`normalized_behavior_tokens`, `strip_item_docs`) ·
-  *Verified:* ✅ `src/impact.rs`
+  *Verified:* [test] `src/impact.rs`
   (`source_index_ignores_comments_but_finds_typed_anchors`,
   `behavior_tokens_exclude_trace_metadata`)
 - **REQ-IMP-004** — A changed enforcement scope SHALL produce direct impact
   for its requirement, while a behavior-bearing changed Rust scope with no
   requirement association SHALL be reported as unclaimed. *Enforced:*
-  `src/impact.rs` (`compare_scopes`, `report_as_unclaimed`) · *Verified:* ✅
+  `src/impact.rs` (`compare_scopes`, `report_as_unclaimed`) · *Verified:* [test]
   `src/impact.rs` (`changed_anchored_function_is_direct_impact`,
   `changed_unanchored_function_records_dependency_candidate`)
 - **REQ-IMP-005** — Requirement document changes SHALL distinguish normative
   statement, enforcement evidence, and verification evidence changes and SHALL
   make the changed requirement directly impacted. *Enforced:* `src/impact.rs`
   (`compare_requirement_documents`, `requirement_change_reasons`) ·
-  *Verified:* ✅ `src/impact.rs`
+  *Verified:* [test] `src/impact.rs`
   (`requirement_change_classifies_each_segment`)
 - **REQ-IMP-006** — The first dependency implementation SHALL propagate one
   conservative reverse syntax-dependency hop from changed local helpers,
   values, or types into anchored callers and SHALL label callable and
   structural impacts separately with non-certain confidence. *Enforced:*
-  `src/impact_dependency.rs` (`analyze`, `propagate`) · *Verified:* ✅
+  `src/impact_dependency.rs` (`analyze`, `propagate`) · *Verified:* [test]
   `src/impact_dependency_tests.rs`
   (`propagates_changed_helper_to_anchored_caller`,
   `classifies_changed_type_dependency_as_structural`)
@@ -650,7 +673,7 @@ or constant tests
   base/head identity, configuration, impact class, reason, confidence, source
   location, unclaimed changes, and policy findings even when policy causes a
   nonzero exit. *Enforced:* `src/impact.rs` (`ImpactArtifact`), `cli:src/main.rs`
-  (`run_impact`) · *Verified:* ✅ `src/impact.rs`
+  (`run_impact`) · *Verified:* [test] `src/impact.rs`
   (`json_artifact_uses_versioned_schema_and_configuration`)
 
 ## Test Identity User Stories
@@ -668,28 +691,28 @@ or constant tests
 - **REQ-TEST-001** — Test indexing SHALL use Cargo metadata to map each
   syntactic verification test to its owning package and library, binary, or
   integration-test target. *Enforced:* `src/test_index.rs` (`load_metadata`,
-  `owning_package`, `select_target`) · *Verified:* ✅
+  `owning_package`, `select_target`) · *Verified:* [test]
   `src/test_index_tests.rs` (`maps_library_and_integration_source_targets`)
 - **REQ-TEST-002** — Enumeration mode SHALL query each selected Cargo test
   harness using its list protocol and SHALL retain only executable test and
   benchmark identities. *Enforced:* `src/test_index.rs` (`enumerate_targets`,
-  `enumerate_target`, `parse_harness_list`) · *Verified:* ✅
+  `enumerate_target`, `parse_harness_list`) · *Verified:* [test]
   `src/test_index_tests.rs` (`parses_only_tests_and_benchmarks_from_harness_output`)
 - **REQ-TEST-003** — Resolution SHALL prefer an exact syntactic module/function
   name, MAY accept a unique function suffix, and SHALL report ambiguous or
   absent matches as deterministic findings. *Enforced:* `src/test_index.rs`
-  (`resolve_candidate`) · *Verified:* ✅ `src/test_index_tests.rs`
+  (`resolve_candidate`) · *Verified:* [test] `src/test_index_tests.rs`
   (`exact_syntactic_name_resolves_before_suffix_matching`,
   `unique_function_suffix_is_accepted`, `ambiguous_function_suffix_is_a_finding`)
 - **REQ-TEST-004** — A resolved test identity SHALL include package, Cargo
   target kind/name, exact harness name, source path/function, and claimed
   requirement IDs. *Enforced:* `src/test_index.rs` (`CargoTestIdentity`,
-  `IndexedVerificationTest`) · *Verified:*  code review only
+  `IndexedVerificationTest`) · *Verified:* [review] code review only
 - **REQ-TEST-005** — A reusable test catalog SHALL record source revision and
   working-tree state, and loading SHALL reject incompatible package filters or
   catalog identities rather than silently selecting another test. *Enforced:*
   `src/test_index.rs` (`HarnessCatalog`, `load_catalog`,
-  `validate_package_filter`) · *Verified:* ✅ `src/test_index_tests.rs`
+  `validate_package_filter`) · *Verified:* [test] `src/test_index_tests.rs`
   (`validates_requested_package_names`)
 
 ## Executable Coverage User Stories
@@ -708,31 +731,31 @@ or constant tests
   associated with requested automated requirements and SHALL list each selected
   requirement and test identity before execution. *Enforced:* `src/coverage.rs`
   (`generate`, `select_tests`), `src/review_workflow.rs`
-  (`select_coverage_requirements`) · *Verified:* ✅
+  (`select_coverage_requirements`) · *Verified:* [test]
   `src/review_workflow.rs`
   (`coverage_selection_intersects_impact_automation_and_request`)
 - **REQ-COV-002** — Selected tests SHALL run under Rust LLVM instrumentation
   with isolated raw profiles per exact test while reusing compatible build
   output across the run. *Enforced:* `src/coverage_llvm.rs` (`prepare`,
-  `collect_test`, `clean_profiles`) · *Verified:*  code review only
+  `collect_test`, `clean_profiles`) · *Verified:* [review] code review only
 - **REQ-COV-003** — LLVM export parsing SHALL retain workspace-local executable
   line/column regions and counts, deduplicate repeated instantiations, and
   reject unknown export forms or paths outside the repository. *Enforced:*
-  `src/coverage_llvm.rs` (`parse_export`, `workspace_relative`) · *Verified:* ✅
+  `src/coverage_llvm.rs` (`parse_export`, `workspace_relative`) · *Verified:* [test]
   `src/coverage_llvm_tests.rs`
   (`parses_workspace_code_regions_and_deduplicates_instantiations`,
   `rejects_an_unknown_export_type`, `source_paths_must_stay_inside_the_workspace`)
 - **REQ-COV-004** — Coverage mapping SHALL intersect executable LLVM regions
   with the source scope of each enforcement anchor using line and column
   boundaries. *Enforced:* `src/coverage.rs` (`enforcement_sites`,
-  `apply_regions`, `ranges_overlap`) · *Verified:* ✅ `src/coverage_tests.rs`
+  `apply_regions`, `ranges_overlap`) · *Verified:* [test] `src/coverage_tests.rs`
   (`source_range_intersection_is_half_open`,
   `covered_llvm_regions_reach_the_owning_enforcement_scope`)
 - **REQ-COV-005** — The artifact SHALL distinguish reached executable anchors,
   instrumented-but-unreached anchors, structural-only anchors, and execution
   errors; execution errors SHALL take precedence over a reach claim.
   *Enforced:* `src/coverage.rs` (`CoverageStatus`,
-  `RequirementAccumulator::finish`) · *Verified:* ✅ `src/coverage_tests.rs`
+  `RequirementAccumulator::finish`) · *Verified:* [test] `src/coverage_tests.rs`
   (`zero_count_region_is_instrumented_but_not_reached`,
   `declarations_are_structural_only`,
   `execution_errors_take_precedence_over_reach`)
@@ -740,12 +763,12 @@ or constant tests
   identities, test outcomes, LLVM evidence, enforcement sites, and requirement
   status, and SHALL remain available when one or more selected tests fail.
   *Enforced:* `src/coverage.rs` (`CoverageArtifact`), `cli:src/main.rs`
-  (`run_coverage`) · *Verified:*  code review only
+  (`run_coverage`) · *Verified:* [review] code review only
 - **REQ-COV-007** — A future patch-exercise result SHALL report whether cited
   tests execute changed executable regions inside impacted enforcement scopes
   and SHALL keep this result separate from whole-scope enforcement reach.
   *Enforced:* not implemented — changed-region coverage described in
-  `docs/requirement-coverage-design.md` · *Verified:* ⏳ pending
+  `docs/requirement-coverage-design.md` · *Verified:* [pending] pending
 
 ## Review Capsule User Stories
 
@@ -762,36 +785,36 @@ or constant tests
 - **REQ-CAP-001** — Bundle generation SHALL produce one independently
   reviewable capsule for each selected impacted requirement and a manifest that
   maps requirement IDs to capsule files. *Enforced:* `src/bundle.rs`
-  (`generate`, `BundleManifest`) · *Verified:*  code review only
+  (`generate`, `BundleManifest`) · *Verified:* [review] code review only
 - **REQ-CAP-002** — A capsule SHALL include the full normative statement and
   clauses, enforcement and verification declarations, impact reasons, related
   tests, available coverage, changed source, and current source for every
   enforcement anchor, including unchanged anchor heads. *Enforced:*
-  `src/bundle.rs` (`build_capsule`, `enforcement_contexts`) · *Verified:* ✅
+  `src/bundle.rs` (`build_capsule`, `enforcement_contexts`) · *Verified:* [test]
   `src/bundle.rs` (`extracts_normative_clauses_and_keeps_complete_segments`,
   `capsule_includes_unchanged_anchored_enforcement_source`)
 - **REQ-CAP-003** — Every included source excerpt SHALL carry a repository path
   and line range suitable for citations; bounded or omitted context SHALL be
   reported explicitly through completeness metadata. *Enforced:*
   `src/bundle.rs` (`SourceExcerpt`, `ImplementationContext`,
-  `EnforcementContext`) · *Verified:* ✅
+  `EnforcementContext`) · *Verified:* [test]
   `src/bundle.rs` (`oversized_enforcement_scope_is_bounded_and_marked_incomplete`)
 - **REQ-CAP-004** — Capsule and manifest schemas SHALL be versioned, and each
   manifest entry SHALL bind the serialized capsule bytes through a stable
   content digest. *Enforced:* `src/bundle.rs` (`ReviewCapsule`, `BundleManifest`,
-  `capsule_digest`) · *Verified:* ✅ `src/bundle.rs`
+  `capsule_digest`) · *Verified:* [test] `src/bundle.rs`
   (`digest_is_stable_and_content_sensitive`,
   `verifies_serialized_capsule_content_against_manifest_digest`)
 - **REQ-CAP-005** — Imported impact and coverage evidence SHALL be accepted
   only when their repository/revision identity is compatible with the bundle
   head. *Enforced:* `src/bundle.rs` (`read_impact`, `read_coverage`,
   `coverage_by_requirement`) ·
-  *Verified:* ✅ `src/bundle.rs`
+  *Verified:* [test] `src/bundle.rs`
   (`selects_requirement_coverage_and_checks_head_identity`)
 - **REQ-CAP-006** — Bundle generation SHALL be deterministic for identical
   source and inputs and SHALL exclude unrelated repository content unless it is
   explicitly related and bounded by the capsule schema. *Enforced:*
-  `src/bundle.rs` (`generate`, `build_capsule`) · *Verified:*  code review only
+  `src/bundle.rs` (`generate`, `build_capsule`) · *Verified:* [review] code review only
 
 ## Semantic Review User Stories
 
@@ -810,28 +833,28 @@ or constant tests
   provider-specific model or supported local inference endpoint. *Enforced:*
   `src/review.rs` (`ReviewProvider`, `review_capsule`),
   `src/review_provider.rs` (`command_spec`) ·
-  *Verified:* ✅ `src/review_tests.rs` (`parses_provider_names`,
+  *Verified:* [test] `src/review_tests.rs` (`parses_provider_names`,
   `codex_command_is_ephemeral_and_read_only`,
   `claude_command_disables_tools_and_sessions`)
 - **REQ-REV-002** — Provider execution SHALL be ephemeral and non-interactive,
   SHALL disable provider tools or filesystem mutation where supported, and
   SHALL pass only an allowlisted environment that excludes unrelated CI
   secrets. *Enforced:* `src/review_provider.rs` (`command_spec`,
-  `sanitize_provider_environment`) · *Verified:* ✅ `src/review_tests.rs`
+  `sanitize_provider_environment`) · *Verified:* [test] `src/review_tests.rs`
   (`codex_command_is_ephemeral_and_read_only`,
   `claude_command_disables_tools_and_sessions`,
   `provider_environment_excludes_unrelated_ci_secrets`)
 - **REQ-REV-003** — A provider response SHALL satisfy a strict versioned schema
   bound to the exact requirement ID and capsule digest and SHALL review every
   supplied normative clause. *Enforced:* `src/review_schema.rs`,
-  `src/review_validation.rs` (`validate_response`) · *Verified:* ✅
+  `src/review_validation.rs` (`validate_response`) · *Verified:* [test]
   `src/review_tests.rs`
   (`response_schema_binds_capsule_and_requirement_identity_exactly`,
   `rejects_missing_clause_review`)
 - **REQ-REV-004** — Every finding and evidence claim SHALL cite only a path and
   line range made citable by the capsule; citations outside that allowlist
   SHALL invalidate the response. *Enforced:* `src/review_validation.rs`
-  (`validate_citations`) · *Verified:* ✅ `src/review_tests.rs`
+  (`validate_citations`) · *Verified:* [test] `src/review_tests.rs`
   (`validates_complete_result_with_supplied_citation`,
   `coverage_anchor_and_scope_are_citable_protocol_locations`,
   `rejects_citation_outside_capsule`)
@@ -843,7 +866,7 @@ or constant tests
   `src/review_progress.rs` (`review_completion_message`),
   `src/review_workflow.rs` (`ReviewWorkflowRun`),
   `cli:src/cli_review_show.rs`
-  (`review_outcome_summary`) · *Verified:* ✅
+  (`review_outcome_summary`) · *Verified:* [test]
   `src/review_progress.rs`
   (`completion_distinguishes_verdicts_from_unavailable_reviews`),
   `cli:src/cli_tests.rs`
@@ -854,14 +877,14 @@ or constant tests
   checkpointed atomically before the aggregate manifest and summary are
   refreshed, so partial progress survives interruption. *Enforced:*
   `src/review_state.rs` (`ReviewStore::write_checkpoint`), `src/review.rs`
-  (`persist_review_artifact`) · *Verified:* ✅ `src/review_state_tests.rs`
+  (`persist_review_artifact`) · *Verified:* [test] `src/review_state_tests.rs`
   (`atomic_json_replaces_complete_document`), `src/review_tests.rs`
   (`aggregate_artifact_is_refreshed_from_running_to_completed`)
 - **REQ-REV-007** — `--resume` SHALL reuse only completed checkpoints whose
   frozen run identity and result validate against the current bundle and SHALL
   reject incompatible or legacy output before modifying it. *Enforced:*
   `src/review_state.rs` (`ReviewStore::open`, `ReviewStore::checkpoint`) ·
-  *Verified:* ✅
+  *Verified:* [test]
   `src/review_state_tests.rs`
   (`compatible_resume_reuses_only_revalidated_completed_checkpoint`,
   `incompatible_resume_is_rejected_before_work_starts`,
@@ -871,7 +894,7 @@ or constant tests
   before materialization; local and CI runs SHALL use the same validation
   rules. *Enforced:* `src/review_state.rs` (`ReviewStore::cache`,
   `ReviewStore::write_cache`, `read_cached_unit`), `src/review.rs`
-  (`materialize_cached_review`) · *Verified:* ✅ `src/review_state_tests.rs`
+  (`materialize_cached_review`) · *Verified:* [test] `src/review_state_tests.rs`
   (`portable_cache_is_revalidated_before_reuse`)
 
 ## Static Checking User Stories
@@ -890,22 +913,22 @@ or constant tests
   more static checks against a requirement ID with checker kind, configuration,
   source scope, and stability metadata. *Enforced:* not implemented — static
   check registry described in `docs/requirement-static-checking-design.md` ·
-  *Verified:* ⏳ pending
+  *Verified:* [pending] pending
 - **REQ-STATIC-002** — The first static backend SHALL support syntax-level Rust
   predicates over `syn`, while future HIR/MIR or Clippy integrations MAY add
   type- and control-flow-aware predicates without changing result semantics.
   *Enforced:* not implemented — backend interface described in
-  `docs/requirement-static-checking-design.md` · *Verified:* ⏳ pending
+  `docs/requirement-static-checking-design.md` · *Verified:* [pending] pending
 - **REQ-STATIC-003** — Static-check results SHALL identify requirement, checker,
   outcome, source span, diagnostic, tool version, and configuration and SHALL
   remain a separate evidence dimension from tests, coverage, and model review.
   *Enforced:* not implemented — result schema described in
-  `docs/requirement-static-checking-design.md` · *Verified:* ⏳ pending
+  `docs/requirement-static-checking-design.md` · *Verified:* [pending] pending
 - **REQ-STATIC-004** — A static checker SHALL become a hard merge gate only
   through explicit repository policy after its semantics and false-positive
   behavior are accepted; experimental or unavailable checks SHALL NOT be
   silently presented as passing. *Enforced:* not implemented — policy lifecycle
-  described in `docs/requirement-static-checking-design.md` · *Verified:* ⏳
+  described in `docs/requirement-static-checking-design.md` · *Verified:* [pending]
   pending
 
 ## Portability User Stories
@@ -923,13 +946,13 @@ or constant tests
 - **REQ-PORT-001** — Repository root and Cargo package topology SHALL be
   discovered from the invocation directory and Cargo metadata and SHALL NOT be
   derived from the tool crate's compile-time manifest location. *Enforced:*
-  `src/workspace.rs` (`workspace_root`, `workspace_root_from`) · *Verified:* ✅
+  `src/workspace.rs` (`workspace_root`, `workspace_root_from`) · *Verified:* [test]
   `src/workspace.rs`
   (`discovers_single_package_and_virtual_workspace_roots`)
 - **REQ-PORT-002** — The standalone tool SHALL support both an ordinary
   single-package Rust repository and a Cargo workspace, including virtual
   workspace roots. *Enforced:* `src/config.rs` (`RepositoryConfig::load`,
-  `RepositoryConfig::documents`), `src/lib.rs` (`DocSpec`) · *Verified:* ✅
+  `RepositoryConfig::documents`), `src/lib.rs` (`DocSpec`) · *Verified:* [test]
   `src/config.rs` (`loads_single_package_repository_configuration`,
   `loads_virtual_workspace_repository_configuration`),
   `cli:tests/external_subcommand.rs`
@@ -939,7 +962,7 @@ or constant tests
   labels, hardened policies, baseline path, artifact defaults, and optional
   providers without recompiling the tool. *Enforced:* `src/config.rs`
   (`RepositoryConfig`, `DocumentConfig`, `AreaConfig`, `ArtifactConfig`,
-  `ReviewConfig`) · *Verified:* ✅ `src/config.rs`
+  `ReviewConfig`) · *Verified:* [test] `src/config.rs`
   (`loads_single_package_repository_configuration`,
   `loads_virtual_workspace_repository_configuration`,
   `rejects_paths_that_escape_repository`),
@@ -950,7 +973,7 @@ or constant tests
   branch names, or repository-specific minimum requirement counts. *Enforced:*
   `src/config.rs` (`RepositoryConfig`), `src/check.rs` (`analyze`),
   `src/docs.rs` (`resolve_path_span`), `src/impact.rs` (`analyze`),
-  `src/impact_dependency.rs` (`analyze`) · *Verified:* ✅ `src/config.rs`
+  `src/impact_dependency.rs` (`analyze`) · *Verified:* [test] `src/config.rs`
   (`loads_single_package_repository_configuration`,
   `loads_virtual_workspace_repository_configuration`),
   `cli:tests/external_subcommand.rs`
@@ -959,23 +982,23 @@ or constant tests
   that accept explicit repository/configuration inputs and return typed results
   without exiting the process or writing terminal output; the CLI SHALL remain
   a thin adapter. *Enforced:* not implemented — extract process and presentation
-  concerns from `cli:src/main.rs` · *Verified:* ⏳ pending
+  concerns from `cli:src/main.rs` · *Verified:* [pending] pending
 - **REQ-PORT-006** — Git, Cargo, LLVM, filesystem, and model-provider process
   execution SHALL be represented by replaceable adapters so core behavior can
   be fixture-tested and alternative implementations can be added without
   changing artifact contracts. *Enforced:* not implemented — command adapter
-  interfaces · *Verified:* ⏳ pending
+  interfaces · *Verified:* [pending] pending
 - **REQ-PORT-007** — Public artifact readers SHALL dispatch on schema version,
   SHALL reject unsupported versions with an actionable error, and SHALL provide
   an explicit migration path before a compatibility-breaking release.
   *Enforced:* not implemented — standalone artifact compatibility policy ·
-  *Verified:* ⏳ pending
+  *Verified:* [pending] pending
 - **REQ-PORT-008** — The standalone repository SHALL dogfood this specification:
   implemented requirements SHALL be fully anchored before the document enters
   the default CI gate, and every subsequent behavior change SHALL update the
   requirement, enforcement anchor, and honest evidence in the same merge
   request. *Enforced:* `src/check.rs` (`analyze`), `cli:src/main.rs` (`main`) ·
-  *Verified:* ✅ `cli:tests/external_subcommand.rs`
+  *Verified:* [test] `cli:tests/external_subcommand.rs`
   (`repository_configuration_has_zero_traceability_debt`)
 
 ## Safety and Trust User Stories
@@ -994,34 +1017,34 @@ or constant tests
   bundle, and review-input stages SHALL treat repository source and Git history
   as read-only; only explicit `fmt` MAY modify a requirement document.
   *Enforced:* `cli:src/main.rs`, `src/impact.rs`, `src/test_index.rs`,
-  `src/coverage.rs`, `src/bundle.rs`, `src/review.rs` · *Verified:*  code
+  `src/coverage.rs`, `src/bundle.rs`, `src/review.rs` · *Verified:* [review] code
   review only
 - **REQ-SEC-002** — Any path read from an artifact, capsule, cache, or provider
   response SHALL be normalized and SHALL NOT escape its configured root through
   an absolute path or parent traversal. *Enforced:* `src/review_state.rs`
   (`safe_output_path`), `src/review_validation.rs`, `src/bundle.rs` ·
-  *Verified:* ✅ `src/review_state_tests.rs`
+  *Verified:* [test] `src/review_state_tests.rs`
   (`safe_output_path_rejects_parent_and_absolute_paths`)
 - **REQ-SEC-003** — A model provider SHALL receive only the selected capsule,
   review protocol, and allowlisted configuration; unrelated source, environment
   variables, credentials, and prior interactive session state SHALL NOT be
   included. *Enforced:* `src/review.rs` (`prepare_review`),
   `src/review_provider.rs` (`command_spec`, `sanitize_provider_environment`) ·
-  *Verified:* ✅ `src/review_tests.rs`
+  *Verified:* [test] `src/review_tests.rs`
   (`provider_environment_excludes_unrelated_ci_secrets`,
   `codex_command_is_ephemeral_and_read_only`,
   `claude_command_disables_tools_and_sessions`)
 - **REQ-SEC-004** — Destructive cleanup SHALL remove only a validated generated
   artifact at the configured default location, SHALL preserve unknown
   directories, and SHALL be idempotent. *Enforced:* `src/bundle.rs`
-  (`clean_bundle`), `cli:src/main.rs` (`run_clean`) · *Verified:* ✅
+  (`clean_bundle`), `cli:src/main.rs` (`run_clean`) · *Verified:* [test]
   `src/bundle.rs` (`clean_removes_only_a_valid_default_bundle_and_is_idempotent`,
   `clean_preserves_a_directory_without_a_shallguard_manifest`)
 - **REQ-SEC-005** — Coverage, capsule, checkpoint, cache, and provider results
   SHALL carry sufficient identity and digest data to detect stale, corrupt, or
   substituted inputs before reuse; validation failure SHALL produce unavailable
   evidence rather than a fabricated pass. *Enforced:* `src/bundle.rs`,
-  `src/review_validation.rs`, `src/review_state.rs` · *Verified:* ✅
+  `src/review_validation.rs`, `src/review_state.rs` · *Verified:* [test]
   `src/bundle.rs` (`verifies_serialized_capsule_content_against_manifest_digest`),
   `src/review_state_tests.rs` (`portable_cache_is_revalidated_before_reuse`)
 
@@ -1043,7 +1066,7 @@ The bootstrap phase is complete when:
    owning source roots without compiled-in consumer constants;
 2. every requirement marked implemented has at least one honest enforcement
    anchor;
-3. every ✅ citation resolves to its exact, enabled `#[shallguard::verifies]` test;
+3. every `[test]` citation resolves to its exact, enabled `#[shallguard::verifies]` test;
 4. the explicit traceability check reports zero unbaselined gaps;
 5. `fmt --check`, unit/integration tests, Clippy, and the deterministic
    requirement gate pass in CI;

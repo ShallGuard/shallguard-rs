@@ -13,6 +13,7 @@ use crate::check_evidence::{
 use crate::check_report::{AreaStats, BaselineStats, render_summary};
 use crate::config::RepositoryConfig;
 use crate::docs::{Requirement, parse_doc};
+use crate::evidence_mark::EvidenceMark;
 use crate::scan::{Anchors, VerificationAnchor, scan};
 
 pub use crate::check_report::{Finding, Report};
@@ -269,7 +270,7 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
         }
     }
 
-    // A verification anchor for a requirement that does not claim ✅
+    // A verification anchor for a requirement that does not claim [test]
     // means either the document or the anchor is stale.
     let mut stale_verified: BTreeMap<&str, (&Path, usize)> = BTreeMap::new();
     for anchor in &anchors.verification {
@@ -289,8 +290,9 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
             file: file.display().to_string(),
             line,
             message: format!(
-                "test anchor cites {id}, which does not claim ✅ automated \
-                 evidence - the document or the anchor is stale"
+                "test anchor cites {id}, which does not claim {} automated \
+                 evidence - the document or the anchor is stale",
+                EvidenceMark::Test.keyword()
             ),
         });
     }
@@ -370,7 +372,7 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
                     );
                 }
                 VerificationOutcome::Demoted(vacuous) => {
-                    // Every anchored test is vacuous: the ✅ claim has no
+                    // Every anchored test is vacuous: the [test] claim has no
                     // automated evidence behind it.
                     for anchor in vacuous {
                         record_gap(
@@ -382,10 +384,11 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
                                 line: anchor.line,
                                 message: format!(
                                     "`{}` verifies {} but {}; add a real assertion \
-                                     or downgrade the document line to ⏳",
+                                     or downgrade the document line to {}",
                                     anchor.test_fn,
                                     req.id,
-                                    vacuity_reason(anchor)
+                                    vacuity_reason(anchor),
+                                    EvidenceMark::Pending.keyword()
                                 ),
                             },
                         );
@@ -442,9 +445,11 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
                         file: req.doc.to_string(),
                         line: req.line,
                         message: format!(
-                            "{} \"{}\" - claims ✅ but cites no concrete test \
+                            "{} \"{}\" - claims {} but cites no concrete test \
                              file in its Verified line",
-                            req.id, req.title
+                            req.id,
+                            req.title,
+                            EvidenceMark::Test.keyword()
                         ),
                     },
                 );

@@ -38,11 +38,13 @@ cargo install cargo-shallguard --version <pinned-version> --locked
   item, or the statement macro `enforces_here!("REQ-X-NNN")` inside a block.
 - **Verification anchor.** The attribute `#[verifies("REQ-X-NNN")]` on a
   test function.
-- **Evidence classes** on a `*Verified:*` line: `✅` an anchored automated
-  test, `🔬` an end-to-end or production validation, `👁` a code review
-  only, `⏳` pending. Only `✅` requires a `#[verifies]` anchor and a
-  citation with a file and a function. The check compares the `✅` claim
-  with the anchor.
+- **Evidence marks** on a `*Verified:*` line: `[test]` an anchored
+  automated test, `[e2e]` an end-to-end or production validation,
+  `[review]` a code review only, `[pending]` pending. The emoji ✅, 🔬, 👁,
+  and ⏳ are optional aliases, and `cargo shallguard fmt` rewrites them to
+  the keywords. Only `[test]` requires a `#[verifies]` anchor and a
+  citation with a file and a function. The check compares the `[test]`
+  claim with the anchor.
 
 ShallGuard finds anchors in the syntax of the code. **A comment is never an
 anchor.** A `REQ-...` string in a comment or in a string literal does
@@ -56,7 +58,7 @@ set:
 
 1. **Write the requirement before the implementation.** Use the next free
    `REQ-<AREA>-NNN` in the document that owns the area. Write the SHALL
-   statement, the `*Enforced:*` target, and `*Verified:*` ⏳ (pending). You
+   statement, the `*Enforced:*` target, and `*Verified:* [pending]`. You
    can explore before you write the requirement. The final implementation
    pass starts from the written requirement. New behavior without a
    requirement is an incomplete change. If a merge or a rebase collides on
@@ -65,11 +67,12 @@ set:
    time. The check catches a rename that reaches the document but not the
    anchors.
 2. **Implement the behavior and anchor the enforcement site.**
-3. **Write the test and anchor it with `#[verifies]`.** Only then change ⏳
-   to ✅, with a citation that names the exact test file and function:
+3. **Write the test and anchor it with `#[verifies]`.** Only then change
+   `[pending]` to `[test]`, with a citation that names the exact test file
+   and function:
 
    ```markdown
-   *Verified:* ✅ `prefix:tests/file.rs` (`test_fn_name`)
+   *Verified:* [test] `prefix:tests/file.rs` (`test_fn_name`)
    ```
 
 4. **Run the gate** before you report the work as done. The gate is
@@ -124,11 +127,13 @@ These rules are hard rules.
 - **Read the test before you anchor it.** Put `#[verifies]` only on a test
   that FAILS when the requirement is violated. A test that only runs the
   enforcing code path is not enough.
-- Never write ✅ in a document without a `#[verifies]` anchor that resolves
+- Never write `[test]` in a document without a `#[verifies]` anchor that
+  resolves
   and a citation that names the exact test file and function. Never invent
   a citation that looks plausible.
-- If no targeted test exists, use the honest class: 🔬, 👁, or ⏳. A ⏳ is a
-  to-do item, not a failure. A false ✅ is a failure.
+- If no targeted test exists, use the honest class: `[e2e]`, `[review]`, or
+  `[pending]`. A `[pending]` is a to-do item, not a failure. A false
+  `[test]` is a failure.
 - Never weaken the text of a requirement, and never make it vague, to make
   a check pass.
 
@@ -178,13 +183,14 @@ cargo shallguard fmt            # fix doc formatting (never hand-wrap
 |---|---|
 | An ID in code is not defined in any document | Add the requirement, or fix the typo. Never delete the anchor without a reason. |
 | Two requirements have the same ID | Renumber the newer one and its anchors. |
-| A ✅ claim has no anchored test | Write and anchor the test, or downgrade honestly to ⏳. |
+| A `[test]` claim has no anchored test | Write and anchor the test, or downgrade honestly to `[pending]`. |
 | A vacuous-evidence finding says the test cannot fail | Assert a real output of the enforcement site, or downgrade the document line honestly. Never hide a trivial assertion behind indirection. |
-| A ✅ citation names no real test file or function | Complete the citation with the real file and function. |
+| A `[test]` citation names no real test file or function | Complete the citation with the real file and function. |
 | A cited path does not exist | Fix the citation to the real file. Never invent a path. |
 | The cited enforcement file has no anchor with the ID | Anchor the real enforcement site. Never move the anchor to a file that only mentions the code. |
 | A baseline entry is stale | Run `cargo shallguard baseline prune` and commit the removal. |
 | The document does not parse | Fix the document structure. The command `fmt --check` points at the structural error. |
+| `fmt --check` reports a document as non-canonical | Run `cargo shallguard fmt`. It also rewrites an emoji evidence alias to its keyword. |
 
 ## Adopt ShallGuard in a new repository
 

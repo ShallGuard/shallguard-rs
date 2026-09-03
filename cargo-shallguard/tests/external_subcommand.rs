@@ -143,7 +143,7 @@ mod tests {
     fs::write(
         root.join("docs/requirements.md"),
         "# Requirements\n\n- **REQ-DEMO-001** — The library SHALL return its stable answer.\n  \
-         *Enforced:* `src/lib.rs` (`answer`) · *Verified:* ✅ `src/lib.rs` \
+         *Enforced:* `src/lib.rs` (`answer`) · *Verified:* [test] `src/lib.rs` \
          (`answer_is_stable`)\n",
     )
     .expect("write requirements document");

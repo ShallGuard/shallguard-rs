@@ -23,7 +23,7 @@ pub enum GapKind {
     EnforcementAnchor,
     VerificationAnchor,
     EvidenceCitation,
-    /// Every ✅ citation resolves only to tests that cannot fail.
+    /// Every `[test]` citation resolves only to tests that cannot fail.
     VacuousEvidence,
     /// The best available evidence is structurally weak (e.g. bare
     /// `#[should_panic]`).

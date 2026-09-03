@@ -12,7 +12,7 @@
 //! - [`macro@enforces`] marks an item as an enforcement site of one or
 //!   more requirements — "this code exists because this contract exists".
 //! - [`macro@verifies`] marks a test as verification evidence for one or
-//!   more requirements — it backs a `✅` entry in a requirement's
+//!   more requirements — it backs a `[test]` entry in a requirement's
 //!   *Verified:* line.
 //!
 //! All anchor forms are compile-time no-ops: the annotated item is

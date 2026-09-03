@@ -54,8 +54,9 @@ This prompt works:
 > user stories with numbered `REQ-<AREA>-<NNN>` system requirements in
 > RFC 2119 form (SHALL / SHALL NOT / MAY). Give each requirement an
 > `*Enforced:*` line that names the file and the symbol that implements it
-> today, and a `*Verified:*` line. Be honest about the evidence. Use ⏳
-> (pending) or 👁 (code review only). Write ✅ only where a real test proves
+> today, and a `*Verified:*` line. Be honest about the evidence. Use
+> `[pending]` or `[review]` (code review only). Write `[test]` only where a
+> real test proves
 > the statement, and name the exact test file and test function. Describe
 > only behavior that you can point at in the code. If the intent is not
 > clear, mark the statement with a question for human review. Do not guess.
@@ -67,7 +68,8 @@ owns in this loop. A wrong requirement that the document records as true is
 worse than no requirement, because from that moment the tool defends it.
 Expect the review to find contradictions between old documents, dead
 behavior that nobody wants, and intended behavior that nobody implemented.
-Record intended behavior as an honest ⏳ entry, not as a false citation.
+Record intended behavior as an honest `[pending]` entry, not as a false
+citation.
 
 Then normalize and validate the draft:
 
@@ -114,8 +116,8 @@ also fine. For each batch, the agent does these steps:
 2. **Give verification evidence.** Read an existing test first. Anchor the
    test with `#[shallguard::verifies]` only if the test fails when the
    requirement breaks. If no such test exists, write one. Then change the
-   document line from ⏳ to ✅ with the exact citation, for example
-   `*Verified:* ✅ \`src/lib.rs\` (\`backoff_is_capped_at_sixty_seconds\`)`.
+   document line from `[pending]` to `[test]` with the exact citation, for
+   example `*Verified:* [test] \`src/lib.rs\` (\`backoff_is_capped_at_sixty_seconds\`)`.
 3. **Prove and prune:**
 
    ```bash
@@ -177,18 +179,19 @@ The migration went as follows:
   read the anchor work without configuration noise. Each step that made an
   area hard was its own decision with its own audit trail.
 - **After two days,** the check reported zero errors and zero warnings. All
-  462 requirements that can have an anchor had one. Every ✅ claim pointed
+  462 requirements that can have an anchor had one. Every `[test]` claim pointed
   at a real anchored test. All 16 areas were hard for both kinds of gaps.
   The committed baseline was empty.
-- **Evidence campaigns continued after the adoption.** The team upgraded 👁
-  evidence to ✅ automated tests, one area at a time. The number of ✅
-  requirements went from 194 to 274, with about 4,500 lines of tests with
-  assertions. Every remaining 👁 entry has a written structural reason.
+- **Evidence campaigns continued after the adoption.** The team upgraded
+  `[review]` evidence to `[test]` automated tests, one area at a time. The
+  number of `[test]` requirements went from 194 to 274, with about 4,500
+  lines of tests with assertions. Every remaining `[review]` entry has a
+  written structural reason.
 
 The migration found four kinds of problems. They are the reason for the
 honesty rules:
 
-1. **A false ✅ is the most common failure.** The review passes found an
+1. **A false `[test]` is the most common failure.** The review passes found an
    authorization test that could not fail, because it asserted on an input
    that the parser rejects. They found an end-to-end test without its core
    component. They found mocks with no assertions. Each test was fixed or
@@ -200,7 +203,7 @@ honesty rules:
 2. **Anchors show real drift.** Two metric fields had become write-only
    after a refactor. Nobody read them. The requirement forced an explicit
    decision to keep or retire them.
-3. **A requirement without an implementation becomes ⏳.** The migration
+3. **A requirement without an implementation becomes `[pending]`.** The migration
    found specified behavior that the code did not have. The document records
    it as pending work, not as a false citation.
 4. **The wording of a requirement comes first.** The team had to rewrite the
