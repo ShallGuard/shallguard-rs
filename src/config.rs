@@ -47,9 +47,6 @@ pub struct AreaConfig {
     pub label: String,
     pub hard_enforcement: bool,
     pub hard_verification: bool,
-    /// Promotes weak-evidence findings from warnings to errors.
-    #[serde(default)]
-    pub strict_oracle: bool,
 }
 
 /// Default root for generated, disposable artifacts.
@@ -139,13 +136,6 @@ impl RepositoryConfig {
                 policy.hard_enforcement
             }
         })
-    }
-
-    /// Whether weak-evidence findings are errors in this area.
-    pub fn area_strict_oracle(&self, area: &str) -> bool {
-        self.areas
-            .get(area)
-            .is_some_and(|policy| policy.strict_oracle)
     }
 
     pub fn bundle_dir(&self) -> PathBuf {
