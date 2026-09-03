@@ -59,7 +59,7 @@ impl VacuityReason {
 }
 
 /// Classifies one test function's oracle from its syntax alone.
-#[shallguard::enforces("REQ-TRACE-009", "REQ-TRACE-012", "REQ-TRACE-015")]
+#[shallguard::enforces("REQ-TRACE-009", "REQ-TRACE-012", "REQ-TRACE-014", "REQ-TRACE-015")]
 pub fn classify(
     attrs: &[syn::Attribute],
     sig: &syn::Signature,
@@ -513,7 +513,7 @@ mod tests {
         );
     }
 
-    // Anchored to REQ-TRACE-014 once the compile-time opt-out lands.
+    #[shallguard::verifies("REQ-TRACE-014")]
     #[test]
     fn suppression_is_recorded_not_silent() {
         let item: syn::ItemFn = syn::parse_str("fn t() {}").expect("BUG: parses");

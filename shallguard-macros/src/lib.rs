@@ -46,11 +46,15 @@
 //! # use shallguard_macros as shallguard;
 //!
 //! #[shallguard::enforces("REQ-RD-006", "REQ-RD-007")]
-//! fn resolve_identity_claim() {}
+//! fn resolve_identity_claim() -> &'static str {
+//!     "worker"
+//! }
 //!
 //! #[shallguard::verifies("REQ-RD-006")]
 //! #[test]
-//! fn req_rd_006_exact_worker_claim_wins() {}
+//! fn req_rd_006_exact_worker_claim_wins() {
+//!     assert_eq!(resolve_identity_claim(), "worker");
+//! }
 //! ```
 //!
 //! Malformed IDs and invalid placements fail the build:
@@ -93,6 +97,40 @@
 //! #[test]
 //! #[ignore]
 //! fn ignored_test() {}
+//! ```
+//!
+//! ```compile_fail
+//! # use shallguard_macros as shallguard;
+//!
+//! // A body with no failure path cannot be evidence.
+//! #[shallguard::verifies("REQ-RD-006")]
+//! #[test]
+//! fn cannot_fail() {
+//!     let _ = 1 + 1;
+//! }
+//! ```
+//!
+//! ```compile_fail
+//! # use shallguard_macros as shallguard;
+//!
+//! // Constant assertions are not a failure path.
+//! #[shallguard::verifies("REQ-RD-006")]
+//! #[test]
+//! fn constant_assertion() {
+//!     assert!(true);
+//! }
+//! ```
+//!
+//! ```compile_fail
+//! # use shallguard_macros as shallguard;
+//!
+//! // The oracle opt-out is a closed set: panic, compile, external.
+//! #[shallguard::verifies("REQ-RD-006", oracle = "vibes")]
+//! #[test]
+//! fn unknown_oracle_class() {
+//!     run_scenario();
+//! }
+//! # fn run_scenario() {}
 //! ```
 
 // The crate-level doctest shows #[shallguard::verifies] above #[test] — the real
@@ -239,43 +277,86 @@ fn validate_id_list(
     errors: &mut proc_macro2::TokenStream,
 ) {
     match Punctuated::<LitStr, Token![,]>::parse_terminated.parse(args) {
-        Ok(ids) if ids.is_empty() => {
-            if !allow_empty {
-                let msg = format!(
-                    "{name} needs at least one requirement ID, \
-                     e.g. {name}(\"REQ-HRS-002\")"
-                );
-                errors.extend(syn::Error::new(Span::call_site(), msg).to_compile_error());
-            }
-        }
         Ok(ids) => {
-            let mut seen = std::collections::HashSet::new();
-            for lit in &ids {
-                let id = lit.value();
-                if let Err(msg) = validate_req_id(&id) {
-                    errors.extend(syn::Error::new(lit.span(), msg).to_compile_error());
-                } else if !seen.insert(id) {
-                    let msg = format!("duplicate requirement ID {:?}", lit.value());
-                    errors.extend(syn::Error::new(lit.span(), msg).to_compile_error());
-                }
-            }
+            let ids: Vec<LitStr> = ids.into_iter().collect();
+            validate_ids(name, &ids, allow_empty, errors);
         }
         Err(err) => errors.extend(err.to_compile_error()),
     }
 }
 
+/// Validates already-parsed requirement ID literals for presence, form,
+/// and uniqueness.
+fn validate_ids(
+    name: &str,
+    ids: &[LitStr],
+    allow_empty: bool,
+    errors: &mut proc_macro2::TokenStream,
+) {
+    if ids.is_empty() {
+        if !allow_empty {
+            let msg = format!(
+                "{name} needs at least one requirement ID, \
+                 e.g. {name}(\"REQ-HRS-002\")"
+            );
+            errors.extend(syn::Error::new(Span::call_site(), msg).to_compile_error());
+        }
+        return;
+    }
+    let mut seen = std::collections::HashSet::new();
+    for lit in ids {
+        let id = lit.value();
+        if let Err(msg) = validate_req_id(&id) {
+            errors.extend(syn::Error::new(lit.span(), msg).to_compile_error());
+        } else if !seen.insert(id) {
+            let msg = format!("duplicate requirement ID {:?}", lit.value());
+            errors.extend(syn::Error::new(lit.span(), msg).to_compile_error());
+        }
+    }
+}
+
 /// Marks a test as verification evidence for the listed requirements.
 ///
-/// Takes one or more requirement IDs as string literals. Expands to the
-/// item unchanged. At compile time it validates the IDs for form
+/// Takes one or more requirement IDs as string literals, optionally
+/// followed by an `oracle = "<class>"` opt-out. Expands to the item
+/// unchanged. At compile time it validates the IDs for form
 /// (`REQ-<AREA>-<NNN>`) and uniqueness, and validates the placement:
 /// the item must be a function carrying a recognized test attribute
 /// (`#[test]`, `#[tokio::test]`, or any attribute whose path ends in
 /// `test`) and must not be `#[ignore]`d — evidence that does not run is
 /// not evidence.
+///
+/// As an early front line for the deterministic vacuity check, the macro
+/// also rejects test bodies that definitely cannot fail: bodies with no
+/// failure-path candidate tokens at all, or whose only assertions are
+/// literal-constant (`assert!(true)`, `assert_eq!(1, 1)`) or compare a
+/// value with itself. Anything ambiguous compiles — `cargo shallguard
+/// check` remains authoritative. Tests whose oracle genuinely lives
+/// outside the body opt out visibly with `oracle = "panic"`,
+/// `oracle = "compile"`, or `oracle = "external"`; suppression is counted
+/// and listed by the checker, never silent.
 #[proc_macro_attribute]
 pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut errors = proc_macro2::TokenStream::new();
+    let parsed = parse_verifies_args(args, &mut errors);
+    if let Some(parsed) = &parsed {
+        validate_ids("#[verifies]", &parsed.ids, false, &mut errors);
+        if let Some(oracle) = &parsed.oracle
+            && !ORACLE_CLASSES.contains(&oracle.value().as_str())
+        {
+            errors.extend(
+                syn::Error::new(
+                    oracle.span(),
+                    format!(
+                        "unknown oracle class {:?}; accepted values: \
+                         \"panic\", \"compile\", \"external\"",
+                        oracle.value()
+                    ),
+                )
+                .to_compile_error(),
+            );
+        }
+    }
     match syn::parse::<syn::Item>(item.clone()) {
         Ok(syn::Item::Fn(fun)) => {
             let is_test = fun.attrs.iter().any(|attr| {
@@ -305,6 +386,13 @@ pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
                     .to_compile_error(),
                 );
             }
+            if let Some(parsed) = &parsed
+                && is_test
+                && parsed.oracle.is_none()
+                && !has_should_panic(&fun.attrs)
+            {
+                reject_definitely_vacuous(&fun, &parsed.ids, &mut errors);
+            }
         }
         Ok(other) => {
             errors.extend(
@@ -318,10 +406,208 @@ pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
         }
         Err(err) => errors.extend(err.to_compile_error()),
     }
-    let validated = anchor("verifies", args, item);
-    let mut out: proc_macro2::TokenStream = errors;
-    out.extend(proc_macro2::TokenStream::from(validated));
-    out.into()
+    let item = proc_macro2::TokenStream::from(item);
+    quote! { #errors #item }.into()
+}
+
+/// The closed set of oracle opt-out classes.
+const ORACLE_CLASSES: &[&str] = &["panic", "compile", "external"];
+
+struct VerifiesArgs {
+    ids: Vec<LitStr>,
+    oracle: Option<LitStr>,
+}
+
+/// Parses `#[verifies]` arguments: requirement ID string literals plus at
+/// most one `oracle = "<class>"`. Returns `None` after a parse error.
+fn parse_verifies_args(
+    args: TokenStream,
+    errors: &mut proc_macro2::TokenStream,
+) -> Option<VerifiesArgs> {
+    let parser = |input: syn::parse::ParseStream<'_>| -> syn::Result<VerifiesArgs> {
+        let mut ids = Vec::new();
+        let mut oracle: Option<LitStr> = None;
+        while !input.is_empty() {
+            if input.peek(syn::Ident) {
+                let name: syn::Ident = input.parse()?;
+                if name != "oracle" {
+                    return Err(syn::Error::new(
+                        name.span(),
+                        format!(
+                            "unknown #[shallguard::verifies] argument `{name}`; expected \
+                             requirement ID string literals and at most one \
+                             oracle = \"<class>\""
+                        ),
+                    ));
+                }
+                input.parse::<Token![=]>()?;
+                let value: LitStr = input.parse()?;
+                if oracle.is_some() {
+                    return Err(syn::Error::new(value.span(), "duplicate oracle argument"));
+                }
+                oracle = Some(value);
+            } else {
+                ids.push(input.parse::<LitStr>()?);
+            }
+            if !input.is_empty() {
+                input.parse::<Token![,]>()?;
+            }
+        }
+        Ok(VerifiesArgs { ids, oracle })
+    };
+    match parser.parse(args) {
+        Ok(parsed) => Some(parsed),
+        Err(err) => {
+            errors.extend(err.to_compile_error());
+            None
+        }
+    }
+}
+
+fn has_should_panic(attrs: &[syn::Attribute]) -> bool {
+    attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("should_panic"))
+}
+
+/// Compile-time front line for the deterministic vacuity check: rejects
+/// only the zero-false-positive subset — a body whose tokens contain no
+/// failure-path candidate at all, or only trivial assertions. Anything
+/// ambiguous compiles; the external checker is authoritative.
+fn reject_definitely_vacuous(
+    fun: &syn::ItemFn,
+    ids: &[LitStr],
+    errors: &mut proc_macro2::TokenStream,
+) {
+    let mut scan = FrontLineScan {
+        candidate: false,
+        trivial_assertion: false,
+    };
+    scan_body_tokens(quote::ToTokens::to_token_stream(&fun.block), &mut scan);
+    if scan.candidate {
+        return;
+    }
+    let detail = if scan.trivial_assertion {
+        "its only assertions are constant or self-identical"
+    } else {
+        "the body contains no assertion, panic, unwrap/expect, or `?`"
+    };
+    let cited = ids.iter().map(LitStr::value).collect::<Vec<_>>().join(", ");
+    errors.extend(
+        syn::Error::new_spanned(
+            &fun.sig.ident,
+            format!(
+                "#[shallguard::verifies({cited})] cites a test that cannot fail: {detail}. \
+                 Evidence must offer a real failure path (see SKILL.md, evidence \
+                 honesty): assert an actual output of the enforcement site, or opt \
+                 out visibly with oracle = \"panic\" | \"compile\" | \"external\""
+            ),
+        )
+        .to_compile_error(),
+    );
+}
+
+struct FrontLineScan {
+    /// Something that can fail — or that we cannot rule out — was seen.
+    candidate: bool,
+    /// A constant-foldable or self-identical assertion was seen.
+    trivial_assertion: bool,
+}
+
+/// Token-level failure-path scan. Deliberately conservative: any macro
+/// invocation other than a trivial `assert*` counts as a candidate, as
+/// do `unwrap`/`expect` idents and the `?` operator anywhere.
+fn scan_body_tokens(tokens: proc_macro2::TokenStream, scan: &mut FrontLineScan) {
+    use proc_macro2::TokenTree;
+    let trees: Vec<TokenTree> = tokens.into_iter().collect();
+    let mut i = 0;
+    while i < trees.len() {
+        match &trees[i] {
+            TokenTree::Ident(ident) => {
+                let name = ident.to_string();
+                let bang = matches!(
+                    trees.get(i + 1),
+                    Some(TokenTree::Punct(p)) if p.as_char() == '!'
+                );
+                if bang {
+                    if matches!(name.as_str(), "assert" | "assert_eq" | "assert_ne")
+                        && let Some(TokenTree::Group(group)) = trees.get(i + 2)
+                    {
+                        if assert_args_trivial(&name, group.stream()) {
+                            scan.trivial_assertion = true;
+                        } else {
+                            scan.candidate = true;
+                        }
+                        i += 3;
+                        continue;
+                    }
+                    // Any other macro may assert internally. Conservative.
+                    scan.candidate = true;
+                    i += 2;
+                    continue;
+                }
+                if matches!(
+                    name.as_str(),
+                    "unwrap" | "expect" | "unwrap_err" | "expect_err"
+                ) {
+                    scan.candidate = true;
+                }
+                i += 1;
+            }
+            TokenTree::Punct(punct) if punct.as_char() == '?' => {
+                scan.candidate = true;
+                i += 1;
+            }
+            TokenTree::Group(group) => {
+                scan_body_tokens(group.stream(), scan);
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+}
+
+/// Whether an `assert*` invocation's significant arguments are all
+/// literals, or the two compared sides are token-identical.
+fn assert_args_trivial(name: &str, tokens: proc_macro2::TokenStream) -> bool {
+    use proc_macro2::TokenTree;
+    let mut args: Vec<Vec<TokenTree>> = vec![Vec::new()];
+    for tree in tokens {
+        match &tree {
+            TokenTree::Punct(p) if p.as_char() == ',' => args.push(Vec::new()),
+            _ => args
+                .last_mut()
+                .expect("BUG: argument accumulator is never empty")
+                .push(tree),
+        }
+    }
+    args.retain(|arg| !arg.is_empty());
+    if args.is_empty() {
+        return false;
+    }
+    let render = |arg: &[TokenTree]| {
+        arg.iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let literal_only = |arg: &[TokenTree]| {
+        arg.iter().all(|tree| match tree {
+            TokenTree::Literal(_) => true,
+            TokenTree::Ident(ident) => ident == "true" || ident == "false",
+            _ => false,
+        })
+    };
+    match name {
+        "assert" => literal_only(&args[0]),
+        _ => {
+            if args.len() < 2 {
+                return false;
+            }
+            render(&args[0]) == render(&args[1])
+                || (literal_only(&args[0]) && literal_only(&args[1]))
+        }
+    }
 }
 
 fn anchor(name: &str, args: TokenStream, item: TokenStream) -> TokenStream {

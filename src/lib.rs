@@ -49,7 +49,7 @@ mod workspace;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-#[shallguard_macros::enforces("REQ-TRACE-008")]
+#[shallguard_macros::enforces("REQ-TRACE-008", "REQ-TRACE-016", "REQ-TRACE-017")]
 pub use shallguard_macros::{enforces, enforces_here, verifies};
 pub use workspace::workspace_root;
 
