@@ -28,6 +28,8 @@ extern crate self as shallguard;
 pub mod baseline;
 pub mod bundle;
 pub mod check;
+mod check_evidence;
+mod check_report;
 pub mod config;
 pub mod coverage;
 mod coverage_llvm;
