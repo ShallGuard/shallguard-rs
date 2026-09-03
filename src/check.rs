@@ -1,28 +1,47 @@
 //! The cross-checks and the report.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 
 use crate::DocSpec;
 use crate::baseline::{Baseline, BaselineEntry, GapKey, GapKind};
-use crate::check_evidence::{
-    VerificationOutcome, evaluate_verification, vacuity_reason, weak_reason,
-};
-use crate::check_report::{AreaStats, BaselineStats, render_summary};
 use crate::config::RepositoryConfig;
 use crate::docs::{Requirement, parse_doc};
 use crate::evidence_mark::EvidenceMark;
+use crate::oracle::OracleClass;
 use crate::scan::{Anchors, VerificationAnchor, scan};
 
-pub use crate::check_report::{Finding, Report};
+/// One finding, locatable in a file.
+#[derive(Debug, Clone)]
+pub struct Finding {
+    /// Workspace-relative file (document or source) the finding points at.
+    pub file: String,
+    /// 1-based line.
+    pub line: usize,
+    pub message: String,
+}
+
+pub struct Report {
+    pub errors: Vec<Finding>,
+    pub warnings: Vec<Finding>,
+    pub summary: String,
+}
 
 /// Result of a monotonic baseline maintenance command.
 pub struct BaselineChange {
     pub path: PathBuf,
     pub entries: usize,
     pub removed: usize,
+}
+
+#[derive(Default)]
+struct BaselineStats {
+    known: usize,
+    resolved: usize,
+    new: usize,
 }
 
 struct TraceabilityGap {
@@ -37,6 +56,68 @@ struct Analysis {
     gaps: BTreeMap<GapKey, TraceabilityGap>,
     stats: BTreeMap<String, AreaStats>,
     anchors: Anchors,
+}
+
+impl Report {
+    pub fn passed(&self) -> bool {
+        self.errors.is_empty()
+    }
+
+    /// Prints the summary, warnings grouped by file (file name shown
+    /// once, up to `warning_limit` entries in total), and every error;
+    /// returns [`Report::passed`].
+    pub fn print(&self, warning_limit: usize) -> bool {
+        print!("{}", self.summary);
+
+        if !self.warnings.is_empty() {
+            println!("\nwarnings ({}):", self.warnings.len());
+            print_grouped(&self.warnings, warning_limit, false);
+        }
+
+        if !self.errors.is_empty() {
+            eprintln!("\nerrors ({}):", self.errors.len());
+            print_grouped(&self.errors, usize::MAX, true);
+            return false;
+        }
+
+        println!("\ncargo shallguard: OK");
+        true
+    }
+}
+
+/// Prints findings grouped by file, the file name once per group,
+/// entries ordered by line, stopping after `limit` entries in total.
+fn print_grouped(findings: &[Finding], limit: usize, to_stderr: bool) {
+    let mut by_file: BTreeMap<&str, Vec<&Finding>> = BTreeMap::new();
+    for finding in findings {
+        by_file.entry(&finding.file).or_default().push(finding);
+    }
+    let mut printed = 0usize;
+    let out = |line: String| {
+        if to_stderr {
+            eprintln!("{line}");
+        } else {
+            println!("{line}");
+        }
+    };
+    for (file, mut group) in by_file {
+        if printed >= limit {
+            break;
+        }
+        group.sort_by_key(|f| f.line);
+        out(format!("  {file}:"));
+        for finding in group {
+            if printed >= limit {
+                break;
+            }
+            out(format!("    {:>5}  {}", finding.line, finding.message));
+            printed += 1;
+        }
+    }
+    let rest = findings.len().saturating_sub(printed);
+    if rest > 0 {
+        out(format!("  ... and {rest} more"));
+    }
 }
 
 /// Runs every check, including committed-baseline policy, for the given
@@ -82,7 +163,15 @@ pub fn initialize_baseline(
         );
     }
 
-    let baseline = Baseline::from_entries(baseline_entries(&analysis));
+    let entries = analysis
+        .gaps
+        .keys()
+        .map(|key| BaselineEntry {
+            requirement: key.requirement.clone(),
+            kind: key.kind,
+        })
+        .collect();
+    let baseline = Baseline::from_entries(entries);
     let count = baseline.gaps.len();
     let path = baseline.create_new(root, &config.baseline)?;
     Ok(BaselineChange {
@@ -523,27 +612,67 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
     })
 }
 
-/// Gap kinds that never gate on their own: they are reported as
-/// warnings (unless an area policy promotes them) and are therefore
-/// never recorded in the baseline, where a later fix would turn them
-/// into stale-entry failures.
-fn gap_is_advisory(kind: GapKind) -> bool {
-    matches!(kind, GapKind::WeakEvidence)
+/// How the verification anchors of one automated requirement add up.
+enum VerificationOutcome<'a> {
+    /// No test anchor cites the requirement at all.
+    Missing,
+    /// Anchors exist, but every one of them is vacuous: the ✅ claim is
+    /// demoted to lacking automated verification.
+    Demoted(Vec<&'a VerificationAnchor>),
+    /// At least one anchor stands as evidence. `weak` is non-empty only
+    /// when nothing stronger backs the requirement; `redundant_vacuous`
+    /// lists vacuous anchors that other evidence makes non-fatal.
+    Anchored {
+        weak: Vec<&'a VerificationAnchor>,
+        redundant_vacuous: Vec<&'a VerificationAnchor>,
+    },
 }
 
-/// Entries recorded by `baseline init`: every current gap except
-/// advisory-only kinds.
 #[shallguard::enforces("REQ-TRACE-013")]
-fn baseline_entries(analysis: &Analysis) -> Vec<BaselineEntry> {
-    analysis
-        .gaps
-        .keys()
-        .filter(|key| !gap_is_advisory(key.kind))
-        .map(|key| BaselineEntry {
-            requirement: key.requirement.clone(),
-            kind: key.kind,
-        })
-        .collect()
+fn evaluate_verification<'a>(anchors: &[&'a VerificationAnchor]) -> VerificationOutcome<'a> {
+    if anchors.is_empty() {
+        return VerificationOutcome::Missing;
+    }
+    let solid = anchors.iter().any(|anchor| {
+        matches!(
+            anchor.oracle,
+            OracleClass::Present | OracleClass::Suppressed(_)
+        )
+    });
+    let weak: Vec<&VerificationAnchor> = anchors
+        .iter()
+        .copied()
+        .filter(|anchor| matches!(anchor.oracle, OracleClass::Weak(_)))
+        .collect();
+    let vacuous: Vec<&VerificationAnchor> = anchors
+        .iter()
+        .copied()
+        .filter(|anchor| matches!(anchor.oracle, OracleClass::Vacuous(_)))
+        .collect();
+    if solid || !weak.is_empty() {
+        VerificationOutcome::Anchored {
+            weak: if solid { Vec::new() } else { weak },
+            redundant_vacuous: vacuous,
+        }
+    } else {
+        VerificationOutcome::Demoted(vacuous)
+    }
+}
+
+fn vacuity_reason(anchor: &VerificationAnchor) -> &'static str {
+    match &anchor.oracle {
+        OracleClass::Vacuous(reason) => reason.describe(),
+        _ => "contains no failure path",
+    }
+}
+
+fn weak_reason(anchor: &VerificationAnchor) -> &'static str {
+    match &anchor.oracle {
+        OracleClass::Weak(reasons) => reasons
+            .first()
+            .map_or("offers only weak evidence", |reason| reason.describe()),
+        _ => "offers only weak evidence",
+    }
 }
 
 fn enforced_path_has_anchor(enforced: &Path, files: Option<&HashSet<&Path>>) -> bool {
@@ -619,8 +748,8 @@ fn apply_baseline(
                     .cloned()
                     .map(|finding| annotate_gap(finding, "grandfathered", key.kind)),
             );
-        } else if gap_is_advisory(key.kind) {
-            // Advisory kinds stay warnings unless the area opts into
+        } else if key.kind == GapKind::WeakEvidence {
+            // Weak evidence stays advisory unless the area opts into
             // `strict_oracle`; hard promotion is handled above.
             analysis.warnings.extend(
                 gap.findings
@@ -747,6 +876,450 @@ fn ensure_no_non_gap_errors(analysis: &Analysis, operation: &str) -> Result<()> 
     Ok(())
 }
 
+#[derive(Default)]
+struct AreaStats {
+    total: usize,
+    retired: usize,
+    automated: usize,
+    e2e: usize,
+    review_only: usize,
+    pending: usize,
+    /// Requirements with at least one Enforced code path (anchor expected).
+    anchorable: usize,
+    /// ... of which the Enforced files actually carry the anchor.
+    anchored: usize,
+    /// Automated-evidence requirements with a matching test anchor.
+    test_anchored: usize,
+}
+
+fn render_summary(
+    stats: &BTreeMap<String, AreaStats>,
+    anchors: &Anchors,
+    baseline: &BaselineStats,
+    config: &RepositoryConfig,
+) -> String {
+    // Label column sized to the longest `Full Name (ACRONYM)` label.
+    let label_width = stats
+        .keys()
+        .map(|area| config.area_label(area).chars().count())
+        .max()
+        .unwrap_or(0)
+        .max("area".len());
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "{:<label_width$} {:>5} {:>5} {:>4} {:>7} {:>8} {:>16} {:>13}",
+        "area", "total", "test", "e2e", "review", "pending", "code-anchored", "test-anchored"
+    );
+    let mut totals = AreaStats::default();
+    for (area, s) in stats {
+        let _ = writeln!(
+            out,
+            "{:<label_width$} {:>5} {:>5} {:>4} {:>7} {:>8} {:>13}/{:<3} {:>9}/{:<3}",
+            config.area_label(area),
+            s.total,
+            s.automated,
+            s.e2e,
+            s.review_only,
+            s.pending,
+            s.anchored,
+            s.anchorable,
+            s.test_anchored,
+            s.automated
+        );
+        totals.total += s.total;
+        totals.automated += s.automated;
+        totals.e2e += s.e2e;
+        totals.review_only += s.review_only;
+        totals.pending += s.pending;
+        totals.anchorable += s.anchorable;
+        totals.anchored += s.anchored;
+        totals.test_anchored += s.test_anchored;
+    }
+    let _ = writeln!(
+        out,
+        "{:<label_width$} {:>5} {:>5} {:>4} {:>7} {:>8} {:>13}/{:<3} {:>9}/{:<3}",
+        "all",
+        totals.total,
+        totals.automated,
+        totals.e2e,
+        totals.review_only,
+        totals.pending,
+        totals.anchored,
+        totals.anchorable,
+        totals.test_anchored,
+        totals.automated
+    );
+    let _ = writeln!(
+        out,
+        "anchors found in code: {} enforcement, {} verification \
+         ({} textual reference(s))",
+        anchors.enforcement.len(),
+        anchors.verification.len(),
+        anchors.references.values().map(Vec::len).sum::<usize>(),
+    );
+    // Suppression is visible, never silent: every opted-out oracle is
+    // counted and listed.
+    let suppressed: Vec<(&VerificationAnchor, &str)> = anchors
+        .verification
+        .iter()
+        .filter_map(|anchor| match &anchor.oracle {
+            OracleClass::Suppressed(class) => Some((anchor, class.as_str())),
+            _ => None,
+        })
+        .collect();
+    if !suppressed.is_empty() {
+        let _ = writeln!(out, "oracle suppressions ({}):", suppressed.len());
+        for (anchor, class) in suppressed {
+            let _ = writeln!(
+                out,
+                "  {}:{} `{}` (oracle = \"{class}\") verifies {}",
+                anchor.file.display(),
+                anchor.line,
+                anchor.test_fn,
+                anchor.ids.join(", ")
+            );
+        }
+    }
+    let _ = writeln!(
+        out,
+        "traceability baseline: {} known gap(s), {} resolved/stale, {} new regression(s)",
+        baseline.known, baseline.resolved, baseline.new
+    );
+    out
+}
+
 #[cfg(test)]
-#[path = "check_tests.rs"]
-mod tests;
+mod tests {
+    use super::*;
+    use crate::config::{AreaConfig, ArtifactConfig, ReviewConfig};
+
+    fn requirement(id: &str, area: &str, retired: bool) -> Requirement {
+        Requirement {
+            id: id.to_string(),
+            area: area.to_string(),
+            title: "Test requirement".to_string(),
+            statement: "Test requirement SHALL hold.".to_string(),
+            enforced_text: "src/lib.rs".to_string(),
+            verified_text: "code review".to_string(),
+            doc: "crate/docs/requirements.md".to_string(),
+            line: 12,
+            enforced_paths: Vec::new(),
+            not_implemented: false,
+            retired,
+            automated: false,
+            evidence: Vec::new(),
+            e2e: false,
+            review_only: true,
+            pending: false,
+        }
+    }
+
+    fn analysis(req: Requirement, kind: Option<GapKind>) -> Analysis {
+        let mut gaps = BTreeMap::new();
+        if let Some(kind) = kind {
+            gaps.insert(
+                GapKey::new(&req.id, kind),
+                TraceabilityGap {
+                    area: req.area.clone(),
+                    findings: vec![Finding {
+                        file: req.doc.clone(),
+                        line: req.line,
+                        message: "gap detail".to_string(),
+                    }],
+                },
+            );
+        }
+        Analysis {
+            errors: Vec::new(),
+            warnings: Vec::new(),
+            requirements: vec![req],
+            gaps,
+            stats: BTreeMap::new(),
+            anchors: Anchors {
+                references: HashMap::new(),
+                enforcement: Vec::new(),
+                verification: Vec::new(),
+                invalid: Vec::new(),
+            },
+        }
+    }
+
+    fn baseline(id: &str, kind: GapKind) -> Baseline {
+        Baseline::from_entries(vec![BaselineEntry {
+            requirement: id.to_string(),
+            kind,
+        }])
+    }
+
+    fn config(hard_area: Option<&str>) -> RepositoryConfig {
+        RepositoryConfig {
+            schema: 1,
+            minimum_requirements: 1,
+            baseline: PathBuf::from(".shallguard/baseline.toml"),
+            verify_outlier_threshold: 6,
+            documents: Vec::new(),
+            prefixes: BTreeMap::new(),
+            areas: hard_area
+                .map(|area| {
+                    BTreeMap::from([(
+                        area.to_string(),
+                        AreaConfig {
+                            label: "Test".to_string(),
+                            hard_enforcement: true,
+                            hard_verification: true,
+                            strict_oracle: false,
+                        },
+                    )])
+                })
+                .unwrap_or_default(),
+            allow_missing_paths: Default::default(),
+            artifacts: ArtifactConfig {
+                root: PathBuf::from("target/shallguard"),
+            },
+            review: ReviewConfig::default(),
+        }
+    }
+
+    #[shallguard::verifies("REQ-TRACE-006")]
+    #[test]
+    fn requires_an_anchor_in_every_documented_enforcement_file() {
+        let anchored = Path::new("src/anchored.rs");
+        let missing = Path::new("src/missing.rs");
+        let files = HashSet::from([anchored]);
+
+        assert!(enforced_path_has_anchor(anchored, Some(&files)));
+        assert!(!enforced_path_has_anchor(missing, Some(&files)));
+        assert!(!enforced_path_has_anchor(anchored, None));
+    }
+
+    #[shallguard::verifies("REQ-BASE-002")]
+    #[test]
+    fn exact_baseline_gap_is_known_warning() {
+        let kind = GapKind::EnforcementAnchor;
+        let mut analysis = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
+        let stats = apply_baseline(
+            &mut analysis,
+            &baseline("REQ-ZZ-001", kind),
+            true,
+            true,
+            &config(None),
+        );
+        assert!(analysis.errors.is_empty());
+        assert_eq!(analysis.warnings.len(), 1);
+        assert!(analysis.warnings[0].message.contains("grandfathered"));
+        assert_eq!(stats.known, 1);
+    }
+
+    #[shallguard::verifies("REQ-BASE-002")]
+    #[test]
+    fn unbaselined_gap_is_a_regression() {
+        let kind = GapKind::VerificationAnchor;
+        let mut analysis = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
+        let stats = apply_baseline(
+            &mut analysis,
+            &Baseline::from_entries(Vec::new()),
+            true,
+            true,
+            &config(None),
+        );
+        assert_eq!(analysis.errors.len(), 1);
+        assert!(analysis.errors[0].message.contains("new regression"));
+        assert_eq!(stats.new, 1);
+    }
+
+    #[shallguard::verifies("REQ-BASE-004")]
+    #[test]
+    fn fixed_gap_makes_entry_stale() {
+        let kind = GapKind::EvidenceCitation;
+        let mut analysis = analysis(requirement("REQ-ZZ-001", "ZZ", false), None);
+        let stats = apply_baseline(
+            &mut analysis,
+            &baseline("REQ-ZZ-001", kind),
+            true,
+            true,
+            &config(None),
+        );
+        assert_eq!(analysis.errors.len(), 1);
+        assert!(analysis.errors[0].message.contains("gap is resolved"));
+        assert_eq!(stats.resolved, 1);
+    }
+
+    #[shallguard::verifies("REQ-BASE-004")]
+    #[test]
+    fn prune_mode_accepts_resolved_entry_for_removal() {
+        let kind = GapKind::EvidenceCitation;
+        let mut analysis = analysis(requirement("REQ-ZZ-001", "ZZ", true), None);
+        let stats = apply_baseline(
+            &mut analysis,
+            &baseline("REQ-ZZ-001", kind),
+            true,
+            false,
+            &config(None),
+        );
+        assert!(analysis.errors.is_empty());
+        assert_eq!(stats.resolved, 1);
+    }
+
+    fn verification_anchor(oracle: OracleClass) -> VerificationAnchor {
+        VerificationAnchor {
+            file: PathBuf::from("src/lib.rs"),
+            line: 7,
+            test_fn: "candidate".to_string(),
+            inline_modules: Vec::new(),
+            ids: vec!["REQ-ZZ-001".to_string()],
+            oracle,
+        }
+    }
+
+    fn strict_config(area: &str) -> RepositoryConfig {
+        let mut config = config(None);
+        config.areas.insert(
+            area.to_string(),
+            AreaConfig {
+                label: "Test".to_string(),
+                hard_enforcement: false,
+                hard_verification: false,
+                strict_oracle: true,
+            },
+        );
+        config
+    }
+
+    #[shallguard::verifies("REQ-TRACE-013")]
+    #[test]
+    fn sole_vacuous_evidence_demotes_the_requirement() {
+        use crate::oracle::VacuityReason;
+
+        let vacuous = verification_anchor(OracleClass::Vacuous(VacuityReason::NoFailurePath));
+        let outcome = evaluate_verification(&[&vacuous]);
+        assert!(matches!(
+            outcome,
+            VerificationOutcome::Demoted(anchors) if anchors.len() == 1
+        ));
+        assert!(matches!(
+            evaluate_verification(&[]),
+            VerificationOutcome::Missing
+        ));
+    }
+
+    #[shallguard::verifies("REQ-TRACE-013")]
+    #[test]
+    fn redundant_vacuous_evidence_keeps_the_requirement_anchored() {
+        use crate::oracle::{VacuityReason, WeakReason};
+
+        let vacuous =
+            verification_anchor(OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly));
+        let present = verification_anchor(OracleClass::Present);
+        match evaluate_verification(&[&present, &vacuous]) {
+            VerificationOutcome::Anchored {
+                weak,
+                redundant_vacuous,
+            } => {
+                assert!(weak.is_empty());
+                assert_eq!(redundant_vacuous.len(), 1);
+            }
+            _ => panic!("solid evidence must keep the requirement anchored"),
+        }
+
+        let weak_anchor = verification_anchor(OracleClass::Weak(vec![WeakReason::BareShouldPanic]));
+        match evaluate_verification(&[&weak_anchor]) {
+            VerificationOutcome::Anchored {
+                weak,
+                redundant_vacuous,
+            } => {
+                assert_eq!(weak.len(), 1);
+                assert!(redundant_vacuous.is_empty());
+            }
+            _ => panic!("weak evidence still anchors the requirement"),
+        }
+    }
+
+    #[shallguard::verifies("REQ-TRACE-013")]
+    #[test]
+    fn vacuous_evidence_flows_through_the_baseline_like_other_kinds() {
+        let kind = GapKind::VacuousEvidence;
+        // Baselined: grandfathered warning.
+        let mut known = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
+        let stats = apply_baseline(
+            &mut known,
+            &baseline("REQ-ZZ-001", kind),
+            true,
+            true,
+            &config(None),
+        );
+        assert!(known.errors.is_empty());
+        assert_eq!(stats.known, 1);
+        // Unbaselined: new regression error.
+        let mut fresh = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
+        let stats = apply_baseline(
+            &mut fresh,
+            &Baseline::from_entries(Vec::new()),
+            true,
+            true,
+            &config(None),
+        );
+        assert_eq!(stats.new, 1);
+        assert!(fresh.errors[0].message.contains("new regression"));
+        // Hard area: rejected like hard_verification.
+        let mut hard = analysis(requirement("REQ-SAFE-999", "SAFE", false), Some(kind));
+        apply_baseline(
+            &mut hard,
+            &baseline("REQ-SAFE-999", kind),
+            true,
+            true,
+            &config(Some("SAFE")),
+        );
+        assert!(hard.errors.iter().any(|f| f.message.contains("forbidden")));
+    }
+
+    #[shallguard::verifies("REQ-TRACE-013")]
+    #[test]
+    fn weak_evidence_is_advisory_unless_strict_oracle() {
+        let kind = GapKind::WeakEvidence;
+        let mut advisory = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
+        let stats = apply_baseline(
+            &mut advisory,
+            &Baseline::from_entries(Vec::new()),
+            true,
+            true,
+            &config(None),
+        );
+        assert!(advisory.errors.is_empty());
+        assert_eq!(stats.new, 0);
+        assert!(advisory.warnings[0].message.contains("advisory"));
+
+        let mut strict = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
+        apply_baseline(
+            &mut strict,
+            &Baseline::from_entries(Vec::new()),
+            true,
+            true,
+            &strict_config("ZZ"),
+        );
+        assert_eq!(strict.errors.len(), 1);
+        assert!(strict.errors[0].message.contains("hard-area"));
+    }
+
+    #[shallguard::verifies("REQ-BASE-003")]
+    #[test]
+    fn hard_area_cannot_be_baselined() {
+        let kind = GapKind::EnforcementAnchor;
+        let area = "SAFE";
+        let mut analysis = analysis(requirement("REQ-SAFE-999", area, false), Some(kind));
+        apply_baseline(
+            &mut analysis,
+            &baseline("REQ-SAFE-999", kind),
+            true,
+            true,
+            &config(Some(area)),
+        );
+        assert!(analysis.errors.len() >= 2);
+        assert!(
+            analysis
+                .errors
+                .iter()
+                .any(|finding| finding.message.contains("forbidden"))
+        );
+    }
+}
