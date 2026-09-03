@@ -20,12 +20,3 @@ friction in silence.
   cannot carry its `#[verifies]` anchor without a stale-anchor warning, so
   the anchor and the flip must land in the same change → accepted-cost
   (the warning is what forces flip discipline)
-- 2026-08-19 `anchors`: a proc-macro crate cannot carry enforcement anchors
-  for its own compile-time behavior (it cannot invoke its own macros), so
-  macro contracts anchor the re-export in `src/lib.rs` instead
-  (REQ-TRACE-008 precedent) → accepted-cost
-- 2026-08-19 `lints`: the vacuity predicates exist twice (macro token
-  scan, classifier) plus a suppression parser; the macro-rejects-a-subset
-  invariant is guarded only by shared regression fixtures → lint idea
-  (a shared proc-macro2-only crate would create one authority, but that
-  is a new publishable crate — maintainer decision)

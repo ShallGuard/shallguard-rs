@@ -36,6 +36,7 @@ pub mod docs;
 pub mod evidence_mark;
 pub mod impact;
 mod impact_dependency;
+pub mod oracle;
 pub mod requirement_format;
 pub mod review;
 pub mod review_workflow;

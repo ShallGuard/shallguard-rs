@@ -11,7 +11,8 @@ use crate::baseline::{Baseline, BaselineEntry, GapKey, GapKind};
 use crate::config::RepositoryConfig;
 use crate::docs::{Requirement, parse_doc};
 use crate::evidence_mark::EvidenceMark;
-use crate::scan::{Anchors, scan};
+use crate::oracle::OracleClass;
+use crate::scan::{Anchors, VerificationAnchor, scan};
 
 /// One finding, locatable in a file.
 #[derive(Debug, Clone)]
@@ -388,7 +389,12 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
     // Anchor presence, ratcheted per area.
     let mut stats: BTreeMap<String, AreaStats> = BTreeMap::new();
     let mut gaps: BTreeMap<GapKey, TraceabilityGap> = BTreeMap::new();
-    let verified_ids: HashSet<&str> = anchors.verified_ids().collect();
+    let mut verifying: HashMap<&str, Vec<&VerificationAnchor>> = HashMap::new();
+    for anchor in &anchors.verification {
+        for id in &anchor.ids {
+            verifying.entry(id.as_str()).or_default().push(anchor);
+        }
+    }
 
     for req in &requirements {
         let stat = stats.entry(req.area.clone()).or_default();
@@ -435,23 +441,85 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
         }
 
         if req.automated {
-            if verified_ids.contains(req.id.as_str()) {
-                stat.test_anchored += 1;
-            } else {
-                record_gap(
-                    &mut gaps,
-                    req,
-                    GapKind::VerificationAnchor,
-                    Finding {
-                        file: req.doc.to_string(),
-                        line: req.line,
-                        message: format!(
-                            "{} \"{}\" - claims automated-test evidence but no \
-                             test anchor verifies it",
-                            req.id, req.title
-                        ),
-                    },
-                );
+            let req_anchors: Vec<&VerificationAnchor> =
+                verifying.get(req.id.as_str()).cloned().unwrap_or_default();
+            match evaluate_verification(&req_anchors) {
+                VerificationOutcome::Missing => {
+                    record_gap(
+                        &mut gaps,
+                        req,
+                        GapKind::VerificationAnchor,
+                        Finding {
+                            file: req.doc.to_string(),
+                            line: req.line,
+                            message: format!(
+                                "{} \"{}\" - claims automated-test evidence but no \
+                                 test anchor verifies it",
+                                req.id, req.title
+                            ),
+                        },
+                    );
+                }
+                VerificationOutcome::Demoted(vacuous) => {
+                    // Every anchored test is vacuous: the [test] claim has no
+                    // automated evidence behind it.
+                    for anchor in vacuous {
+                        record_gap(
+                            &mut gaps,
+                            req,
+                            GapKind::VacuousEvidence,
+                            Finding {
+                                file: anchor.file.display().to_string(),
+                                line: anchor.line,
+                                message: format!(
+                                    "`{}` verifies {} but {}; add a real assertion \
+                                     or downgrade the document line to {}",
+                                    anchor.test_fn,
+                                    req.id,
+                                    vacuity_reason(anchor),
+                                    EvidenceMark::Pending.keyword()
+                                ),
+                            },
+                        );
+                    }
+                }
+                VerificationOutcome::Anchored {
+                    weak,
+                    redundant_vacuous,
+                } => {
+                    stat.test_anchored += 1;
+                    for anchor in weak {
+                        record_gap(
+                            &mut gaps,
+                            req,
+                            GapKind::WeakEvidence,
+                            Finding {
+                                file: anchor.file.display().to_string(),
+                                line: anchor.line,
+                                message: format!(
+                                    "`{}` verifies {} but {}; add an expected panic \
+                                     message or a real assertion",
+                                    anchor.test_fn,
+                                    req.id,
+                                    weak_reason(anchor)
+                                ),
+                            },
+                        );
+                    }
+                    for anchor in redundant_vacuous {
+                        warnings.push(Finding {
+                            file: anchor.file.display().to_string(),
+                            line: anchor.line,
+                            message: format!(
+                                "`{}` verifies {} but {}; other anchored evidence \
+                                 remains - strengthen or remove this anchor",
+                                anchor.test_fn,
+                                req.id,
+                                vacuity_reason(anchor)
+                            ),
+                        });
+                    }
+                }
             }
 
             // Evidence binding: the Verified line must cite the concrete
@@ -544,6 +612,69 @@ fn analyze(root: &Path, docs: &[DocSpec], config: &RepositoryConfig) -> Result<A
     })
 }
 
+/// How the verification anchors of one automated requirement add up.
+enum VerificationOutcome<'a> {
+    /// No test anchor cites the requirement at all.
+    Missing,
+    /// Anchors exist, but every one of them is vacuous: the ✅ claim is
+    /// demoted to lacking automated verification.
+    Demoted(Vec<&'a VerificationAnchor>),
+    /// At least one anchor stands as evidence. `weak` is non-empty only
+    /// when nothing stronger backs the requirement; `redundant_vacuous`
+    /// lists vacuous anchors that other evidence makes non-fatal.
+    Anchored {
+        weak: Vec<&'a VerificationAnchor>,
+        redundant_vacuous: Vec<&'a VerificationAnchor>,
+    },
+}
+
+#[shallguard::enforces("REQ-TRACE-013")]
+fn evaluate_verification<'a>(anchors: &[&'a VerificationAnchor]) -> VerificationOutcome<'a> {
+    if anchors.is_empty() {
+        return VerificationOutcome::Missing;
+    }
+    let solid = anchors.iter().any(|anchor| {
+        matches!(
+            anchor.oracle,
+            OracleClass::Present | OracleClass::Suppressed(_)
+        )
+    });
+    let weak: Vec<&VerificationAnchor> = anchors
+        .iter()
+        .copied()
+        .filter(|anchor| matches!(anchor.oracle, OracleClass::Weak(_)))
+        .collect();
+    let vacuous: Vec<&VerificationAnchor> = anchors
+        .iter()
+        .copied()
+        .filter(|anchor| matches!(anchor.oracle, OracleClass::Vacuous(_)))
+        .collect();
+    if solid || !weak.is_empty() {
+        VerificationOutcome::Anchored {
+            weak: if solid { Vec::new() } else { weak },
+            redundant_vacuous: vacuous,
+        }
+    } else {
+        VerificationOutcome::Demoted(vacuous)
+    }
+}
+
+fn vacuity_reason(anchor: &VerificationAnchor) -> &'static str {
+    match &anchor.oracle {
+        OracleClass::Vacuous(reason) => reason.describe(),
+        _ => "contains no failure path",
+    }
+}
+
+fn weak_reason(anchor: &VerificationAnchor) -> &'static str {
+    match &anchor.oracle {
+        OracleClass::Weak(reasons) => reasons
+            .first()
+            .map_or("offers only weak evidence", |reason| reason.describe()),
+        _ => "offers only weak evidence",
+    }
+}
+
 fn enforced_path_has_anchor(enforced: &Path, files: Option<&HashSet<&Path>>) -> bool {
     files.is_some_and(|files| {
         files.iter().any(|file| {
@@ -616,6 +747,15 @@ fn apply_baseline(
                     .iter()
                     .cloned()
                     .map(|finding| annotate_gap(finding, "grandfathered", key.kind)),
+            );
+        } else if key.kind == GapKind::WeakEvidence {
+            // Weak evidence stays advisory unless the area opts into
+            // `strict_oracle`; hard promotion is handled above.
+            analysis.warnings.extend(
+                gap.findings
+                    .iter()
+                    .cloned()
+                    .map(|finding| annotate_gap(finding, "advisory", key.kind)),
             );
         } else {
             stats.new += 1;
@@ -691,11 +831,14 @@ fn baseline_finding(config: &RepositoryConfig, message: String) -> Finding {
     }
 }
 
-#[shallguard::enforces("REQ-BASE-003")]
+#[shallguard::enforces("REQ-BASE-003", "REQ-TRACE-013")]
 fn gap_is_hard(kind: GapKind, area: &str, config: &RepositoryConfig) -> bool {
     match kind {
         GapKind::EnforcementAnchor => config.area_is_hard(area, false),
-        GapKind::VerificationAnchor | GapKind::EvidenceCitation => config.area_is_hard(area, true),
+        GapKind::VerificationAnchor | GapKind::EvidenceCitation | GapKind::VacuousEvidence => {
+            config.area_is_hard(area, true)
+        }
+        GapKind::WeakEvidence => config.area_strict_oracle(area),
     }
 }
 
@@ -815,6 +958,29 @@ fn render_summary(
         anchors.verification.len(),
         anchors.references.values().map(Vec::len).sum::<usize>(),
     );
+    // Suppression is visible, never silent: every opted-out oracle is
+    // counted and listed.
+    let suppressed: Vec<(&VerificationAnchor, &str)> = anchors
+        .verification
+        .iter()
+        .filter_map(|anchor| match &anchor.oracle {
+            OracleClass::Suppressed(class) => Some((anchor, class.as_str())),
+            _ => None,
+        })
+        .collect();
+    if !suppressed.is_empty() {
+        let _ = writeln!(out, "oracle suppressions ({}):", suppressed.len());
+        for (anchor, class) in suppressed {
+            let _ = writeln!(
+                out,
+                "  {}:{} `{}` (oracle = \"{class}\") verifies {}",
+                anchor.file.display(),
+                anchor.line,
+                anchor.test_fn,
+                anchor.ids.join(", ")
+            );
+        }
+    }
     let _ = writeln!(
         out,
         "traceability baseline: {} known gap(s), {} resolved/stale, {} new regression(s)",
@@ -902,6 +1068,7 @@ mod tests {
                             label: "Test".to_string(),
                             hard_enforcement: true,
                             hard_verification: true,
+                            strict_oracle: false,
                         },
                     )])
                 })
@@ -992,6 +1159,146 @@ mod tests {
         );
         assert!(analysis.errors.is_empty());
         assert_eq!(stats.resolved, 1);
+    }
+
+    fn verification_anchor(oracle: OracleClass) -> VerificationAnchor {
+        VerificationAnchor {
+            file: PathBuf::from("src/lib.rs"),
+            line: 7,
+            test_fn: "candidate".to_string(),
+            inline_modules: Vec::new(),
+            ids: vec!["REQ-ZZ-001".to_string()],
+            oracle,
+        }
+    }
+
+    fn strict_config(area: &str) -> RepositoryConfig {
+        let mut config = config(None);
+        config.areas.insert(
+            area.to_string(),
+            AreaConfig {
+                label: "Test".to_string(),
+                hard_enforcement: false,
+                hard_verification: false,
+                strict_oracle: true,
+            },
+        );
+        config
+    }
+
+    #[shallguard::verifies("REQ-TRACE-013")]
+    #[test]
+    fn sole_vacuous_evidence_demotes_the_requirement() {
+        use crate::oracle::VacuityReason;
+
+        let vacuous = verification_anchor(OracleClass::Vacuous(VacuityReason::NoFailurePath));
+        let outcome = evaluate_verification(&[&vacuous]);
+        assert!(matches!(
+            outcome,
+            VerificationOutcome::Demoted(anchors) if anchors.len() == 1
+        ));
+        assert!(matches!(
+            evaluate_verification(&[]),
+            VerificationOutcome::Missing
+        ));
+    }
+
+    #[shallguard::verifies("REQ-TRACE-013")]
+    #[test]
+    fn redundant_vacuous_evidence_keeps_the_requirement_anchored() {
+        use crate::oracle::{VacuityReason, WeakReason};
+
+        let vacuous =
+            verification_anchor(OracleClass::Vacuous(VacuityReason::TrivialFailurePathsOnly));
+        let present = verification_anchor(OracleClass::Present);
+        match evaluate_verification(&[&present, &vacuous]) {
+            VerificationOutcome::Anchored {
+                weak,
+                redundant_vacuous,
+            } => {
+                assert!(weak.is_empty());
+                assert_eq!(redundant_vacuous.len(), 1);
+            }
+            _ => panic!("solid evidence must keep the requirement anchored"),
+        }
+
+        let weak_anchor = verification_anchor(OracleClass::Weak(vec![WeakReason::BareShouldPanic]));
+        match evaluate_verification(&[&weak_anchor]) {
+            VerificationOutcome::Anchored {
+                weak,
+                redundant_vacuous,
+            } => {
+                assert_eq!(weak.len(), 1);
+                assert!(redundant_vacuous.is_empty());
+            }
+            _ => panic!("weak evidence still anchors the requirement"),
+        }
+    }
+
+    #[shallguard::verifies("REQ-TRACE-013")]
+    #[test]
+    fn vacuous_evidence_flows_through_the_baseline_like_other_kinds() {
+        let kind = GapKind::VacuousEvidence;
+        // Baselined: grandfathered warning.
+        let mut known = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
+        let stats = apply_baseline(
+            &mut known,
+            &baseline("REQ-ZZ-001", kind),
+            true,
+            true,
+            &config(None),
+        );
+        assert!(known.errors.is_empty());
+        assert_eq!(stats.known, 1);
+        // Unbaselined: new regression error.
+        let mut fresh = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
+        let stats = apply_baseline(
+            &mut fresh,
+            &Baseline::from_entries(Vec::new()),
+            true,
+            true,
+            &config(None),
+        );
+        assert_eq!(stats.new, 1);
+        assert!(fresh.errors[0].message.contains("new regression"));
+        // Hard area: rejected like hard_verification.
+        let mut hard = analysis(requirement("REQ-SAFE-999", "SAFE", false), Some(kind));
+        apply_baseline(
+            &mut hard,
+            &baseline("REQ-SAFE-999", kind),
+            true,
+            true,
+            &config(Some("SAFE")),
+        );
+        assert!(hard.errors.iter().any(|f| f.message.contains("forbidden")));
+    }
+
+    #[shallguard::verifies("REQ-TRACE-013")]
+    #[test]
+    fn weak_evidence_is_advisory_unless_strict_oracle() {
+        let kind = GapKind::WeakEvidence;
+        let mut advisory = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
+        let stats = apply_baseline(
+            &mut advisory,
+            &Baseline::from_entries(Vec::new()),
+            true,
+            true,
+            &config(None),
+        );
+        assert!(advisory.errors.is_empty());
+        assert_eq!(stats.new, 0);
+        assert!(advisory.warnings[0].message.contains("advisory"));
+
+        let mut strict = analysis(requirement("REQ-ZZ-001", "ZZ", false), Some(kind));
+        apply_baseline(
+            &mut strict,
+            &Baseline::from_entries(Vec::new()),
+            true,
+            true,
+            &strict_config("ZZ"),
+        );
+        assert_eq!(strict.errors.len(), 1);
+        assert!(strict.errors[0].message.contains("hard-area"));
     }
 
     #[shallguard::verifies("REQ-BASE-003")]

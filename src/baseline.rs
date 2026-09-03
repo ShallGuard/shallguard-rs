@@ -16,12 +16,18 @@ use serde::{Deserialize, Serialize};
 pub const BASELINE_SCHEMA: u32 = 1;
 
 /// A traceability dimension that may have historical debt.
+#[shallguard::enforces("REQ-TRACE-013")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum GapKind {
     EnforcementAnchor,
     VerificationAnchor,
     EvidenceCitation,
+    /// Every `[test]` citation resolves only to tests that cannot fail.
+    VacuousEvidence,
+    /// The best available evidence is structurally weak (e.g. bare
+    /// `#[should_panic]`).
+    WeakEvidence,
 }
 
 impl fmt::Display for GapKind {
@@ -30,6 +36,8 @@ impl fmt::Display for GapKind {
             Self::EnforcementAnchor => "enforcement-anchor",
             Self::VerificationAnchor => "verification-anchor",
             Self::EvidenceCitation => "evidence-citation",
+            Self::VacuousEvidence => "vacuous-evidence",
+            Self::WeakEvidence => "weak-evidence",
         };
         f.write_str(name)
     }
@@ -192,6 +200,20 @@ mod tests {
         assert!(aa < zz);
 
         let parsed: Baseline = toml::from_str(&rendered).expect("rendered TOML parses");
+        assert_eq!(parsed, baseline);
+    }
+
+    #[shallguard::verifies("REQ-TRACE-013")]
+    #[test]
+    fn evidence_gap_kinds_round_trip_through_baseline() {
+        let baseline = Baseline::from_entries(vec![
+            entry("REQ-AA-001", GapKind::VacuousEvidence),
+            entry("REQ-AA-002", GapKind::WeakEvidence),
+        ]);
+        let rendered = baseline.render().expect("baseline renders");
+        assert!(rendered.contains("vacuous-evidence"));
+        assert!(rendered.contains("weak-evidence"));
+        let parsed = Baseline::parse(&rendered, "test").expect("rendered TOML parses");
         assert_eq!(parsed, baseline);
     }
 
