@@ -8,7 +8,7 @@
 #
 # The recordings run inside a throwaway legacy-style project
 # (fleet-scheduler): code without requirements, one thin test, plus an
-# agent-drafted requirement document with honest [pending] evidence. Set
+# agent-drafted requirement document with honest [pending] ⏳ evidence. Set
 # SHALLGUARD_PATH to a local ShallGuard checkout to record against
 # unpublished changes; otherwise the published crate version is used.
 set -euo pipefail
@@ -71,9 +71,9 @@ Every SHALL statement below was reviewed by a human before enrollment.
 **System Requirements:**
 
 - **REQ-SCH-001** — The scheduler SHALL never emit a zero worker floor.
-  *Enforced:* `src/lib.rs` (`floor`) · *Verified:* [pending]
+  *Enforced:* `src/lib.rs` (`floor`) · *Verified:* [pending] ⏳
 - **REQ-SCH-002** — Worker resolution SHALL apply the configured floor in
-  every scheduling mode. *Enforced:* `src/lib.rs` (`resolve`) · *Verified:* [pending]
+  every scheduling mode. *Enforced:* `src/lib.rs` (`resolve`) · *Verified:* [pending] ⏳
   pending
 
 ## US-2: Reconnects must not stampede the pool
@@ -81,7 +81,7 @@ Every SHALL statement below was reviewed by a human before enrollment.
 **System Requirements:**
 
 - **REQ-NET-001** — Reconnect backoff SHALL be capped at 60 seconds.
-  *Enforced:* `src/lib.rs` (`backoff_delay`) · *Verified:* [pending]
+  *Enforced:* `src/lib.rs` (`backoff_delay`) · *Verified:* [pending] ⏳
 EOF
 
 cat > "$project/src/lib.rs" <<'EOF'
@@ -155,9 +155,9 @@ src = src.replace("""    fn floor_never_returns_zero() {
 open('src/lib.rs', 'w').write(src)
 doc = open('docs/REQUIREMENTS.md').read()
 doc = doc.replace("""- **REQ-NET-001** — Reconnect backoff SHALL be capped at 60 seconds.
-  *Enforced:* `src/lib.rs` (`backoff_delay`) · *Verified:* [pending]""",
+  *Enforced:* `src/lib.rs` (`backoff_delay`) · *Verified:* [pending] ⏳""",
 """- **REQ-NET-001** — Reconnect backoff SHALL be capped at 60 seconds.
-  *Enforced:* `src/lib.rs` (`backoff_delay`) · *Verified:* [test] `src/lib.rs`
+  *Enforced:* `src/lib.rs` (`backoff_delay`) · *Verified:* [test] ✅ `src/lib.rs`
   (`backoff_is_capped_at_sixty_seconds`)""")
 open('docs/REQUIREMENTS.md', 'w').write(doc)
 EOF

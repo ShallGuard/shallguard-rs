@@ -41,8 +41,8 @@ cargo install cargo-shallguard --version <pinned-version> --locked
 - **Evidence marks** on a `*Verified:*` line: `[test]` an anchored
   automated test, `[e2e]` an end-to-end or production validation,
   `[review]` a code review only, `[pending]` pending. The emoji ✅, 🔬, 👁,
-  and ⏳ are optional aliases, and `cargo shallguard fmt` rewrites them to
-  the keywords. Only `[test]` requires a `#[verifies]` anchor and a
+  and ⏳ are optional aliases. `cargo shallguard fmt` adds the keyword
+  before an emoji and keeps the emoji, for example `[test] ✅`. Only `[test]` requires a `#[verifies]` anchor and a
   citation with a file and a function. The check compares the `[test]`
   claim with the anchor.
 
@@ -190,7 +190,7 @@ cargo shallguard fmt            # fix doc formatting (never hand-wrap
 | The cited enforcement file has no anchor with the ID | Anchor the real enforcement site. Never move the anchor to a file that only mentions the code. |
 | A baseline entry is stale | Run `cargo shallguard baseline prune` and commit the removal. |
 | The document does not parse | Fix the document structure. The command `fmt --check` points at the structural error. |
-| `fmt --check` reports a document as non-canonical | Run `cargo shallguard fmt`. It also rewrites an emoji evidence alias to its keyword. |
+| `fmt --check` reports a document as non-canonical | Run `cargo shallguard fmt`. It also adds the keyword before an emoji evidence alias. |
 
 ## Adopt ShallGuard in a new repository
 

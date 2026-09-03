@@ -77,10 +77,10 @@ configuration can never idle every machine.
 **System Requirements:**
 
 - **REQ-HRS-001** — The scheduler SHALL never emit a zero worker floor.
-  *Enforced:* `src/lib.rs` (`floor`) · *Verified:* [test] `src/lib.rs`
+  *Enforced:* `src/lib.rs` (`floor`) · *Verified:* [test] ✅ `src/lib.rs`
   (`floor_never_returns_zero`)
 - **REQ-HRS-002** — Worker resolution SHALL apply the configured floor in
-  every scheduling mode. *Enforced:* `src/lib.rs` (`resolve`) · *Verified:* [test]
+  every scheduling mode. *Enforced:* `src/lib.rs` (`resolve`) · *Verified:* [test] ✅
   `src/lib.rs` (`resolve_applies_floor_in_every_mode`)
 EOF
 
