@@ -106,12 +106,6 @@ again.
   path that ends in `test`. It **rejects a test with `#[ignore]`** at
   compile time and in the check. There is no statement form for
   verification.
-- `#[verifies]` also rejects, at compile time, a test body that cannot fail.
-  This is a body with no failure-path tokens at all, or a body with only
-  constant assertions that always pass. A test can have its oracle outside
-  its body, for example a compile-fail harness or an external checker. Such
-  a test opts out in a visible way with `oracle = "panic"`, `"compile"`, or
-  `"external"`. The check report counts and lists every opt-out.
 - The check flags one test that claims 6 or more requirements as an
   outlier.
 - The compiler validates the format of each anchor ID. A typo like
@@ -173,8 +167,6 @@ cargo shallguard fmt            # fix doc formatting (never hand-wrap
 - Never mark an anchored test with `#[ignore]`.
 - Never invent or guess a requirement ID. An ID in code that no document
   defines is a hard failure.
-- Never add `oracle = "<class>"` to remove a vacuity finding when the test
-  does not match that class. That is evidence fabrication.
 - Never use a retired requirement ID again.
 
 ## Respond to `check` failures
@@ -184,7 +176,6 @@ cargo shallguard fmt            # fix doc formatting (never hand-wrap
 | An ID in code is not defined in any document | Add the requirement, or fix the typo. Never delete the anchor without a reason. |
 | Two requirements have the same ID | Renumber the newer one and its anchors. |
 | A `[test]` claim has no anchored test | Write and anchor the test, or downgrade honestly to `[pending]`. |
-| A vacuous-evidence finding says the test cannot fail | Assert a real output of the enforcement site, or downgrade the document line honestly. Never hide a trivial assertion behind indirection. |
 | A `[test]` citation names no real test file or function | Complete the citation with the real file and function. |
 | A cited path does not exist | Fix the citation to the real file. Never invent a path. |
 | The cited enforcement file has no anchor with the ID | Anchor the real enforcement site. Never move the anchor to a file that only mentions the code. |

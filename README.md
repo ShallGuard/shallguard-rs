@@ -31,8 +31,6 @@ The command `cargo shallguard check` reads the document and the code. It
 fails in these cases:
 
 - Somebody deletes the test or removes the anchor.
-- Somebody changes the test so that it cannot fail. The `assert!(true)`
-  version does not compile.
 - A requirement claims a test as evidence, but no real test exists.
 
 The check needs no network and no language model. It gives the same result
@@ -79,10 +77,7 @@ ShallGuard has three parts and one check:
    requirement has no anchor, or when a requirement claims evidence without a
    real test.
 
-The check also applies an evidence floor. A verification test that cannot
-fail is rejected. The compiler rejects the certain cases. The check reports
-the other cases as findings. Each `oracle` opt-out is counted and listed in
-the report. The user guide explains
+The user guide explains
 [what the check proves and what it does not prove](docs/USER_DOC.md#what-the-deterministic-gate-does-and-does-not-prove).
 
 ```mermaid
@@ -424,8 +419,7 @@ most likely to satisfy the check in the wrong way:
 - They invent evidence citations.
 - They delete anchors to remove failures.
 - They reword requirements to match the code.
-- They remove assertions until a test cannot fail. The compiler now rejects
-  the certain cases, and the check flags the others.
+- They remove assertions until a test cannot fail.
 
 The file [`docs/skill/SKILL.md`](docs/skill/SKILL.md) is a self-contained
 manual for agents. It describes the requirements-first workflow, the rules
