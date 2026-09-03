@@ -135,7 +135,7 @@ Or install from one fixed Git commit:
 
 ```bash
 cargo install \
-  --git https://github.com/sigi64/shallguard.git \
+  --git https://github.com/shallguard/shallguard-rs.git \
   --rev <published-sha> \
   --locked cargo-shallguard
 ```
