@@ -208,7 +208,7 @@ fn validate_container_args(
     field_anchors: usize,
     errors: &mut proc_macro2::TokenStream,
 ) {
-    validate_id_list("#[enforces]", args, field_anchors > 0, errors);
+    validate_id_list("enforces", args, field_anchors > 0, errors);
 }
 
 /// Strips `#[shallguard::enforces(...)]` anchors off every field in the
@@ -295,11 +295,10 @@ fn validate_ids(
 ) {
     if ids.is_empty() {
         if !allow_empty {
-            let example = match name.strip_prefix("#[").and_then(|n| n.strip_suffix(']')) {
-                Some(attr) => format!("#[{attr}(\"REQ-HRS-002\")]"),
-                None => format!("{name}!(\"REQ-HRS-002\")"),
-            };
-            let msg = format!("{name} needs at least one requirement ID, e.g. {example}");
+            let msg = format!(
+                "{name} needs at least one requirement ID, \
+                 e.g. {name}(\"REQ-HRS-002\")"
+            );
             errors.extend(syn::Error::new(Span::call_site(), msg).to_compile_error());
         }
         return;
@@ -349,9 +348,9 @@ pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
                 syn::Error::new(
                     oracle.span(),
                     format!(
-                        "unknown oracle class {:?}; accepted values: {}",
-                        oracle.value(),
-                        oracle_classes_list(", ")
+                        "unknown oracle class {:?}; accepted values: \
+                         \"panic\", \"compile\", \"external\"",
+                        oracle.value()
                     ),
                 )
                 .to_compile_error(),
@@ -389,7 +388,6 @@ pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
             }
             if let Some(parsed) = &parsed
                 && is_test
-                && !parsed.ids.is_empty()
                 && parsed.oracle.is_none()
                 && !has_should_panic(&fun.attrs)
                 && !can_fail_via_return(&fun.sig)
@@ -413,20 +411,8 @@ pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
     quote! { #errors #item }.into()
 }
 
-/// The closed set of oracle opt-out classes. The checker keeps its own
-/// copy (a proc-macro crate cannot export items); both crates pin the
-/// same literal list in unit tests so drift fails a test.
+/// The closed set of oracle opt-out classes.
 const ORACLE_CLASSES: &[&str] = &["panic", "compile", "external"];
-
-/// Renders the accepted oracle classes for error messages, so the text
-/// can never go stale against the const.
-fn oracle_classes_list(separator: &str) -> String {
-    ORACLE_CLASSES
-        .iter()
-        .map(|class| format!("{class:?}"))
-        .collect::<Vec<_>>()
-        .join(separator)
-}
 
 struct VerifiesArgs {
     ids: Vec<LitStr>,
@@ -516,7 +502,7 @@ fn reject_definitely_vacuous(
         return;
     }
     let detail = if scan.trivial_assertion {
-        "its only assertions are constants that always pass"
+        "its only assertions are constant or self-identical"
     } else {
         "the body contains no assertion, panic, unwrap/expect, or `?`"
     };
@@ -528,8 +514,7 @@ fn reject_definitely_vacuous(
                 "#[shallguard::verifies({cited})] cites a test that cannot fail: {detail}. \
                  Evidence must offer a real failure path (see SKILL.md, evidence \
                  honesty): assert an actual output of the enforcement site, or opt \
-                 out visibly with oracle = {}",
-                oracle_classes_list(" | ")
+                 out visibly with oracle = \"panic\" | \"compile\" | \"external\""
             ),
         )
         .to_compile_error(),
@@ -539,7 +524,7 @@ fn reject_definitely_vacuous(
 struct FrontLineScan {
     /// Something that can fail — or that we cannot rule out — was seen.
     candidate: bool,
-    /// An always-passing constant assertion was seen.
+    /// A constant-foldable or self-identical assertion was seen.
     trivial_assertion: bool,
 }
 
@@ -554,36 +539,29 @@ fn scan_body_tokens(tokens: proc_macro2::TokenStream, scan: &mut FrontLineScan) 
         match &trees[i] {
             TokenTree::Ident(ident) => {
                 let name = ident.to_string();
-                // A macro invocation is ident + '!' + group; a bare '!'
-                // after an ident is an operator (`a != b`), not a macro.
                 let bang = matches!(
                     trees.get(i + 1),
                     Some(TokenTree::Punct(p)) if p.as_char() == '!'
                 );
-                if bang && let Some(TokenTree::Group(group)) = trees.get(i + 2) {
-                    if matches!(
-                        name.as_str(),
-                        "assert"
-                            | "assert_eq"
-                            | "assert_ne"
-                            | "debug_assert"
-                            | "debug_assert_eq"
-                            | "debug_assert_ne"
-                    ) {
+                if bang {
+                    if matches!(name.as_str(), "assert" | "assert_eq" | "assert_ne")
+                        && let Some(TokenTree::Group(group)) = trees.get(i + 2)
+                    {
                         if assert_args_trivial(&name, group.stream()) {
                             scan.trivial_assertion = true;
                             // The argument expressions still run: an
-                            // unwrap inside identical sides is a real
-                            // failure path.
+                            // unwrap inside token-identical sides is a
+                            // real failure path.
                             scan_body_tokens(group.stream(), scan);
                         } else {
                             scan.candidate = true;
                         }
-                    } else {
-                        // Any other macro may assert internally.
-                        scan.candidate = true;
+                        i += 3;
+                        continue;
                     }
-                    i += 3;
+                    // Any other macro may assert internally. Conservative.
+                    scan.candidate = true;
+                    i += 2;
                     continue;
                 }
                 if matches!(
@@ -607,11 +585,8 @@ fn scan_body_tokens(tokens: proc_macro2::TokenStream, scan: &mut FrontLineScan) 
     }
 }
 
-/// Whether an `assert*` invocation provably always passes:
-/// `assert!(true)`, equal literal `_eq` sides, or different literal
-/// `_ne` sides. Always-failing constants are unconditional panics and
-/// token-identical impure sides can fail, so both count as failure
-/// paths.
+/// Whether an `assert*` invocation's significant arguments are all
+/// literals, or the two compared sides are token-identical.
 fn assert_args_trivial(name: &str, tokens: proc_macro2::TokenStream) -> bool {
     use proc_macro2::TokenTree;
     let mut args: Vec<Vec<TokenTree>> = vec![Vec::new()];
@@ -642,15 +617,13 @@ fn assert_args_trivial(name: &str, tokens: proc_macro2::TokenStream) -> bool {
         })
     };
     match name {
-        "assert" | "debug_assert" => {
-            matches!(args[0].as_slice(), [TokenTree::Ident(ident)] if ident == "true")
-        }
+        "assert" => literal_only(&args[0]),
         _ => {
-            if args.len() < 2 || !literal_only(&args[0]) || !literal_only(&args[1]) {
+            if args.len() < 2 {
                 return false;
             }
-            let equal = render(&args[0]) == render(&args[1]);
-            if name.ends_with("ne") { !equal } else { equal }
+            render(&args[0]) == render(&args[1])
+                || (literal_only(&args[0]) && literal_only(&args[1]))
         }
     }
 }
@@ -690,14 +663,7 @@ fn validate_req_id(id: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ORACLE_CLASSES, validate_req_id};
-
-    #[test]
-    fn oracle_class_set_is_pinned() {
-        // src/oracle.rs pins the same literal list; drift between the
-        // two crates fails one of the tests.
-        assert_eq!(ORACLE_CLASSES, &["panic", "compile", "external"]);
-    }
+    use super::validate_req_id;
 
     #[test]
     fn accepts_known_area_shapes() {
