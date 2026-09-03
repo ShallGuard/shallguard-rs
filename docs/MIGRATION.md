@@ -56,8 +56,8 @@ This prompt works:
 > `*Enforced:*` line that names the file and the symbol that implements it
 > today, and a `*Verified:*` line. Be honest about the evidence. Use
 > `[pending]` or `[review]` (code review only). Write `[test]` only where a
-> real test proves
-> the statement, and name the exact test file and test function. Describe
+> real test proves the statement, and name the exact test file and test
+> function. Describe
 > only behavior that you can point at in the code. If the intent is not
 > clear, mark the statement with a question for human review. Do not guess.
 > Report honestly. Do not hide gaps.
