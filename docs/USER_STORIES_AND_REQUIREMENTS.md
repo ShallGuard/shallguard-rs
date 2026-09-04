@@ -242,7 +242,8 @@ rejects any traceability regression.
 
 ### US-CLI-003: Inspect a Stored Review Run
 
-**Status:** Implemented
+**Status:** Implemented as an experimental feature. It inspects the output of
+the experimental semantic review.
 
 **As a** developer or reviewer  
 **I want** to inspect a preserved local review from the CLI  
@@ -314,7 +315,8 @@ rejects any traceability regression.
 
 ### US-CLI-004: Publish an Advisory Pull Request Review
 
-**Status:** Implemented
+**Status:** Implemented as an experimental feature. The workflow needs a
+language model provider.
 
 **As a** pull request author or reviewer  
 **I want** a bounded Copilot review summarized as Markdown on the pull request  
@@ -800,7 +802,9 @@ or constant tests
 
 ### US-REV-001: Local and CI Agent Review
 
-**Status:** Implemented for local Codex/Claude-compatible CLIs
+**Status:** Implemented as an experimental feature for local Codex and
+Claude-compatible CLIs. Every feature that needs a language model is
+experimental. It can change in any release, and its verdicts are advisory.
 
 **As a** developer or CI reviewer  
 **I want** resumable requirement-by-requirement semantic review  
@@ -876,6 +880,13 @@ or constant tests
   `ReviewStore::write_cache`, `read_cached_unit`), `src/review.rs`
   (`materialize_cached_review`) · *Verified:* [test] ✅ `src/review_state_tests.rs`
   (`portable_cache_is_revalidated_before_reuse`)
+- **REQ-REV-010** — `cargo shallguard review` SHALL print a notice that
+  semantic review is experimental before it starts the review workflow, and
+  the help output SHALL label the `review` and `review show` commands as
+  experimental. *Enforced:* `cli:src/cli_review.rs` (`experimental_notice`),
+  `cli:src/cli_help.rs` (`print`) · *Verified:* [test] ✅
+  `cli:tests/external_subcommand.rs`
+  (`review_commands_are_labeled_experimental`)
 
 ## Static Checking User Stories
 

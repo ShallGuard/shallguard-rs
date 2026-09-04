@@ -98,6 +98,64 @@ fn installed_subcommand_checks_a_single_package_fixture() {
     );
 }
 
+#[shallguard::verifies("REQ-REV-010")]
+#[test]
+fn review_commands_are_labeled_experimental() {
+    let fixture = tempdir().expect("create fixture repository");
+    write_fixture(fixture.path());
+
+    let binary = Path::new(env!("CARGO_BIN_EXE_cargo-shallguard"));
+    let binary_dir = binary.parent().expect("binary has a parent directory");
+    let current_path = std::env::var_os("PATH").unwrap_or_default();
+    let mut paths = vec![binary_dir.to_path_buf()];
+    paths.extend(std::env::split_paths(&current_path));
+    let search_path = std::env::join_paths(paths).expect("build subprocess search path");
+
+    let help_output = Command::new("cargo")
+        .args(["shallguard", "help"])
+        .env("PATH", &search_path)
+        .output()
+        .expect("invoke help");
+    let help = String::from_utf8_lossy(&help_output.stdout);
+    let review_usage_lines = help
+        .lines()
+        .filter(|line| line.trim_start().starts_with("cargo shallguard review"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        review_usage_lines.len(),
+        2,
+        "help lists review and review show:\n{help}"
+    );
+    for line in review_usage_lines {
+        assert!(
+            line.contains("(experimental)"),
+            "usage line is labeled: {line}"
+        );
+    }
+
+    let review_output = Command::new("cargo")
+        .args(["shallguard", "review"])
+        .current_dir(fixture.path())
+        .env("PATH", &search_path)
+        .output()
+        .expect("invoke review");
+    let stderr = String::from_utf8_lossy(&review_output.stderr);
+    assert!(
+        !review_output.status.success(),
+        "review without a target must fail:\n{stderr}"
+    );
+    let notice = stderr
+        .find("semantic review is experimental")
+        .expect("review prints the experimental notice");
+    let failure = stderr
+        .find("review failed")
+        .expect("review reports the missing target");
+    assert!(
+        notice < failure,
+        "the notice comes before the failure:\n{stderr}"
+    );
+}
+
 #[shallguard::verifies("REQ-PORT-008")]
 #[test]
 fn repository_configuration_has_zero_traceability_debt() {

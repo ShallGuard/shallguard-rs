@@ -41,7 +41,8 @@ hard_verification = true
 [artifacts]
 root = "target/shallguard"
 
-# Every review setting is optional. CLI flags take precedence.
+# The review command is experimental. Every review setting is optional.
+# CLI flags take precedence.
 [review]
 target = "origin/main"
 provider = "codex" # codex, claude, or copilot

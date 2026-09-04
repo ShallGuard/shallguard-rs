@@ -16,7 +16,7 @@ them. The command can:
 - list the exact Cargo tests behind the verification anchors,
 - collect LLVM execution evidence,
 - build review capsules,
-- run an optional semantic review.
+- run an optional semantic review. This feature is experimental.
 
 ## Installation
 
@@ -63,6 +63,23 @@ Two commands have more prerequisites:
 - The `review` command needs the selected provider program. The command can
   send bounded source capsules to that provider. The provider login and the
   data handling of the provider are outside this tool.
+
+## Experimental features
+
+An experimental feature is a feature that needs a large language model
+(LLM). These features are experimental:
+
+- the command `cargo shallguard review`, with its providers and its local
+  inference options,
+- the command `cargo shallguard review show`, which inspects the output of
+  a review,
+- the advisory pull-request workflow in `.github/workflows/shallguard-review.yml`.
+
+An experimental feature can change or go away in any release, also in a
+patch release. Its commands, options, and artifacts are not stable. Its
+verdicts are advisory. The check, the format check, and the other
+deterministic commands never depend on an experimental feature. The
+`review` command prints a notice about this when it starts.
 
 ## What the deterministic gate does and does not prove
 

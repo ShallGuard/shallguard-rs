@@ -1,9 +1,9 @@
-#[shallguard::enforces("REQ-CLI-001")]
+#[shallguard::enforces("REQ-CLI-001", "REQ-REV-010")]
 pub(super) fn print() {
     println!(
         r#"ShallGuard keeps product requirements connected to Rust implementation and real tests.
 It provides deterministic traceability and impact checks, executable coverage,
-auditable review capsules, and optional semantic review.
+auditable review capsules, and optional semantic review (experimental).
 
 Development workflow:
   1. Add or update a REQ-<AREA>-<NNN> contract in a configured Markdown document.
@@ -14,6 +14,7 @@ Development workflow:
      The check rejects missing or stale anchors and traceability ratchet regressions.
 
 Review workflow:
+  This workflow is experimental. It needs a language model provider.
   1. Run cargo shallguard impact --target <branch> to map the change to affected
      requirements and their exact verification tests.
   2. Run cargo shallguard review --target <branch> for the end-to-end workflow:
@@ -35,10 +36,10 @@ Usage:
   cargo shallguard bundle --impact <impact.json> [--coverage <coverage.json>] [options]
   cargo shallguard test-index <--enumerate|--catalog <path>> [options]
   cargo shallguard coverage [--package <crate>] [--requirement <REQ-ID>] [options]
-  cargo shallguard review [--base <revision>|--target <branch>] [options]
-  cargo shallguard review show [--output <directory>] [--format <format>] [<REQ-ID> ...]
+  cargo shallguard review [--base <revision>|--target <branch>] [options]  (experimental)
+  cargo shallguard review show [--output <directory>] [--format <format>] [<REQ-ID> ...]  (experimental)
 
-Review options:
+Review options (experimental):
   --provider <name>          Model CLI: codex, claude, or copilot
                              [default: shallguard.toml, then codex]
   --base <revision>          Compare against an exact revision
