@@ -122,9 +122,11 @@ meaning. The parser and the lint accept both forms. The command
 `cargo shallguard fmt` adds the keyword before an emoji that has no keyword,
 and it keeps the emoji next to the keyword, for example `[test] ✅`. A
 document with only keywords stays as it is. The commands
-`cargo shallguard fmt --check` and `cargo shallguard lint` report a document
-with an emoji that lacks its keyword as non-canonical. To migrate an
-existing document, run `cargo shallguard fmt` once and commit the result.
+`cargo shallguard fmt --check` and `cargo shallguard lint` accept a document
+with an emoji that lacks its keyword. They do not report it. An existing
+document therefore passes the checks without a change. To add the keywords
+to an existing document, run `cargo shallguard fmt` once and commit the
+result.
 
 ## Requirement ID concurrency
 

@@ -8,9 +8,9 @@ follows [Semantic Versioning](https://semver.org/).
 - Added ASCII evidence marks `[test]`, `[e2e]`, `[review]`, and `[pending]`
   as the canonical form on `*Verified:*` lines. The emoji ✅, 🔬, 👁, and ⏳
   stay valid as optional aliases. `cargo shallguard fmt` adds the keyword
-  before an emoji and keeps the emoji, and `fmt --check` reports an emoji
-  without its keyword as non-canonical, so run `fmt` once after the upgrade
-  (#14).
+  before an emoji and keeps the emoji. `fmt --check`, `lint`, and `check`
+  accept an emoji without its keyword, so an existing document passes
+  without a change (#14).
 - Rewrote every document in Simplified Technical English and added
   `docs/WRITING_STYLE.md` with the mandatory rules.
 - Marked every feature that needs a language model as experimental: the

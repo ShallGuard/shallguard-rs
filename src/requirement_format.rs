@@ -84,7 +84,7 @@ pub fn format(root: &Path, specs: &[DocSpec]) -> Result<FormatReport> {
 fn run(root: &Path, specs: &[DocSpec], write: bool) -> Result<FormatReport> {
     let mut prepared = Vec::with_capacity(specs.len());
     for spec in specs {
-        prepared.push(prepare_document(root, spec)?);
+        prepared.push(prepare_document(root, spec, write)?);
     }
 
     let diagnostics = prepared
@@ -109,11 +109,14 @@ fn run(root: &Path, specs: &[DocSpec], write: bool) -> Result<FormatReport> {
     })
 }
 
-fn prepare_document(root: &Path, spec: &DocSpec) -> Result<PreparedDocument> {
+/// Reads and formats one document. The write mode adds the canonical keyword
+/// next to an emoji evidence alias. The check mode keeps the marks as they
+/// are, so an emoji-only document passes `fmt --check`.
+fn prepare_document(root: &Path, spec: &DocSpec, add_keywords: bool) -> Result<PreparedDocument> {
     let path = root.join(&spec.path);
     let original = std::fs::read_to_string(&path)
         .with_context(|| format!("reading requirement document {}", path.display()))?;
-    let formatted = format_text(&original, spec);
+    let formatted = format_text(&original, spec, add_keywords);
     if formatted.diagnostics.is_empty() {
         verify_semantic_equivalence(&original, &formatted.text, spec)?;
     }
@@ -126,7 +129,7 @@ fn prepare_document(root: &Path, spec: &DocSpec) -> Result<PreparedDocument> {
     })
 }
 
-fn format_text(text: &str, spec: &DocSpec) -> FormattedText {
+fn format_text(text: &str, spec: &DocSpec, add_keywords: bool) -> FormattedText {
     let candidate_re =
         Regex::new(r"^\s*-\s+\*\*REQ-").expect("BUG: invalid requirement candidate regex");
     let lines = text.lines().collect::<Vec<_>>();
@@ -154,7 +157,7 @@ fn format_text(text: &str, spec: &DocSpec) -> FormattedText {
         requirements += 1;
         let block_diagnostics = lint_block(block, spec, start + 1);
         if block_diagnostics.is_empty() {
-            output.extend(format_block(block));
+            output.extend(format_block(block, add_keywords));
         } else {
             output.extend(block.iter().map(|line| (*line).to_string()));
             diagnostics.extend(block_diagnostics);
@@ -248,9 +251,14 @@ fn normalized_block(block: &[&str]) -> String {
         .join(" ")
 }
 
-fn format_block(block: &[&str]) -> Vec<String> {
+fn format_block(block: &[&str], add_keywords: bool) -> Vec<String> {
+    let lines = if add_keywords {
+        canonicalize_evidence_marks(block)
+    } else {
+        block.iter().map(|line| (*line).to_string()).collect()
+    };
     let mut formatted = Vec::new();
-    for (index, line) in canonicalize_evidence_marks(block).iter().enumerate() {
+    for (index, line) in lines.iter().enumerate() {
         wrap_existing_line(line.trim(), index == 0, &mut formatted);
     }
     formatted
@@ -258,8 +266,9 @@ fn format_block(block: &[&str]) -> Vec<String> {
 
 /// Adds the keyword next to every emoji evidence alias after `*Verified:*`.
 ///
-/// The emoji stays in the document. Text before the verification segment is
-/// returned unchanged, so an emoji in a statement is not touched.
+/// Only the write mode of `fmt` calls this. The emoji stays in the document.
+/// Text before the verification segment is returned unchanged, so an emoji in
+/// a statement is not touched.
 #[shallguard::enforces("REQ-SPEC-008")]
 fn canonicalize_evidence_marks(block: &[&str]) -> Vec<String> {
     let mut in_verified = false;
@@ -363,7 +372,7 @@ mod tests {
     fn formats_requirement_blocks_without_touching_surrounding_markdown() {
         let input = "# Story\n\n- **REQ-AA-001** — The service SHALL retain a deliberately long value across every ordinary processing pass so the formatter has to wrap it.\n    *Enforced:* `src/lib.rs` (`apply`) · *Verified:* [test] `src/lib.rs` (`test_apply`)\n\n| prose | stays |\n";
 
-        let formatted = format_text(input, &spec());
+        let formatted = format_text(input, &spec(), true);
 
         assert!(formatted.diagnostics.is_empty());
         assert_eq!(formatted.requirements, 1);
@@ -388,8 +397,8 @@ mod tests {
     #[test]
     fn formatting_is_idempotent_and_semantically_equivalent() {
         let input = "- **REQ-AA-001** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs` (`apply`) · *Verified:* [test] `src/lib.rs` (`test_apply`)\n";
-        let once = format_text(input, &spec());
-        let twice = format_text(&once.text, &spec());
+        let once = format_text(input, &spec(), true);
+        let twice = format_text(&once.text, &spec(), true);
 
         assert!(once.diagnostics.is_empty());
         assert_eq!(once.text, twice.text);
@@ -404,8 +413,8 @@ mod tests {
             "- **REQ-AA-001** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs`\n";
         let no_status = "- **REQ-AA-002** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs` · *Verified:* `src/lib.rs` (`test_apply`)\n";
 
-        let first = format_text(missing_verified, &spec());
-        let second = format_text(no_status, &spec());
+        let first = format_text(missing_verified, &spec(), true);
+        let second = format_text(no_status, &spec(), true);
 
         assert!(
             first
@@ -426,7 +435,7 @@ mod tests {
     fn adds_canonical_keywords_next_to_emoji_aliases() {
         let input = "- **REQ-AA-001** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs` (`apply`) · *Verified:* ✅ `src/lib.rs` (`test_apply`) ·\n  🔬 differential run\n- **REQ-AA-002** — The service SHALL not fail.\n  *Enforced:* not implemented · *Verified:* ⏳ pending\n";
 
-        let formatted = format_text(input, &spec());
+        let formatted = format_text(input, &spec(), true);
 
         assert!(
             formatted.diagnostics.is_empty(),
@@ -441,8 +450,14 @@ mod tests {
         assert!(joined.contains("*Verified:* [test] ✅ `src/lib.rs` (`test_apply`) ·"));
         assert!(joined.contains("[e2e] 🔬 differential run"));
         assert!(joined.contains("*Verified:* [pending] ⏳ pending"));
-        let twice = format_text(&formatted.text, &spec());
+        let twice = format_text(&formatted.text, &spec(), true);
         assert_eq!(twice.text, formatted.text, "the rewrite is idempotent");
+        let kept = format_text(input, &spec(), false);
+        assert!(kept.diagnostics.is_empty());
+        assert!(
+            !kept.text.contains("[test]") && kept.text.contains('✅'),
+            "the check mode keeps an emoji alias without its keyword"
+        );
         verify_semantic_equivalence(input, &formatted.text, &spec())
             .expect("an alias and its keyword have the same parsed meaning");
 
@@ -455,7 +470,7 @@ mod tests {
 
     #[shallguard::verifies("REQ-SPEC-008")]
     #[test]
-    fn check_reports_emoji_aliases_as_non_canonical() {
+    fn check_accepts_emoji_aliases_and_format_adds_keywords() {
         let dir = tempfile::tempdir().expect("tempdir");
         let doc = dir
             .path()
@@ -470,10 +485,18 @@ mod tests {
         let report = check(dir.path(), &[spec()]).expect("check runs");
 
         assert!(report.diagnostics.is_empty());
-        assert!(!report.is_clean());
-        assert_eq!(report.changed_documents.len(), 1);
+        assert!(
+            report.is_clean(),
+            "an emoji-only document passes fmt --check"
+        );
         let untouched = std::fs::read_to_string(&doc).expect("read document");
-        assert!(untouched.contains('✅'), "check must not write");
+        assert!(!untouched.contains("[test]"), "check must not write");
+
+        let written = super::format(dir.path(), &[spec()]).expect("format runs");
+        assert_eq!(written.changed_documents.len(), 1);
+        let migrated = std::fs::read_to_string(&doc).expect("read document");
+        assert!(migrated.contains("*Verified:* [test] ✅"), "{migrated}");
+        assert!(check(dir.path(), &[spec()]).expect("check runs").is_clean());
     }
 
     #[shallguard::verifies("REQ-SPEC-004")]
@@ -481,7 +504,7 @@ mod tests {
     fn permits_retired_requirements_without_evidence_segments() {
         let input = "- **REQ-AA-001** — *(retired into REQ-AA-002.)*\n";
 
-        let formatted = format_text(input, &spec());
+        let formatted = format_text(input, &spec(), true);
 
         assert!(formatted.diagnostics.is_empty());
         assert_eq!(formatted.text, input);

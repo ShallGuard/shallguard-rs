@@ -425,12 +425,12 @@ language model provider.
 - **REQ-SPEC-008** — `cargo shallguard fmt` SHALL insert the canonical keyword
   before every emoji alias in a verification segment whose keyword is absent,
   SHALL keep the emoji, and SHALL NOT change the parsed evidence classes;
-  `cargo shallguard fmt --check` and `cargo shallguard lint` SHALL report a
-  selected document with an emoji alias that lacks its keyword as
-  non-canonical. *Enforced:* `src/requirement_format.rs`
+  `cargo shallguard fmt --check` and `cargo shallguard lint` SHALL accept a
+  selected document with an emoji alias that lacks its keyword as canonical
+  and SHALL NOT report it. *Enforced:* `src/requirement_format.rs`
   (`canonicalize_evidence_marks`) · *Verified:* [test] ✅
   `src/requirement_format.rs` (`adds_canonical_keywords_next_to_emoji_aliases`,
-  `check_reports_emoji_aliases_as_non_canonical`)
+  `check_accepts_emoji_aliases_and_format_adds_keywords`)
 
 ## Traceability User Stories
 
