@@ -118,7 +118,7 @@ failure.
 Install the published Cargo subcommand:
 
 ```bash
-cargo install cargo-shallguard --version 0.1.1 --locked
+cargo install cargo-shallguard --version 0.1.2 --locked
 ```
 
 Or install from a local copy of this repository:
@@ -150,7 +150,7 @@ crate:
 
 ```toml
 [dependencies]
-shallguard = "0.1.1"
+shallguard = "0.1.2"
 ```
 
 **2. Create the file `shallguard.toml`** at the root of the repository. Copy
@@ -363,7 +363,7 @@ This is an example for GitHub Actions:
 ```yaml
 - name: Requirement assurance
   run: |
-    cargo install cargo-shallguard --version 0.1.1 --locked
+    cargo install cargo-shallguard --version 0.1.2 --locked
     cargo shallguard fmt --check
     cargo shallguard check
 ```
