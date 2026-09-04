@@ -237,7 +237,9 @@ cargo shallguard fmt            # fix doc formatting (never hand-wrap
 
 Run these commands only on request. They are for change review and for
 evidence audits. They are not gates. Do not run them on every edit. The
-`coverage` and `review` commands are expensive.
+`coverage` and `review` commands are expensive. The `review` and
+`review show` commands are experimental: they need a language model
+provider, and they can change in any release.
 
 ```bash
 # Which requirements does this diff touch? Direct, transitive (one
@@ -254,7 +256,7 @@ cargo shallguard test-index --enumerate --json requirement-tests.json
 cargo shallguard coverage --requirement REQ-<AREA>-NNN \
   --json requirement-coverage.json
 
-# One-command local semantic review: impact -> impacted-test selection ->
+# One-command local semantic review (experimental): impact -> impacted-test selection ->
 # coverage -> capsule bundle -> LLM review. Defaults: --target
 # origin/master (falls back per repo config), --with-coverage,
 # --provider codex; "claude" and "copilot" are the other providers. May send bounded

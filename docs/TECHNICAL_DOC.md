@@ -22,8 +22,8 @@ Each package has one role:
   namespace. The internal macro crate validates the syntax of each
   requirement ID at compile time. It emits the annotated Rust item without a
   change.
-- Git, Cargo, LLVM, and the optional model providers run as local
-  subprocesses. There is no long-running process and no network service.
+- Git, Cargo, LLVM, and the optional model providers of the experimental
+  review command run as local subprocesses. There is no long-running process and no network service.
 
 The [requirements specification](USER_STORIES_AND_REQUIREMENTS.md#architecture-preflight)
 holds the detailed architecture preflight and the dependency contract.

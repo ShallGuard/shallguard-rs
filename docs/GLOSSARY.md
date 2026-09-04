@@ -16,7 +16,7 @@ one meaning. The documents use the same word for the same thing.
 | Continuous integration (CI) | An automated pipeline that builds and tests each proposed change. |
 | Gate | A CI step that must pass before a change can merge. |
 | Coding agent | A program that uses a large language model to write or change code. Examples are Claude Code, Codex, and Copilot. |
-| Large language model (LLM) | A program that produces text from a prompt. ShallGuard uses an LLM only for advisory review. |
+| Large language model (LLM) | A program that produces text from a prompt. ShallGuard uses an LLM only for advisory review, and every feature that needs an LLM is experimental. |
 | Provider | The command-line program that gives ShallGuard access to an LLM. The supported providers are Codex, Claude, and Copilot. |
 
 ## ShallGuard terms
@@ -45,6 +45,7 @@ one meaning. The documents use the same word for the same thing.
 | Impact | The relation between a Git change and a requirement. The impact can be direct, transitive, or structural. |
 | Coverage | Execution evidence from the LLVM tools. It shows if a verification test reached an enforcement site. Coverage does not prove that the code is correct. |
 | Capsule | A bounded, reproducible bundle that holds one requirement, its code, its changes, and its evidence for a review. |
-| Semantic review | An advisory judgment about a capsule. A person or an LLM gives the judgment. It is not part of the check. |
+| Semantic review | An advisory judgment about a capsule. A person or an LLM gives the judgment. It is not part of the check. The `review` command is experimental. |
+| Experimental feature | A feature that needs an LLM. It can change or go away in any release, also in a patch release. Its result is advisory, and the check never depends on it. |
 | Verdict | The result of a semantic review for one requirement. A verdict is advisory. |
 | Artifact | A machine-readable file that a ShallGuard command writes. Each artifact has a schema version. |

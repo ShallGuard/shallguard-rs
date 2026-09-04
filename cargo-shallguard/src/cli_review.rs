@@ -6,7 +6,21 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 
-use super::{CliBase, ReviewArgs};
+use super::{COMMAND_NAME, CliBase, ReviewArgs};
+
+/// The notice that the review command prints before it starts.
+///
+/// Semantic review needs a large language model. ShallGuard marks every
+/// feature that needs a model as experimental: the commands, the options, and
+/// the artifacts can change in any release, and the verdicts stay advisory.
+#[shallguard::enforces("REQ-REV-010")]
+pub(super) fn experimental_notice() -> String {
+    format!(
+        "{COMMAND_NAME} review: semantic review is experimental. It needs a language model \
+         provider, its verdicts are advisory, and its commands, options, and artifacts can \
+         change in any release."
+    )
+}
 
 #[shallguard::enforces("REQ-CLI-002")]
 pub(super) fn parse_review_args(args: &[String]) -> Result<ReviewArgs> {

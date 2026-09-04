@@ -13,6 +13,11 @@ follows [Semantic Versioning](https://semver.org/).
   (#14).
 - Rewrote every document in Simplified Technical English and added
   `docs/WRITING_STYLE.md` with the mandatory rules.
+- Marked every feature that needs a language model as experimental: the
+  `review` command with its providers, `review show`, and the advisory
+  pull-request workflow. The `review` command prints a notice, and the help
+  output labels the commands. An experimental feature can change in any
+  release.
 
 ## [0.1.1] - 2026-08-17
 

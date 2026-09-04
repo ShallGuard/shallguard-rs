@@ -102,7 +102,8 @@ Optional commands add more evidence:
 
 - Execution coverage through the tool `cargo-llvm-cov`.
 - Impact analysis of a Git change.
-- Semantic review by a local language model. This review is advisory.
+- Semantic review by a local language model. This review is advisory, and
+  the feature is experimental.
 
 ## The name
 
@@ -326,6 +327,11 @@ runs the impact analysis, collects execution coverage with `cargo-llvm-cov`,
 builds a bounded review capsule, and gives the capsule to a local agent. The
 agent returns a verdict for each requirement.
 
+This feature is experimental, like every feature that needs a language
+model. It can change in any release, and its verdicts are advisory. The
+[user guide](docs/USER_DOC.md#experimental-features) lists the experimental
+features.
+
 In this recording, a colleague adds a new scheduling mode. The code compiles,
 passes every test, and keeps the check green. The new code also bypasses the
 required worker floor. Coverage proves that the anchored test reaches the
@@ -373,7 +379,8 @@ This repository also contains the workflow file
 `.github/workflows/shallguard-review.yml`. The workflow publishes an optional
 semantic review as a pull-request comment and updates the comment on each
 run. It keeps the Markdown report and the local review directory as a
-workflow artifact.
+workflow artifact. The workflow is experimental, because it needs a language
+model provider.
 
 The workflow needs credentials:
 
@@ -482,8 +489,8 @@ the version.
 | `cargo shallguard test-index` | List the exact Cargo tests behind the verification anchors. |
 | `cargo shallguard coverage` | Collect LLVM execution evidence for the verification tests. Needs `cargo-llvm-cov`. |
 | `cargo shallguard bundle` | Build a bounded source capsule for a review. |
-| `cargo shallguard review` | Run an optional semantic review of the affected requirements with a local LLM. The verdicts are advisory. |
-| `cargo shallguard review show` | Show a stored review as terminal text or as GitHub-flavored Markdown. |
+| `cargo shallguard review` | Run an optional semantic review of the affected requirements with a local LLM. The verdicts are advisory. Experimental. |
+| `cargo shallguard review show` | Show a stored review as terminal text or as GitHub-flavored Markdown. Experimental. |
 | `cargo shallguard clean` | Remove the validated bundle at the configured artifact location. |
 
 The executable finds the Cargo repository with `cargo metadata`. It reads the

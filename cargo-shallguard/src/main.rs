@@ -50,7 +50,7 @@ mod cli_review;
 #[path = "cli_review_show.rs"]
 mod cli_review_show;
 use cli_progress::print_progress;
-use cli_review::parse_review_args;
+use cli_review::{experimental_notice, parse_review_args};
 use cli_review_show::{ReviewShowArgs, parse_review_show_args, review_outcome_summary};
 
 /// Warnings printed in full detail before the rest is summarized.
@@ -848,6 +848,7 @@ fn run_review(
     config: &shallguard::config::RepositoryConfig,
     args: &ReviewArgs,
 ) -> ExitCode {
+    eprintln!("{}", experimental_notice());
     let configured_target = if args.base.is_none() && !args.resume && args.bundle.is_none() {
         config.review.target.as_deref()
     } else {
