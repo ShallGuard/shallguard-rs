@@ -5,7 +5,8 @@
 //! diff tools, and screen readers, and `grep` finds it. The four emoji
 //! that older documents use are accepted as aliases of the same classes.
 //! `cargo shallguard fmt` adds the keyword before an emoji that has no
-//! keyword yet, and it keeps the emoji next to the keyword.
+//! keyword yet, and it keeps the emoji next to the keyword. The check mode
+//! of `fmt` and the `lint` command accept an emoji without a keyword.
 
 /// One evidence class that a *Verified:* segment can claim.
 #[shallguard::enforces("REQ-SPEC-007")]
