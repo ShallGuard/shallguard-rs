@@ -38,7 +38,8 @@ and the gate is a ratchet.
 ## Documentation style (mandatory)
 
 Write ALL documents in **ASD-STE100** (Simplified Technical English), for
-readers **without prior knowledge**. The rules are in
+readers **without prior knowledge**. The rules are in the shared writing
+style page of the specification repository, linked from
 `docs/WRITING_STYLE.md`. Exception: a requirement statement keeps its
 RFC 2119 form (SHALL, SHALL NOT, MAY), because ShallGuard needs it.
 
