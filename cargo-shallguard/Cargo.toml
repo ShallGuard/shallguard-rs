@@ -1,6 +1,6 @@
 [package]
 name = "cargo-shallguard"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Tomas Siegl <tomas.siegl@gmail.com>"]
 edition = "2024"
 rust-version = "1.89"
@@ -21,7 +21,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0"
 serde_json = "1.0"
-shallguard = { path = "..", version = "0.1.1" }
+shallguard = { path = "..", version = "0.1.2" }
 
 [dev-dependencies]
 tempfile = "3.23.0"

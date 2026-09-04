@@ -23,7 +23,7 @@ them. The command can:
 Install the published Cargo subcommand:
 
 ```bash
-cargo install cargo-shallguard --version 0.1.1 --locked
+cargo install cargo-shallguard --version 0.1.2 --locked
 ```
 
 Or install from a local copy of the repository:

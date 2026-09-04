@@ -44,7 +44,7 @@ After all packages are available, verify a fresh installation from a
 directory outside this repository:
 
 ```bash
-cargo install cargo-shallguard --version 0.1.1 --locked
+cargo install cargo-shallguard --version 0.1.2 --locked
 cargo shallguard --help
 ```
 
