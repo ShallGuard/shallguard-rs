@@ -12,7 +12,16 @@ documentation = "https://docs.rs/shallguard"
 readme = "README.md"
 keywords = ["requirements", "traceability", "verification", "testing", "cargo"]
 categories = ["development-tools", "development-tools::testing"]
-include = ["src/**", "tests/**", "docs/**", "CHANGELOG.md", "LICENSE", "README.md"]
+include = [
+    "src/**",
+    "tests/**",
+    "docs/**",
+    "!docs/demo/*.gif",
+    "!docs/demo/*.tape",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+]
 
 [workspace]
 members = ["cargo-shallguard", "shallguard-macros"]
