@@ -468,11 +468,14 @@ language model provider.
   (`branch_anchor_only_owns_its_enclosing_block`,
   `branch_anchor_without_braces_owns_its_match_arm`)
 - **REQ-TRACE-004** — `#[shallguard::verifies]` SHALL count as automated
-  evidence only on a syntactically recognized, non-ignored test function; an
-  ordinary or ignored function carrying the attribute SHALL be reported
-  invalid. *Enforced:*
-  `src/scan.rs` (`collect_fn_attrs`) · *Verified:* [test] ✅ `src/scan_tests.rs`
-  (`verifies_attribute_needs_an_enabled_test`)
+  evidence only on a non-ignored function that carries a test attribute,
+  that is, an attribute whose last path segment is `test` or ends in `test`,
+  such as `#[test]`, `#[tokio::test]`, or `#[my_harness::container_test]`;
+  an ordinary or ignored function carrying the attribute SHALL be reported
+  invalid. *Enforced:* `src/scan.rs` (`collect_fn_attrs`,
+  `is_test_attribute`) · *Verified:* [test] ✅ `src/scan_tests.rs`
+  (`verifies_attribute_needs_an_enabled_test`), `tests/public_anchor_api.rs`
+  (`custom_test_attribute_is_accepted_by_the_macro`)
 - **REQ-TRACE-005** — The checker SHALL fail for malformed documents,
   duplicate IDs, unknown live anchor IDs, or nonexistent cited Rust paths.
   *Enforced:* `src/check.rs` (`run`, `analyze`), `src/docs.rs` (`parse_doc`) ·

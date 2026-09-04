@@ -104,7 +104,8 @@ again.
   wrap it in `{ }`. The macro expands to nothing.
 - `#[verifies("REQ-X-NNN", ...)]` is valid only on a function with a
   recognized test attribute: `#[test]`, `#[tokio::test]`, or any attribute
-  path that ends in `test`. It **rejects a test with `#[ignore]`** at
+  whose name ends in `test`, for example `#[my_harness::container_test]`.
+  It **rejects a test with `#[ignore]`** at
   compile time and in the check. There is no statement form for
   verification.
 - The check flags one test that claims 6 or more requirements as an

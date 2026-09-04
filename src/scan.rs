@@ -474,6 +474,19 @@ fn collect_item_attrs(
     }
 }
 
+/// Returns whether an attribute path names a test attribute.
+///
+/// The last path segment must be `test` or end in `test`. This accepts
+/// `#[test]`, `#[tokio::test]`, and custom harness attributes such as
+/// `#[my_harness::container_test]`. The `verifies` macro applies the same
+/// rule at compile time.
+#[shallguard::enforces("REQ-TRACE-004")]
+fn is_test_attribute(path: &syn::Path) -> bool {
+    path.segments
+        .last()
+        .is_some_and(|segment| segment.ident.to_string().ends_with("test"))
+}
+
 /// Handles attributes on a function (free or impl): `#[shallguard::verifies]` is a
 /// verification anchor only when the function is a real, enabled test.
 #[shallguard::enforces("REQ-TRACE-004")]
@@ -486,12 +499,7 @@ fn collect_fn_attrs(
     id_re: &Regex,
     anchors: &mut Anchors,
 ) {
-    let is_test = attrs.iter().any(|a| {
-        a.path()
-            .segments
-            .last()
-            .is_some_and(|segment| segment.ident == "test")
-    });
+    let is_test = attrs.iter().any(|a| is_test_attribute(a.path()));
     let is_ignored = attrs.iter().any(|a| a.path().is_ident("ignore"));
 
     for attr in attrs {
