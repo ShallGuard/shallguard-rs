@@ -8,6 +8,10 @@ follows [Semantic Versioning](https://semver.org/).
 - Fixed `#[shallguard::verifies]` and the scanner so that they accept every
   test attribute whose name ends in `test`, such as
   `#[my_harness::container_test]`, as the documentation already said (#27).
+- Moved the contributing rules that apply to every ShallGuard repository,
+  the code of conduct, the writing rules, and the shared glossary to the
+  specification repository `shallguard/spec`. This repository keeps its
+  Rust-specific contributing page and links to the shared documents.
 - Added ASCII evidence marks `[test]`, `[e2e]`, `[review]`, and `[pending]`
   as the canonical form on `*Verified:*` lines. The emoji ✅, 🔬, 👁, and ⏳
   stay valid as optional aliases. `cargo shallguard fmt` adds the keyword
