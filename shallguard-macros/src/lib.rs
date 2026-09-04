@@ -273,24 +273,32 @@ fn validate_id_list(
 /// (`#[test]`, `#[tokio::test]`, or any attribute whose path ends in
 /// `test`) and must not be `#[ignore]`d — evidence that does not run is
 /// not evidence.
+/// Returns whether an attribute path names a test attribute.
+///
+/// The last path segment must be `test` or end in `test`. This accepts
+/// `#[test]`, `#[tokio::test]`, and custom harness attributes such as
+/// `#[my_harness::container_test]`. The scanner in the `shallguard` crate
+/// applies the same rule.
+fn is_test_attribute(path: &syn::Path) -> bool {
+    path.segments
+        .last()
+        .is_some_and(|segment| segment.ident.to_string().ends_with("test"))
+}
+
 #[proc_macro_attribute]
 pub fn verifies(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut errors = proc_macro2::TokenStream::new();
     match syn::parse::<syn::Item>(item.clone()) {
         Ok(syn::Item::Fn(fun)) => {
-            let is_test = fun.attrs.iter().any(|attr| {
-                attr.path()
-                    .segments
-                    .last()
-                    .is_some_and(|segment| segment.ident == "test")
-            });
+            let is_test = fun.attrs.iter().any(|attr| is_test_attribute(attr.path()));
             let is_ignored = fun.attrs.iter().any(|attr| attr.path().is_ident("ignore"));
             if !is_test {
                 errors.extend(
                     syn::Error::new_spanned(
                         &fun.sig.ident,
-                        "#[shallguard::verifies] requires a test function: add #[test] / \
-                         #[tokio::test] below the anchor, or remove the anchor",
+                        "#[shallguard::verifies] requires a test function: add #[test], \
+                         #[tokio::test], or another attribute whose name ends in `test` \
+                         below the anchor, or remove the anchor",
                     )
                     .to_compile_error(),
                 );
@@ -359,7 +367,34 @@ fn validate_req_id(id: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_req_id;
+    use super::{is_test_attribute, validate_req_id};
+
+    #[test]
+    fn recognizes_test_attributes_by_their_last_segment() {
+        for path in [
+            "test",
+            "tokio::test",
+            "my_harness::container_test",
+            "rstest",
+            "sqlx::test",
+        ] {
+            let parsed: syn::Path = syn::parse_str(path).expect("path parses");
+            assert!(is_test_attribute(&parsed), "{path} is a test attribute");
+        }
+        for path in [
+            "ignore",
+            "cfg",
+            "testing::setup",
+            "test_case",
+            "harness::tester",
+        ] {
+            let parsed: syn::Path = syn::parse_str(path).expect("path parses");
+            assert!(
+                !is_test_attribute(&parsed),
+                "{path} is not a test attribute"
+            );
+        }
+    }
 
     #[test]
     fn accepts_known_area_shapes() {

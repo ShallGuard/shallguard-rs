@@ -272,12 +272,21 @@ fn not_a_test() {}
 #[test]
 #[ignore]
 fn ignored_test() {}
+
+#[shallguard::verifies(\"REQ-RD-009\")]
+#[my_harness::container_test(user = \"svc\")]
+async fn custom_harness_test() {}
+
+#[shallguard::verifies(\"REQ-RD-010\")]
+#[testing::setup]
+fn attribute_that_does_not_end_in_test() {}
 ",
     );
     let ids: Vec<&str> = anchors.verified_ids().collect();
-    assert_eq!(ids, vec!["REQ-RD-006"]);
+    assert_eq!(ids, vec!["REQ-RD-006", "REQ-RD-009"]);
     assert_eq!(anchors.verification[0].test_fn, "valid_test");
-    assert_eq!(anchors.invalid.len(), 2);
+    assert_eq!(anchors.verification[1].test_fn, "custom_harness_test");
+    assert_eq!(anchors.invalid.len(), 3);
 }
 
 #[shallguard::verifies("REQ-TRACE-002")]

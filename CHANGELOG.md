@@ -5,6 +5,9 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Fixed `#[shallguard::verifies]` and the scanner so that they accept every
+  test attribute whose name ends in `test`, such as
+  `#[my_harness::container_test]`, as the documentation already said (#27).
 - Added ASCII evidence marks `[test]`, `[e2e]`, `[review]`, and `[pending]`
   as the canonical form on `*Verified:*` lines. The emoji ✅, 🔬, 👁, and ⏳
   stay valid as optional aliases. `cargo shallguard fmt` adds the keyword
