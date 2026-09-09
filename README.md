@@ -20,6 +20,9 @@ Every test passes. The continuous integration (CI) pipeline is green.
 The same change has also deleted the test that proves a critical rule. Or it
 has changed the test to `assert!(true)`. Nothing in the pipeline sees this.
 
+The page [Why write requirements](https://github.com/shallguard/spec/blob/master/WHY.md)
+says why a team writes requirements at all when an agent writes the code.
+
 ## The solution
 
 With ShallGuard, the critical rule is a numbered requirement in a Markdown
