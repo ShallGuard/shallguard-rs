@@ -116,6 +116,87 @@ again.
 - Put `#[enforces]` on the item that implements the SHALL statement. Do not
   put it on the nearest public function.
 
+## Comments next to anchors
+
+A comment can explain why the code at an anchor makes a requirement true.
+The comment is text for a reader. It is never an anchor, and the check does
+not read it. The anchor stays mandatory. The IDs live only in the anchor.
+Do not repeat them in the comment. A list in a comment can drift from the
+anchor, and the check does not compare the two.
+
+There are three placements. Use one, or use the first together with the
+second or the third.
+
+**A block before the anchor.** Use it for the summary of what the item
+guarantees. When you add the block next to an existing comment, follow
+these rules:
+
+- Put the block in its own group of lines, after the existing comment.
+- Separate the two with one empty line. In a doc comment, the empty line
+  is a line with only `///`. In a line comment, the empty line is an empty
+  source line.
+- Start the block with the line `// Requirements:` or `/// Requirements:`
+  and nothing else on that line.
+- Put the explanation in the lines after the first line.
+
+```rust
+/// Registration of a new provider.
+/// Checks for duplicates to prevent tracking corruption.
+///
+/// Requirements:
+/// The first registration makes an eligible target `Ok`. The health
+/// fact and the quality timing do not change.
+#[enforces("REQ-OP-066")]
+pub fn register_provider(&mut self, provider_id: ProviderId) {
+```
+
+```rust
+if has_prefix {
+    // The provider is ready and has a free prefix.
+
+    // Requirements:
+    // Registration is the provider-presence fact behind the operational
+    // state. Health is left to the quality handlers.
+    enforces_here!("REQ-OP-066");
+    target.register_provider(provider_id);
+}
+```
+
+**A comment after an ID inside the attribute.** Use it when an anchor
+claims several requirements and each ID has its own one-line reason. Put
+a comma after the last ID when a comment follows it.
+
+**A comment above a group of IDs inside the attribute.** Use it when one
+reason covers several IDs. Both forms can mix in one attribute. Only `//`
+and `/* */` comments are valid inside an attribute. A `///` line inside
+an attribute is a compile error. The compiler removes the comments before
+the macro reads the IDs, and `rustfmt` keeps them.
+
+```rust
+/// Returns a `Patch` with all receiver movements.
+///
+/// Requirements:
+/// One optimizer cycle: migrations converge per-goal allocations toward
+/// the configured targets, batched under the patch-size limit. The cap
+/// also limits the migration rate during instability.
+#[enforces(
+    // Weighted split that converges per goal and reacts to receivers
+    // appearing, disappearing, and goal changes.
+    "REQ-CR-008",
+    "REQ-CR-009",
+    "REQ-OP-002",
+    // Batched per cycle. A move never drops a downstream connection.
+    "REQ-OP-004",
+    "REQ-OP-016",
+    "REQ-EH-016", // the cap damps cascade patterns across targets
+    "REQ-EH-017", // and so lowers the migration rate during instability
+)]
+pub fn get_patch(&mut self, configuration: &OptimizerConfiguration) -> Patch {
+```
+
+The line `Requirements:` makes the block easy to find with a text search.
+The comments inside the attribute tell a reviewer why each ID is claimed.
+
 ## Evidence honesty
 
 These rules are hard rules.
