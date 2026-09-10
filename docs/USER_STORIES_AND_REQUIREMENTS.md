@@ -487,6 +487,7 @@ language model provider.
   (`canonicalize_evidence_marks`) · *Verified:* [test] ✅
   `src/requirement_format.rs` (`adds_canonical_keywords_next_to_emoji_aliases`,
   `check_accepts_emoji_aliases_and_format_adds_keywords`)
+- **REQ-SPEC-009** — Consecutive active requirement items SHALL be separated by exactly one empty line. `cargo shallguard fmt` SHALL produce this canonical form, while `cargo shallguard check` SHALL accept both separated and unseparated requirement items. *Enforced:* `src/requirement_format.rs` (`format_text`) · *Verified:* [test] ✅ `src/requirement_format.rs` (`formats_consecutive_requirements_with_exactly_one_blank_line`)
 
 ## Traceability User Stories
 

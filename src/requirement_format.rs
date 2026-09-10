@@ -129,6 +129,7 @@ fn prepare_document(root: &Path, spec: &DocSpec, add_keywords: bool) -> Result<P
     })
 }
 
+#[shallguard::enforces("REQ-SPEC-009")]
 fn format_text(text: &str, spec: &DocSpec, add_keywords: bool) -> FormattedText {
     let candidate_re =
         Regex::new(r"^\s*-\s+\*\*REQ-").expect("BUG: invalid requirement candidate regex");
@@ -158,6 +159,24 @@ fn format_text(text: &str, spec: &DocSpec, add_keywords: bool) -> FormattedText 
         let block_diagnostics = lint_block(block, spec, start + 1);
         if block_diagnostics.is_empty() {
             output.extend(format_block(block, add_keywords));
+
+            let mut next = index;
+            while next < lines.len() && lines[next].trim().is_empty() {
+                next += 1;
+            }
+
+            if next < lines.len() && candidate_re.is_match(lines[next]) {
+                // Consecutive requirements: exactly one blank line.
+                output.push(String::new());
+                index = next;
+            } else {
+                // Not a requirement-to-requirement boundary:
+                // preserve the original blank lines.
+                while index < next {
+                    output.push(lines[index].to_string());
+                    index += 1;
+                }
+            }
         } else {
             output.extend(block.iter().map(|line| (*line).to_string()));
             diagnostics.extend(block_diagnostics);
@@ -365,6 +384,21 @@ mod tests {
             "crate",
             std::collections::BTreeMap::new(),
         )
+    }
+
+    #[shallguard::verifies("REQ-SPEC-009")]
+    #[test]
+    fn formats_consecutive_requirements_with_exactly_one_blank_line() {
+        let input = "before\n- **REQ-AA-001** — First requirement SHALL work. *Enforced:* `src/lib.rs` (`first`) · *Verified:* [test] `src/lib.rs` (`first_test`)\n  continuation\n\n\n- **REQ-AA-002** — Second requirement SHALL work. *Enforced:* `src/lib.rs` (`second`) · *Verified:* [test] `src/lib.rs` (`second_test`)\n  continuation\n\nafter\n";
+
+        let formatted = format_text(input, &spec(), true);
+
+        assert!(formatted.diagnostics.is_empty());
+        assert_eq!(formatted.requirements, 2);
+        assert!(formatted.text.contains("  continuation\n\n- **REQ-AA-002**"));
+        assert!(!formatted.text.contains("  continuation\n\n\n- **REQ-AA-002**"));
+        assert!(formatted.text.contains("- **REQ-AA-002** — Second requirement"));
+        assert!(formatted.text.contains("\n\nafter\n"));
     }
 
     #[shallguard::verifies("REQ-SPEC-005")]
