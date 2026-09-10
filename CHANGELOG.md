@@ -7,7 +7,9 @@ follows [Semantic Versioning](https://semver.org/).
 
 - Added `cargo shallguard install-skill`. The executable embeds the AI agent
   skill and writes it for Claude Code, for Codex, into a project, or into a
-  named directory. The command needs no repository.
+  named directory. The command needs no repository. The option `--check`
+  reports whether each installed skill is current, and the skill front
+  matter names the release under `metadata.version`.
 - Fixed `#[shallguard::verifies]` and the scanner so that they accept every
   test attribute whose name ends in `test`, such as
   `#[my_harness::container_test]`, as the documentation already said (#27).

@@ -12,7 +12,9 @@ its version, and you do not publish it again.
 
 1. Increase the version of each package that you release. Change an internal
    dependency requirement only when the release needs a newer version of that
-   dependency. In all other cases, keep the published version.
+   dependency. In all other cases, keep the published version. When you
+   release `cargo-shallguard`, set the same version under `metadata.version`
+   in `docs/skill/SKILL.md`. A test compares the two.
 2. Move the related entries in [`CHANGELOG.md`](../CHANGELOG.md) from the
    `Unreleased` section into a dated release section.
 3. Run the validation commands in
