@@ -467,6 +467,10 @@ cargo shallguard install-skill --project
 
 # Any other agent. The command writes <directory>/SKILL.md.
 cargo shallguard install-skill --dir <directory>
+
+# Report only. The command prints current, outdated, or missing for each
+# file, never writes, and exits nonzero when a file is not current.
+cargo shallguard install-skill --check
 ```
 
 Claude Code finds skills automatically. It loads this skill when the agent
@@ -476,10 +480,12 @@ in `.agents/skills` directories. It loads the full instructions when the
 description of the skill matches the task. If a change does not appear,
 restart Codex.
 
-The skill has the same version as the executable. When your repository
-moves to a newer `shallguard` release, install the matching
-`cargo-shallguard` and run `cargo shallguard install-skill` again. The
-command reports `updated`.
+The skill has the same version as the executable, and its front matter
+names that version under `metadata.version`. When your repository moves to
+a newer `shallguard` release, install the matching `cargo-shallguard` and
+run `cargo shallguard install-skill` again. The command reports `updated`.
+A CI step with `--check` fails when a committed project skill is older
+than the executable.
 
 ## Command reference
 

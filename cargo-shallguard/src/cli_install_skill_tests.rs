@@ -23,6 +23,13 @@ fn embedded_skill_is_the_repository_skill() {
         "the embedded skill must equal {}",
         repository_skill.display()
     );
+    assert_eq!(
+        skill_version(SKILL),
+        Some(env!("CARGO_PKG_VERSION")),
+        "docs/skill/SKILL.md must name the package version under metadata.version"
+    );
+    assert_eq!(skill_version("no front matter"), None);
+    assert_eq!(skill_version("---\nname: x\n---\nversion: 9\n"), None);
 }
 
 #[shallguard::verifies("REQ-CLI-014")]
@@ -50,6 +57,10 @@ fn parses_agents_project_and_dir() {
 
     let empty = parse_install_skill_args(&[]).expect("no arguments parse");
     assert_eq!(empty, InstallSkillArgs::default());
+
+    let check =
+        parse_install_skill_args(&strings(&["--check", "--project"])).expect("check parses");
+    assert!(check.check && check.project);
 
     for (arguments, message) in [
         (&["--agent", "gemini"][..], "unknown agent"),
@@ -151,4 +162,57 @@ fn reports_installed_updated_and_unchanged() {
     fs::write(&path, "an older manual").expect("replace the skill");
     assert_eq!(write_skill(&path).expect("third write"), "updated");
     assert_eq!(fs::read_to_string(&path).expect("read skill"), SKILL);
+}
+
+#[shallguard::verifies("REQ-CLI-016")]
+#[test]
+fn check_reports_current_outdated_and_missing() {
+    let root = tempdir().expect("create destination root");
+    let path = root.path().join("skills/shallguard/SKILL.md");
+
+    assert_eq!(
+        check_skill(&path).expect("check a missing file"),
+        SkillStatus::Missing
+    );
+    assert!(!path.exists(), "a check never writes");
+
+    write_skill(&path).expect("install the skill");
+    assert_eq!(
+        check_skill(&path).expect("check a current file"),
+        SkillStatus::Current
+    );
+
+    fs::write(
+        &path,
+        "---\nname: shallguard\nmetadata:\n  version: 0.0.1\n---\nold\n",
+    )
+    .expect("replace with an older skill");
+    assert_eq!(
+        check_skill(&path).expect("check an older file"),
+        SkillStatus::Outdated {
+            installed: Some("0.0.1".to_string())
+        }
+    );
+    assert_eq!(
+        SkillStatus::Outdated {
+            installed: Some("0.0.1".to_string())
+        }
+        .line(Path::new("x/SKILL.md")),
+        format!(
+            "outdated x/SKILL.md: installed 0.0.1, executable {}",
+            env!("CARGO_PKG_VERSION")
+        )
+    );
+
+    fs::write(&path, "a manual without front matter").expect("replace with an unknown skill");
+    assert_eq!(
+        check_skill(&path).expect("check a file without a version"),
+        SkillStatus::Outdated { installed: None }
+    );
+    assert!(
+        SkillStatus::Outdated { installed: None }
+            .line(Path::new("x/SKILL.md"))
+            .contains("installed unknown"),
+        "a file without a version is reported as unknown"
+    );
 }

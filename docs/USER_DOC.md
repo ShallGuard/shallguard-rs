@@ -53,7 +53,7 @@ cargo shallguard install-skill
 
 The command writes the skill for every agent that it finds on the machine.
 The [README](../README.md#ai-agent-skill) explains the options `--agent`,
-`--project`, and `--dir`.
+`--project`, `--dir`, and `--check`.
 
 ## Repository setup and usage
 

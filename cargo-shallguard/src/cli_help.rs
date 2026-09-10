@@ -33,7 +33,7 @@ Usage:
   cargo shallguard fmt [--check] [<doc.md> ...]
   cargo shallguard lint [<doc.md> ...]
   cargo shallguard clean
-  cargo shallguard install-skill [--agent <claude|codex>]... [--project | --dir <directory>]
+  cargo shallguard install-skill [--check] [--agent <claude|codex>]... [--project | --dir <directory>]
   cargo shallguard baseline <check|init|prune>
   cargo shallguard impact <--base <revision>|--target <branch>> [--json <path>] [--markdown <path>]
   cargo shallguard bundle --impact <impact.json> [--coverage <coverage.json>] [options]
@@ -49,6 +49,8 @@ Install skill options:
   --project                  Write below the Cargo workspace root instead of
                              the home directory
   --dir <directory>          Write SKILL.md into this directory instead
+  --check                    Report current, outdated, or missing files and
+                             never write; nonzero when a file is not current
 
 Review options (experimental):
   --provider <name>          Model CLI: codex, claude, or copilot

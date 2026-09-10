@@ -10,7 +10,7 @@
 //! cargo shallguard fmt [--check] [<doc.md> ...]
 //! cargo shallguard lint [<doc.md> ...]
 //! cargo shallguard clean
-//! cargo shallguard install-skill [--agent <claude|codex>]... [--project | --dir <directory>]
+//! cargo shallguard install-skill [--check] [--agent <claude|codex>]... [--project | --dir <directory>]
 //! cargo shallguard baseline check
 //! cargo shallguard baseline prune
 //! cargo shallguard impact --base <revision> --json requirement-impact.json

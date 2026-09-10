@@ -73,3 +73,53 @@ fn installed_skill_command_works_without_repository() {
     );
     assert!(codex_skill.is_file(), "the Codex skill is written");
 }
+
+#[shallguard::verifies("REQ-CLI-016")]
+#[test]
+fn installed_check_reports_missing_current_and_outdated() {
+    let home = tempdir().expect("create home directory");
+    fs::create_dir(home.path().join(".claude")).expect("mark Claude Code as installed");
+    let skill = home.path().join(".claude/skills/shallguard/SKILL.md");
+
+    let missing = install_skill(&home, &["--check"]);
+    assert!(!missing.status.success(), "a missing skill fails the check");
+    assert_eq!(
+        String::from_utf8_lossy(&missing.stdout),
+        format!("missing {}\n", skill.display())
+    );
+    assert!(!skill.exists(), "a check never writes");
+
+    let install = install_skill(&home, &[]);
+    assert!(install.status.success(), "install-skill succeeds");
+    let current = install_skill(&home, &["--check"]);
+    assert!(current.status.success(), "a current skill passes the check");
+    assert_eq!(
+        String::from_utf8_lossy(&current.stdout),
+        format!("current {}\n", skill.display())
+    );
+    assert!(current.stderr.is_empty(), "a passing check is quiet");
+
+    fs::write(
+        &skill,
+        "---\nname: shallguard\nmetadata:\n  version: 0.0.1\n---\nold\n",
+    )
+    .expect("replace with an older skill");
+    let outdated = install_skill(&home, &["--check"]);
+    assert!(
+        !outdated.status.success(),
+        "an outdated skill fails the check"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&outdated.stdout),
+        format!(
+            "outdated {}: installed 0.0.1, executable {}\n",
+            skill.display(),
+            env!("CARGO_PKG_VERSION")
+        )
+    );
+    assert_eq!(
+        fs::read_to_string(&skill).expect("read the skill"),
+        "---\nname: shallguard\nmetadata:\n  version: 0.0.1\n---\nold\n",
+        "a check never writes"
+    );
+}

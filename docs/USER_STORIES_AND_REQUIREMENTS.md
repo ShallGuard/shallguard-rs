@@ -371,9 +371,11 @@ language model provider.
 
 **System Requirements:**
 
-- **REQ-CLI-013** — The executable SHALL embed the agent skill manual, and
-  the embedded manual SHALL be identical to the file `docs/skill/SKILL.md`
-  of the same release. *Enforced:* `cli:src/cli_install_skill.rs` (`SKILL`)
+- **REQ-CLI-013** — The executable SHALL embed the agent skill manual, the
+  embedded manual SHALL be identical to the file `docs/skill/SKILL.md`
+  of the same release, and the front matter of the manual SHALL name the
+  version of the `cargo-shallguard` package under `metadata.version`.
+  *Enforced:* `cli:src/cli_install_skill.rs` (`SKILL`, `skill_version`)
   · *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
   (`embedded_skill_is_the_repository_skill`)
 - **REQ-CLI-014** — `cargo shallguard install-skill` SHALL write the embedded
@@ -401,6 +403,16 @@ language model provider.
   *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
   (`reports_installed_updated_and_unchanged`), `cli:tests/install_skill.rs`
   (`installed_skill_command_works_without_repository`)
+- **REQ-CLI-016** — `install-skill --check` SHALL compare each destination
+  with the embedded manual and SHALL NOT write. It SHALL print one line per
+  destination that starts with `current`, `outdated`, or `missing` followed
+  by the path, and an `outdated` line SHALL also name the version from the
+  front matter of the installed file, or `unknown`, and the version of the
+  executable. It SHALL exit nonzero when any destination is not current.
+  *Enforced:* `cli:src/cli_install_skill.rs` (`check_skill`, `install`) ·
+  *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
+  (`check_reports_current_outdated_and_missing`), `cli:tests/install_skill.rs`
+  (`installed_check_reports_missing_current_and_outdated`)
 
 ## Specification User Stories
 

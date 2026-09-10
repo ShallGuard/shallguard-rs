@@ -17,6 +17,21 @@ use anyhow::{Context, Result, bail};
 #[shallguard::enforces("REQ-CLI-013")]
 pub(super) const SKILL: &str = include_str!("skill/SKILL.md");
 
+/// The version of the executable, which the skill front matter repeats.
+const SKILL_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The value of `version:` in the front matter of a skill, if present.
+#[shallguard::enforces("REQ-CLI-013")]
+pub(super) fn skill_version(skill: &str) -> Option<&str> {
+    let body = skill.strip_prefix("---\n")?;
+    let front_matter = &body[..body.find("\n---\n")?];
+    front_matter
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("version:"))
+        .map(str::trim)
+        .filter(|version| !version.is_empty())
+}
+
 const COMMAND: &str = "cargo shallguard install-skill";
 
 /// A coding agent that loads a skill from a known directory.
@@ -61,6 +76,7 @@ pub(super) struct InstallSkillArgs {
     pub(super) agents: BTreeSet<Agent>,
     pub(super) project: bool,
     pub(super) dir: Option<PathBuf>,
+    pub(super) check: bool,
 }
 
 #[shallguard::enforces("REQ-CLI-014")]
@@ -81,6 +97,7 @@ pub(super) fn parse_install_skill_args(args: &[String]) -> Result<InstallSkillAr
                 parsed.agents.insert(agent);
             }
             "--project" => parsed.project = true,
+            "--check" => parsed.check = true,
             "--dir" => {
                 let dir = args
                     .get(index)
@@ -88,7 +105,7 @@ pub(super) fn parse_install_skill_args(args: &[String]) -> Result<InstallSkillAr
                 index += 1;
                 parsed.dir = Some(PathBuf::from(dir));
             }
-            _ => bail!("unknown argument {flag:?}; expected --agent, --project, or --dir"),
+            _ => bail!("unknown argument {flag:?}; expected --agent, --project, --dir, or --check"),
         }
     }
     if parsed.dir.is_some() && (parsed.project || !parsed.agents.is_empty()) {
@@ -137,7 +154,8 @@ pub(super) fn destinations(
 #[shallguard::enforces("REQ-CLI-015")]
 pub(super) fn run(args: &InstallSkillArgs) -> ExitCode {
     match install(args) {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::FAILURE,
         Err(err) => {
             eprintln!("{COMMAND} failed: {err:#}");
             ExitCode::FAILURE
@@ -145,7 +163,10 @@ pub(super) fn run(args: &InstallSkillArgs) -> ExitCode {
     }
 }
 
-fn install(args: &InstallSkillArgs) -> Result<()> {
+/// Writes or checks every destination. Returns `false` when a check finds
+/// a destination that is not current.
+#[shallguard::enforces("REQ-CLI-016")]
+fn install(args: &InstallSkillArgs) -> Result<bool> {
     let project_root = if args.project {
         Some(shallguard::workspace_root()?)
     } else {
@@ -153,11 +174,58 @@ fn install(args: &InstallSkillArgs) -> Result<()> {
     };
     let home = std::env::home_dir();
     let targets = destinations(args, home.as_deref(), project_root.as_deref())?;
+    let mut stale = 0usize;
     for path in targets {
-        let outcome = write_skill(&path)?;
-        println!("{outcome} {}", path.display());
+        if args.check {
+            let status = check_skill(&path)?;
+            if !matches!(status, SkillStatus::Current) {
+                stale += 1;
+            }
+            println!("{}", status.line(&path));
+        } else {
+            let outcome = write_skill(&path)?;
+            println!("{outcome} {}", path.display());
+        }
     }
-    Ok(())
+    if stale > 0 {
+        eprintln!("{COMMAND} --check: {stale} file(s) need `{COMMAND}`");
+    }
+    Ok(stale == 0)
+}
+
+/// The state of one installed skill file, compared with the embedded one.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum SkillStatus {
+    Current,
+    Missing,
+    Outdated { installed: Option<String> },
+}
+
+impl SkillStatus {
+    fn line(&self, path: &Path) -> String {
+        match self {
+            SkillStatus::Current => format!("current {}", path.display()),
+            SkillStatus::Missing => format!("missing {}", path.display()),
+            SkillStatus::Outdated { installed } => format!(
+                "outdated {}: installed {}, executable {SKILL_VERSION}",
+                path.display(),
+                installed.as_deref().unwrap_or("unknown")
+            ),
+        }
+    }
+}
+
+/// Compares the file with the embedded manual without a write.
+#[shallguard::enforces("REQ-CLI-016")]
+pub(super) fn check_skill(path: &Path) -> Result<SkillStatus> {
+    match fs::read(path) {
+        Ok(existing) if existing == SKILL.as_bytes() => Ok(SkillStatus::Current),
+        Ok(existing) => Ok(SkillStatus::Outdated {
+            installed: skill_version(&String::from_utf8_lossy(&existing)).map(str::to_string),
+        }),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(SkillStatus::Missing),
+        Err(err) => Err(err).with_context(|| format!("reading {}", path.display())),
+    }
 }
 
 /// Writes the manual and reports `installed`, `updated`, or `unchanged`.

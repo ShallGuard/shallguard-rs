@@ -1,5 +1,7 @@
 ---
 name: shallguard
+metadata:
+  version: 0.1.1
 description: Use when working in a Rust repository that uses ShallGuard requirement traceability — recognizable by a shallguard.toml at the repo root, #[enforces]/#[verifies] anchors in code, or a numbered-requirement USER_STORIES_AND_REQUIREMENTS.md. Triggers include adding/modifying/removing behavior in such a repo, editing a requirements document, responding to "cargo shallguard check" failures, anchoring tests, adopting ShallGuard in a new repository, or running requirement impact/coverage/review analysis.
 ---
 
