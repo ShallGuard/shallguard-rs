@@ -5,31 +5,66 @@ fn strings(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_string()).collect()
 }
 
+fn embedded(name: &str) -> &'static str {
+    SKILL_FILES
+        .iter()
+        .find(|(file, _)| *file == name)
+        .map(|(_, content)| *content)
+        .unwrap_or_else(|| panic!("BUG: the skill embeds {name}"))
+}
+
 #[shallguard::verifies("REQ-CLI-013")]
 #[test]
 fn embedded_skill_is_the_repository_skill() {
-    let repository_skill = Path::new(env!("CARGO_MANIFEST_DIR"))
+    let skill_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("BUG: CLI package must have a workspace parent")
-        .join("docs/skill/SKILL.md");
-    let expected = fs::read_to_string(&repository_skill).expect("read docs/skill/SKILL.md");
+        .join("docs/skill");
+    assert_eq!(
+        SKILL_FILES.map(|(name, _)| name),
+        ["SKILL.md", "rust.md"],
+        "the skill embeds the generic file and the Rust file"
+    );
+    for (name, content) in SKILL_FILES {
+        let path = skill_dir.join(name);
+        let expected = fs::read_to_string(&path)
+            .unwrap_or_else(|err| panic!("read {}: {err}", path.display()));
+        assert_eq!(
+            content,
+            expected,
+            "the embedded {name} must equal {}",
+            path.display()
+        );
+    }
+
+    let skill = embedded("SKILL.md");
     assert!(
-        expected.starts_with("---\nname: shallguard\n"),
-        "the repository skill starts with its front matter"
+        skill.starts_with("---\nname: shallguard\n"),
+        "SKILL.md starts with its front matter"
     );
     assert_eq!(
-        SKILL,
-        expected,
-        "the embedded skill must equal {}",
-        repository_skill.display()
-    );
-    assert_eq!(
-        skill_version(SKILL),
+        front_matter_value(skill, "version"),
         Some(env!("CARGO_PKG_VERSION")),
         "docs/skill/SKILL.md must name the package version under metadata.version"
     );
-    assert_eq!(skill_version("no front matter"), None);
-    assert_eq!(skill_version("---\nname: x\n---\nversion: 9\n"), None);
+    assert!(
+        front_matter_value(skill, "spec").is_some(),
+        "docs/skill/SKILL.md must name the shared skill version under metadata.spec"
+    );
+    assert!(
+        skill.contains("`rust.md`"),
+        "the generic skill sends the agent to the language file"
+    );
+
+    assert_eq!(front_matter_value("no front matter", "version"), None);
+    assert_eq!(
+        front_matter_value("---\nname: x\n---\nversion: 9\n", "version"),
+        None
+    );
+    assert_eq!(
+        front_matter_value("---\nversion-x: 9\n---\n", "version"),
+        None
+    );
 }
 
 #[shallguard::verifies("REQ-CLI-014")]
@@ -102,15 +137,15 @@ fn selects_installed_agents_from_the_home_directory() {
     fs::create_dir(home.path().join(".claude")).expect("mark Claude Code as installed");
     assert_eq!(
         destinations(&default_args, Some(home.path()), None).expect("Claude Code is selected"),
-        vec![home.path().join(".claude/skills/shallguard/SKILL.md")]
+        vec![home.path().join(".claude/skills/shallguard")]
     );
 
     fs::create_dir(home.path().join(".codex")).expect("mark Codex as installed");
     assert_eq!(
         destinations(&default_args, Some(home.path()), None).expect("both agents are selected"),
         vec![
-            home.path().join(".claude/skills/shallguard/SKILL.md"),
-            home.path().join(".agents/skills/shallguard/SKILL.md"),
+            home.path().join(".claude/skills/shallguard"),
+            home.path().join(".agents/skills/shallguard"),
         ]
     );
 
@@ -122,8 +157,8 @@ fn selects_installed_agents_from_the_home_directory() {
         destinations(&project_args, Some(home.path()), Some(project.path()))
             .expect("the project root replaces the home directory"),
         vec![
-            project.path().join(".claude/skills/shallguard/SKILL.md"),
-            project.path().join(".agents/skills/shallguard/SKILL.md"),
+            project.path().join(".claude/skills/shallguard"),
+            project.path().join(".agents/skills/shallguard"),
         ]
     );
 
@@ -135,7 +170,7 @@ fn selects_installed_agents_from_the_home_directory() {
     assert_eq!(
         destinations(&explicit_args, Some(empty_home.path()), None)
             .expect("an explicit agent needs no marker"),
-        vec![empty_home.path().join(".agents/skills/shallguard/SKILL.md")]
+        vec![empty_home.path().join(".agents/skills/shallguard")]
     );
 
     let dir_args = InstallSkillArgs {
@@ -144,7 +179,7 @@ fn selects_installed_agents_from_the_home_directory() {
     };
     assert_eq!(
         destinations(&dir_args, None, None).expect("an explicit directory needs no home"),
-        vec![PathBuf::from("custom/skills/SKILL.md")]
+        vec![PathBuf::from("custom/skills")]
     );
 }
 
@@ -152,16 +187,23 @@ fn selects_installed_agents_from_the_home_directory() {
 #[test]
 fn reports_installed_updated_and_unchanged() {
     let root = tempdir().expect("create destination root");
-    let path = root.path().join("nested/skills/shallguard/SKILL.md");
+    let path = root.path().join("nested/skills/shallguard/rust.md");
+    let content = embedded("rust.md");
 
-    assert_eq!(write_skill(&path).expect("first write"), "installed");
-    assert_eq!(fs::read_to_string(&path).expect("read skill"), SKILL);
+    assert_eq!(
+        write_file(&path, content).expect("first write"),
+        "installed"
+    );
+    assert_eq!(fs::read_to_string(&path).expect("read skill"), content);
 
-    assert_eq!(write_skill(&path).expect("second write"), "unchanged");
+    assert_eq!(
+        write_file(&path, content).expect("second write"),
+        "unchanged"
+    );
 
     fs::write(&path, "an older manual").expect("replace the skill");
-    assert_eq!(write_skill(&path).expect("third write"), "updated");
-    assert_eq!(fs::read_to_string(&path).expect("read skill"), SKILL);
+    assert_eq!(write_file(&path, content).expect("third write"), "updated");
+    assert_eq!(fs::read_to_string(&path).expect("read skill"), content);
 }
 
 #[shallguard::verifies("REQ-CLI-016")]
@@ -169,16 +211,17 @@ fn reports_installed_updated_and_unchanged() {
 fn check_reports_current_outdated_and_missing() {
     let root = tempdir().expect("create destination root");
     let path = root.path().join("skills/shallguard/SKILL.md");
+    let content = embedded("SKILL.md");
 
     assert_eq!(
-        check_skill(&path).expect("check a missing file"),
+        check_file(&path, content).expect("check a missing file"),
         SkillStatus::Missing
     );
     assert!(!path.exists(), "a check never writes");
 
-    write_skill(&path).expect("install the skill");
+    write_file(&path, content).expect("install the skill");
     assert_eq!(
-        check_skill(&path).expect("check a current file"),
+        check_file(&path, content).expect("check a current file"),
         SkillStatus::Current
     );
 
@@ -188,7 +231,7 @@ fn check_reports_current_outdated_and_missing() {
     )
     .expect("replace with an older skill");
     assert_eq!(
-        check_skill(&path).expect("check an older file"),
+        check_file(&path, content).expect("check an older file"),
         SkillStatus::Outdated {
             installed: Some("0.0.1".to_string())
         }
@@ -204,15 +247,14 @@ fn check_reports_current_outdated_and_missing() {
         )
     );
 
-    fs::write(&path, "a manual without front matter").expect("replace with an unknown skill");
+    fs::write(&path, "a file without front matter").expect("replace with a changed file");
     assert_eq!(
-        check_skill(&path).expect("check a file without a version"),
+        check_file(&path, content).expect("check a file without a version"),
         SkillStatus::Outdated { installed: None }
     );
-    assert!(
-        SkillStatus::Outdated { installed: None }
-            .line(Path::new("x/SKILL.md"))
-            .contains("installed unknown"),
-        "a file without a version is reported as unknown"
+    assert_eq!(
+        SkillStatus::Outdated { installed: None }.line(Path::new("x/rust.md")),
+        "outdated x/rust.md",
+        "a file without a version names only the path"
     );
 }

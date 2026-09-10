@@ -439,10 +439,18 @@ most likely to satisfy the check in the wrong way:
 - They reword requirements to match the code.
 - They remove assertions until a test cannot fail.
 
-The file [`docs/skill/SKILL.md`](docs/skill/SKILL.md) is a self-contained
-manual for agents. It describes the requirements-first workflow, the rules
-for anchor placement, the rules for honest evidence, the commands of the
-check, and a table that maps each failure to the correct response.
+The skill has two files in [`docs/skill/`](docs/skill/):
+
+- [`SKILL.md`](docs/skill/SKILL.md) is the same for every language. It
+  describes the requirements-first workflow, the rules for anchor
+  placement, the rules for honest evidence, the commands of the check, and
+  a table that maps each failure to the correct response.
+- [`rust.md`](docs/skill/rust.md) gives the Rust command, the anchor
+  syntax, and the rules that exist only in Rust.
+
+Both files are a copy of the shared skill in the
+[specification repository](https://github.com/shallguard/spec/tree/master/skills/shallguard).
+Change the skill there, not here.
 
 The executable embeds the skill. Install it with one command:
 
@@ -450,11 +458,11 @@ The executable embeds the skill. Install it with one command:
 cargo shallguard install-skill
 ```
 
-The command finds the agents on your machine. It writes the skill for
-**Claude Code** to `~/.claude/skills/shallguard/SKILL.md` when the directory
-`~/.claude` exists. It writes the skill for **Codex** to
-`~/.agents/skills/shallguard/SKILL.md` when the directory `~/.codex` exists.
-The command needs no repository. It prints one line per file, with the word
+The command finds the agents on your machine. It writes the two files for
+**Claude Code** into `~/.claude/skills/shallguard/` when the directory
+`~/.claude` exists. It writes them for **Codex** into
+`~/.agents/skills/shallguard/` when the directory `~/.codex` exists. The
+command needs no repository. It prints one line per file, with the word
 `installed`, `updated`, or `unchanged` and the path.
 
 The options select other destinations:
@@ -463,12 +471,12 @@ The options select other destinations:
 # One agent only. The option is repeatable.
 cargo shallguard install-skill --agent claude
 
-# A project skill, committed into the consuming repository. The files are
-# .claude/skills/shallguard/SKILL.md and .agents/skills/shallguard/SKILL.md
+# A project skill, committed into the consuming repository. The
+# directories are .claude/skills/shallguard/ and .agents/skills/shallguard/
 # below the root of the Cargo workspace.
 cargo shallguard install-skill --project
 
-# Any other agent. The command writes <directory>/SKILL.md.
+# Any other agent. The command writes the two files into <directory>.
 cargo shallguard install-skill --dir <directory>
 
 # Report only. The command prints current, outdated, or missing for each
@@ -483,12 +491,20 @@ in `.agents/skills` directories. It loads the full instructions when the
 description of the skill matches the task. If a change does not appear,
 restart Codex.
 
-The skill has the same version as the executable, and its front matter
-names that version under `metadata.version`. When your repository moves to
-a newer `shallguard` release, install the matching `cargo-shallguard` and
-run `cargo shallguard install-skill` again. The command reports `updated`.
-A CI step with `--check` fails when a committed project skill is older
-than the executable.
+The skill is also a plugin for Claude Code and for Codex. The
+[specification repository](https://github.com/shallguard/spec#the-skill-for-a-coding-agent)
+explains how to install it. The plugin follows the version of the
+specification, and the command follows the version of the executable. Use
+one of the two, not both. Two copies give the agent two skills with the
+same rules.
+
+The front matter of `SKILL.md` names the version of the executable under
+`metadata.version` and the version of the shared skill under
+`metadata.spec`. When your repository moves to a newer `shallguard`
+release, install the matching `cargo-shallguard` and run
+`cargo shallguard install-skill` again. The command reports `updated`. A
+CI step with `--check` fails when a committed project skill is older than
+the executable.
 
 ## Command reference
 

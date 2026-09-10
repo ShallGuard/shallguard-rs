@@ -1,4 +1,4 @@
-//! The `install-skill` command. It writes the agent skill manual that the
+//! The `install-skill` command. It writes the agent skill that the
 //! executable embeds into the skill directory of a coding agent.
 
 use std::collections::BTreeSet;
@@ -8,28 +8,32 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result, bail};
 
-/// The agent skill manual of this release.
+/// Every file of the skill, with its name in the skill directory.
 ///
 /// Requirements:
-/// The path `skill/SKILL.md` is a symbolic link to `docs/skill/SKILL.md`
-/// of the repository. Cargo packages the link as a plain file, so the
-/// executable ships the manual of its own release.
+/// The files below `skill/` are symbolic links to `docs/skill/` of the
+/// repository, which holds a copy of the shared skill of the
+/// specification. Cargo packages a link as a plain file, so the executable
+/// ships the skill of its own release.
 #[shallguard::enforces("REQ-CLI-013")]
-pub(super) const SKILL: &str = include_str!("skill/SKILL.md");
+pub(super) const SKILL_FILES: [(&str, &str); 2] = [
+    ("SKILL.md", include_str!("skill/SKILL.md")),
+    ("rust.md", include_str!("skill/rust.md")),
+];
 
 /// The version of the executable, which the skill front matter repeats.
-const SKILL_VERSION: &str = env!("CARGO_PKG_VERSION");
+const EXECUTABLE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The value of `version:` in the front matter of a skill, if present.
+/// The value of `<key>:` in the front matter of a skill file, if present.
 #[shallguard::enforces("REQ-CLI-013")]
-pub(super) fn skill_version(skill: &str) -> Option<&str> {
+pub(super) fn front_matter_value<'a>(skill: &'a str, key: &str) -> Option<&'a str> {
     let body = skill.strip_prefix("---\n")?;
     let front_matter = &body[..body.find("\n---\n")?];
     front_matter
         .lines()
-        .find_map(|line| line.trim().strip_prefix("version:"))
+        .find_map(|line| line.trim().strip_prefix(key)?.strip_prefix(':'))
         .map(str::trim)
-        .filter(|version| !version.is_empty())
+        .filter(|value| !value.is_empty())
 }
 
 const COMMAND: &str = "cargo shallguard install-skill";
@@ -61,12 +65,12 @@ impl Agent {
         }
     }
 
-    /// The skill file, relative to the home directory or to the project
-    /// root.
-    fn skill_path(self) -> &'static str {
+    /// The skill directory, relative to the home directory or to the
+    /// project root.
+    fn skill_dir(self) -> &'static str {
         match self {
-            Agent::Claude => ".claude/skills/shallguard/SKILL.md",
-            Agent::Codex => ".agents/skills/shallguard/SKILL.md",
+            Agent::Claude => ".claude/skills/shallguard",
+            Agent::Codex => ".agents/skills/shallguard",
         }
     }
 }
@@ -114,7 +118,7 @@ pub(super) fn parse_install_skill_args(args: &[String]) -> Result<InstallSkillAr
     Ok(parsed)
 }
 
-/// The files that the command writes.
+/// The skill directories that the command writes.
 ///
 /// Requirements:
 /// The home directory selects the agents when `--agent` is absent. The
@@ -127,7 +131,7 @@ pub(super) fn destinations(
     project_root: Option<&Path>,
 ) -> Result<Vec<PathBuf>> {
     if let Some(dir) = &args.dir {
-        return Ok(vec![dir.join("SKILL.md")]);
+        return Ok(vec![dir.clone()]);
     }
     let home = home.context("cannot find the home directory of the user")?;
     let agents: Vec<Agent> = if args.agents.is_empty() {
@@ -147,7 +151,7 @@ pub(super) fn destinations(
     let base = project_root.unwrap_or(home);
     Ok(agents
         .into_iter()
-        .map(|agent| base.join(agent.skill_path()))
+        .map(|agent| base.join(agent.skill_dir()))
         .collect())
 }
 
@@ -163,8 +167,8 @@ pub(super) fn run(args: &InstallSkillArgs) -> ExitCode {
     }
 }
 
-/// Writes or checks every destination. Returns `false` when a check finds
-/// a destination that is not current.
+/// Writes or checks every file in every destination. Returns `false` when
+/// a check finds a file that is not current.
 #[shallguard::enforces("REQ-CLI-016")]
 fn install(args: &InstallSkillArgs) -> Result<bool> {
     let project_root = if args.project {
@@ -175,16 +179,19 @@ fn install(args: &InstallSkillArgs) -> Result<bool> {
     let home = std::env::home_dir();
     let targets = destinations(args, home.as_deref(), project_root.as_deref())?;
     let mut stale = 0usize;
-    for path in targets {
-        if args.check {
-            let status = check_skill(&path)?;
-            if !matches!(status, SkillStatus::Current) {
-                stale += 1;
+    for dir in targets {
+        for (name, content) in SKILL_FILES {
+            let path = dir.join(name);
+            if args.check {
+                let status = check_file(&path, content)?;
+                if status != SkillStatus::Current {
+                    stale += 1;
+                }
+                println!("{}", status.line(&path));
+            } else {
+                let outcome = write_file(&path, content)?;
+                println!("{outcome} {}", path.display());
             }
-            println!("{}", status.line(&path));
-        } else {
-            let outcome = write_skill(&path)?;
-            println!("{outcome} {}", path.display());
         }
     }
     if stale > 0 {
@@ -206,32 +213,37 @@ impl SkillStatus {
         match self {
             SkillStatus::Current => format!("current {}", path.display()),
             SkillStatus::Missing => format!("missing {}", path.display()),
-            SkillStatus::Outdated { installed } => format!(
-                "outdated {}: installed {}, executable {SKILL_VERSION}",
-                path.display(),
-                installed.as_deref().unwrap_or("unknown")
+            SkillStatus::Outdated {
+                installed: Some(version),
+            } => format!(
+                "outdated {}: installed {version}, executable {EXECUTABLE_VERSION}",
+                path.display()
             ),
+            SkillStatus::Outdated { installed: None } => {
+                format!("outdated {}", path.display())
+            }
         }
     }
 }
 
-/// Compares the file with the embedded manual without a write.
+/// Compares the file with the embedded content without a write.
 #[shallguard::enforces("REQ-CLI-016")]
-pub(super) fn check_skill(path: &Path) -> Result<SkillStatus> {
+pub(super) fn check_file(path: &Path, content: &str) -> Result<SkillStatus> {
     match fs::read(path) {
-        Ok(existing) if existing == SKILL.as_bytes() => Ok(SkillStatus::Current),
+        Ok(existing) if existing == content.as_bytes() => Ok(SkillStatus::Current),
         Ok(existing) => Ok(SkillStatus::Outdated {
-            installed: skill_version(&String::from_utf8_lossy(&existing)).map(str::to_string),
+            installed: front_matter_value(&String::from_utf8_lossy(&existing), "version")
+                .map(str::to_string),
         }),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(SkillStatus::Missing),
         Err(err) => Err(err).with_context(|| format!("reading {}", path.display())),
     }
 }
 
-/// Writes the manual and reports `installed`, `updated`, or `unchanged`.
-fn write_skill(path: &Path) -> Result<&'static str> {
+/// Writes the content and reports `installed`, `updated`, or `unchanged`.
+fn write_file(path: &Path, content: &str) -> Result<&'static str> {
     let outcome = match fs::read(path) {
-        Ok(existing) if existing == SKILL.as_bytes() => return Ok("unchanged"),
+        Ok(existing) if existing == content.as_bytes() => return Ok("unchanged"),
         Ok(_) => "updated",
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => "installed",
         Err(err) => return Err(err).with_context(|| format!("reading {}", path.display())),
@@ -239,7 +251,7 @@ fn write_skill(path: &Path) -> Result<&'static str> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     }
-    fs::write(path, SKILL).with_context(|| format!("writing {}", path.display()))?;
+    fs::write(path, content).with_context(|| format!("writing {}", path.display()))?;
     Ok(outcome)
 }
 

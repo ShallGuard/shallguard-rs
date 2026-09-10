@@ -48,7 +48,7 @@ Install skill options:
                              [default: every agent with a home directory]
   --project                  Write below the Cargo workspace root instead of
                              the home directory
-  --dir <directory>          Write SKILL.md into this directory instead
+  --dir <directory>          Write the skill files into this directory instead
   --check                    Report current, outdated, or missing files and
                              never write; nonzero when a file is not current
 

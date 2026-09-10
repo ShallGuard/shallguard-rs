@@ -1,0 +1,1 @@
+../../../docs/skill/rust.md

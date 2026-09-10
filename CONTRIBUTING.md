@@ -45,7 +45,8 @@ SHALL, SHALL NOT, or MAY. ShallGuard needs that form.
 ## Use the ShallGuard agent skill
 
 If you work with a coding agent, install and use the
-[ShallGuard skill](docs/skill/SKILL.md). The
+[ShallGuard skill](docs/skill/SKILL.md) with its Rust file
+[`rust.md`](docs/skill/rust.md). The
 [README](README.md#ai-agent-skill) gives the installation steps for Codex
 and Claude Code. Tell the agent to use the skill before it changes behavior,
 requirements, anchors, verification tests, or code near an anchor. The
