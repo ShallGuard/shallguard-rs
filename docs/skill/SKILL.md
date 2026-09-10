@@ -1,7 +1,7 @@
 ---
 name: shallguard
 metadata:
-  version: 0.1.1
+  version: 0.1.2
   spec: 0.1.0
 description: Use when working in a repository that uses ShallGuard requirement traceability, in any language. Recognizable by a shallguard.toml at the repository root, enforcement or verification anchors in code, or a Markdown document with numbered REQ-<AREA>-<NNN> requirements. Triggers include adding, changing, or removing behavior in such a repository, editing a requirement document, responding to a "shallguard check" failure, anchoring a test, adopting ShallGuard in a new repository, or running requirement impact, coverage, or review analysis.
 ---
