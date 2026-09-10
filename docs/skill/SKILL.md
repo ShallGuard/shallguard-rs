@@ -26,6 +26,9 @@ repository pins:
 cargo install cargo-shallguard --version <pinned-version> --locked
 ```
 
+When the pinned version changes, run `cargo shallguard install-skill` after
+the install. It replaces this skill with the skill of that release.
+
 ## The model
 
 - **Requirement.** A requirement has the ID `REQ-<AREA>-<NNN>` and lives in

@@ -12,6 +12,8 @@ Development workflow:
   3. Exercise the contract in a real test marked #[shallguard::verifies(...)].
   4. Run cargo test, cargo shallguard fmt --check, and cargo shallguard check.
      The check rejects missing or stale anchors and traceability ratchet regressions.
+  A coding agent learns this workflow from the ShallGuard skill. Install it once
+  with cargo shallguard install-skill.
 
 Review workflow:
   This workflow is experimental. It needs a language model provider.
@@ -31,6 +33,7 @@ Usage:
   cargo shallguard fmt [--check] [<doc.md> ...]
   cargo shallguard lint [<doc.md> ...]
   cargo shallguard clean
+  cargo shallguard install-skill [--agent <claude|codex>]... [--project | --dir <directory>]
   cargo shallguard baseline <check|init|prune>
   cargo shallguard impact <--base <revision>|--target <branch>> [--json <path>] [--markdown <path>]
   cargo shallguard bundle --impact <impact.json> [--coverage <coverage.json>] [options]
@@ -38,6 +41,14 @@ Usage:
   cargo shallguard coverage [--package <crate>] [--requirement <REQ-ID>] [options]
   cargo shallguard review [--base <revision>|--target <branch>] [options]  (experimental)
   cargo shallguard review show [--output <directory>] [--format <format>] [<REQ-ID> ...]  (experimental)
+
+Install skill options:
+  --agent <name>             Install for claude (~/.claude/skills) or codex
+                             (~/.agents/skills); repeatable
+                             [default: every agent with a home directory]
+  --project                  Write below the Cargo workspace root instead of
+                             the home directory
+  --dir <directory>          Write SKILL.md into this directory instead
 
 Review options (experimental):
   --provider <name>          Model CLI: codex, claude, or copilot
@@ -66,6 +77,7 @@ Review show options:
 
 `fmt` lints and formats requirement blocks; `fmt --check` and `lint` never write.
 `clean` removes only the validated bundle at the configured artifact location.
+`install-skill` writes the agent skill of this release and needs no repository.
 Model verdicts are advisory. Provider or schema failures return nonzero."#
     );
 }

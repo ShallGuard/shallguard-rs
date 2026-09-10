@@ -361,6 +361,47 @@ language model provider.
   *Verified:* [test] ✅ `cli:tests/github_advisory_workflow.rs`
   (`advisory_review_is_isolated_from_the_required_deterministic_gate`)
 
+### US-CLI-004: Install the Agent Skill
+
+**Status:** Implemented
+
+**As a** developer who works with a coding agent  
+**I want** one command that installs the ShallGuard skill for my agent  
+**So that** the agent follows the requirements-first workflow from the first change, without a manual copy of a file
+
+**System Requirements:**
+
+- **REQ-CLI-013** — The executable SHALL embed the agent skill manual, and
+  the embedded manual SHALL be identical to the file `docs/skill/SKILL.md`
+  of the same release. *Enforced:* `cli:src/cli_install_skill.rs` (`SKILL`)
+  · *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
+  (`embedded_skill_is_the_repository_skill`)
+- **REQ-CLI-014** — `cargo shallguard install-skill` SHALL write the embedded
+  manual to `<home>/.claude/skills/shallguard/SKILL.md` for the agent
+  `claude` and to `<home>/.agents/skills/shallguard/SKILL.md` for the agent
+  `codex`, where `<home>` is the home directory of the user. Without
+  `--agent`, the command SHALL select every agent whose home directory
+  exists, `~/.claude` for `claude` and `~/.codex` for `codex`, and SHALL fail
+  with a message that names the accepted `--agent` values when it finds
+  none. `--agent <name>` SHALL select one named agent, SHALL be repeatable,
+  and SHALL reject an unknown name. `--project` SHALL write the same relative
+  paths below the root of the Cargo workspace instead of the home directory.
+  `--dir <directory>` SHALL write `SKILL.md` into the named directory and
+  SHALL NOT combine with `--agent` or `--project`. *Enforced:*
+  `cli:src/cli_install_skill.rs` (`parse_install_skill_args`,
+  `destinations`) · *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
+  (`parses_agents_project_and_dir`, `selects_installed_agents_from_the_home_directory`),
+  `cli:tests/install_skill.rs` (`installed_skill_command_works_without_repository`)
+- **REQ-CLI-015** — `install-skill` SHALL create a missing destination
+  directory, SHALL print one line per destination that starts with
+  `installed`, `updated`, or `unchanged` and ends with the path, SHALL exit
+  nonzero when a write fails, and SHALL NOT require ShallGuard repository
+  discovery or configuration unless `--project` is given. *Enforced:*
+  `cli:src/cli_install_skill.rs` (`run`), `cli:src/main.rs` (`main`) ·
+  *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
+  (`reports_installed_updated_and_unchanged`), `cli:tests/install_skill.rs`
+  (`installed_skill_command_works_without_repository`)
+
 ## Specification User Stories
 
 ### US-SPEC-001: Maintainable Requirement Documents

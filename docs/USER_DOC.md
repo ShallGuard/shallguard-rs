@@ -43,6 +43,18 @@ cargo shallguard --version
 The top-level [README](../README.md) also shows how to install from one fixed
 Git commit. If you change the executable, run the source installation again.
 
+If a coding agent works in your repository, install the ShallGuard skill for
+it. The skill teaches the agent the requirements-first workflow and the
+evidence rules:
+
+```bash
+cargo shallguard install-skill
+```
+
+The command writes the skill for every agent that it finds on the machine.
+The [README](../README.md#ai-agent-skill) explains the options `--agent`,
+`--project`, and `--dir`.
+
 ## Repository setup and usage
 
 Create the file `shallguard.toml` with the help of the
