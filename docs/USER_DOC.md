@@ -57,6 +57,8 @@ cargo shallguard impact --target origin/main \
   --markdown requirement-impact.md
 ```
 
+`cargo shallguard fmt` puts exactly one empty line between consecutive requirement items.
+
 Two commands have more prerequisites:
 
 - The `coverage` command needs the tool `cargo-llvm-cov`.
