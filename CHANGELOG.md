@@ -10,6 +10,10 @@ follows [Semantic Versioning](https://semver.org/).
   named directory. The command needs no repository. The option `--check`
   reports whether each installed skill is current, and the skill front
   matter names the release under `metadata.version`.
+- Replaced the Rust-only skill with a copy of the shared skill of the
+  specification. `SKILL.md` is the same for every language, and `rust.md`
+  gives the Rust command and the anchor syntax. `install-skill` writes both
+  files.
 - Fixed `#[shallguard::verifies]` and the scanner so that they accept every
   test attribute whose name ends in `test`, such as
   `#[my_harness::container_test]`, as the documentation already said (#27).

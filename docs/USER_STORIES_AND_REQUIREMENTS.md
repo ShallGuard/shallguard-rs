@@ -371,46 +371,48 @@ language model provider.
 
 **System Requirements:**
 
-- **REQ-CLI-013** — The executable SHALL embed the agent skill manual, the
-  embedded manual SHALL be identical to the file `docs/skill/SKILL.md`
-  of the same release, and the front matter of the manual SHALL name the
-  version of the `cargo-shallguard` package under `metadata.version`.
-  *Enforced:* `cli:src/cli_install_skill.rs` (`SKILL`, `skill_version`)
-  · *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
+- **REQ-CLI-013** — The executable SHALL embed the agent skill, the generic
+  file `SKILL.md` and the Rust file `rust.md`, and each embedded file SHALL be
+  identical to the file of the same name in `docs/skill/` of the same
+  release. The front matter of `SKILL.md` SHALL name the version of the
+  `cargo-shallguard` package under `metadata.version` and the version of the
+  shared skill of the specification under `metadata.spec`. *Enforced:*
+  `cli:src/cli_install_skill.rs` (`SKILL_FILES`, `front_matter_value`) ·
+  *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
   (`embedded_skill_is_the_repository_skill`)
-- **REQ-CLI-014** — `cargo shallguard install-skill` SHALL write the embedded
-  manual to `<home>/.claude/skills/shallguard/SKILL.md` for the agent
-  `claude` and to `<home>/.agents/skills/shallguard/SKILL.md` for the agent
+- **REQ-CLI-014** — `cargo shallguard install-skill` SHALL write every
+  embedded file into the directory `<home>/.claude/skills/shallguard/` for the
+  agent `claude` and into `<home>/.agents/skills/shallguard/` for the agent
   `codex`, where `<home>` is the home directory of the user. Without
   `--agent`, the command SHALL select every agent whose home directory
   exists, `~/.claude` for `claude` and `~/.codex` for `codex`, and SHALL fail
   with a message that names the accepted `--agent` values when it finds
   none. `--agent <name>` SHALL select one named agent, SHALL be repeatable,
   and SHALL reject an unknown name. `--project` SHALL write the same relative
-  paths below the root of the Cargo workspace instead of the home directory.
-  `--dir <directory>` SHALL write `SKILL.md` into the named directory and
-  SHALL NOT combine with `--agent` or `--project`. *Enforced:*
+  directories below the root of the Cargo workspace instead of the home
+  directory. `--dir <directory>` SHALL write the files into the named
+  directory and SHALL NOT combine with `--agent` or `--project`. *Enforced:*
   `cli:src/cli_install_skill.rs` (`parse_install_skill_args`,
   `destinations`) · *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
   (`parses_agents_project_and_dir`, `selects_installed_agents_from_the_home_directory`),
   `cli:tests/install_skill.rs` (`installed_skill_command_works_without_repository`)
 - **REQ-CLI-015** — `install-skill` SHALL create a missing destination
-  directory, SHALL print one line per destination that starts with
-  `installed`, `updated`, or `unchanged` and ends with the path, SHALL exit
-  nonzero when a write fails, and SHALL NOT require ShallGuard repository
-  discovery or configuration unless `--project` is given. *Enforced:*
+  directory, SHALL print one line per file that starts with `installed`,
+  `updated`, or `unchanged` and ends with the path, SHALL exit nonzero when a
+  write fails, and SHALL NOT require ShallGuard repository discovery or
+  configuration unless `--project` is given. *Enforced:*
   `cli:src/cli_install_skill.rs` (`run`), `cli:src/main.rs` (`main`) ·
   *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
   (`reports_installed_updated_and_unchanged`), `cli:tests/install_skill.rs`
   (`installed_skill_command_works_without_repository`)
-- **REQ-CLI-016** — `install-skill --check` SHALL compare each destination
-  with the embedded manual and SHALL NOT write. It SHALL print one line per
-  destination that starts with `current`, `outdated`, or `missing` followed
-  by the path, and an `outdated` line SHALL also name the version from the
-  front matter of the installed file, or `unknown`, and the version of the
-  executable. It SHALL exit nonzero when any destination is not current.
-  *Enforced:* `cli:src/cli_install_skill.rs` (`check_skill`, `install`) ·
-  *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
+- **REQ-CLI-016** — `install-skill --check` SHALL compare each file in each
+  destination with the embedded file and SHALL NOT write. It SHALL print one
+  line per file that starts with `current`, `outdated`, or `missing` followed
+  by the path. When an outdated file names a version in its front matter,
+  the line SHALL also name that version and the version of the executable.
+  It SHALL exit nonzero when any file is not current. *Enforced:*
+  `cli:src/cli_install_skill.rs` (`check_file`, `install`) · *Verified:*
+  [test] `cli:src/cli_install_skill_tests.rs`
   (`check_reports_current_outdated_and_missing`), `cli:tests/install_skill.rs`
   (`installed_check_reports_missing_current_and_outdated`)
 
