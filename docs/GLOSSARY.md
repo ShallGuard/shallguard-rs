@@ -1,7 +1,12 @@
 # ShallGuard glossary
 
-This page defines the terms that the ShallGuard documents use. Each term has
-one meaning. The documents use the same word for the same thing.
+This page defines the terms that the documents of this repository use.
+Each term has one meaning. The documents use the same word for the same
+thing. The
+[shared glossary](https://github.com/shallguard/spec/blob/master/GLOSSARY.md)
+of the specification repository defines the language-independent terms for
+every ShallGuard repository. This page adds the terms of the Rust
+implementation.
 
 ## General terms
 
