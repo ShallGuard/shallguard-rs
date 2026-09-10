@@ -28,7 +28,7 @@ mkdir -p "$project/src" "$project/docs"
 if [[ -n "${SHALLGUARD_PATH:-}" ]]; then
     dependency="shallguard = { path = \"$SHALLGUARD_PATH\" }"
 else
-    dependency='shallguard = "0.1.1"'
+    dependency='shallguard = "0.1.2"'
 fi
 
 cat > "$project/Cargo.toml" <<EOF
