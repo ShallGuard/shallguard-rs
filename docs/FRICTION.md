@@ -29,3 +29,4 @@ friction in silence.
   invariant is guarded only by shared regression fixtures → lint idea
   (a shared proc-macro2-only crate would create one authority, but that
   is a new publishable crate — maintainer decision)
+- 2026-09-11 `advisory review`: preparation tries to check out fork code although the provider skips fork pull requests → bug
