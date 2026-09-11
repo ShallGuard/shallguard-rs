@@ -10,6 +10,7 @@
 //! cargo shallguard fmt [--check] [<doc.md> ...]
 //! cargo shallguard lint [<doc.md> ...]
 //! cargo shallguard clean
+//! cargo shallguard install-skill [--check] [--agent <claude|codex>]... [--project | --dir <directory>]
 //! cargo shallguard baseline check
 //! cargo shallguard baseline prune
 //! cargo shallguard impact --base <revision> --json requirement-impact.json
@@ -43,12 +44,15 @@ use anyhow::{Context, Result, bail};
 mod cli_color;
 #[path = "cli_help.rs"]
 mod cli_help;
+#[path = "cli_install_skill.rs"]
+mod cli_install_skill;
 #[path = "cli_progress.rs"]
 mod cli_progress;
 #[path = "cli_review.rs"]
 mod cli_review;
 #[path = "cli_review_show.rs"]
 mod cli_review_show;
+use cli_install_skill::InstallSkillArgs;
 use cli_progress::print_progress;
 use cli_review::{experimental_notice, parse_review_args};
 use cli_review_show::{ReviewShowArgs, parse_review_show_args, review_outcome_summary};
@@ -61,6 +65,7 @@ enum Command {
     Help,
     Version,
     Clean,
+    InstallSkill(InstallSkillArgs),
     Check(Vec<String>),
     Format(FormatArgs),
     BaselineInit,
@@ -134,6 +139,7 @@ struct ReviewArgs {
     "REQ-CLI-001",
     "REQ-CLI-002",
     "REQ-CLI-006",
+    "REQ-CLI-015", // install-skill returns before workspace discovery
     "REQ-PORT-008",
     "REQ-SEC-001"
 )]
@@ -143,6 +149,15 @@ fn main() -> ExitCode {
         [help] if help == "help" || help == "--help" || help == "-h" => Command::Help,
         [version] if version == "version" || version == "--version" => Command::Version,
         [clean] if clean == "clean" => Command::Clean,
+        [install, rest @ ..] if install == "install-skill" => {
+            match cli_install_skill::parse_install_skill_args(rest) {
+                Ok(args) => Command::InstallSkill(args),
+                Err(err) => {
+                    eprintln!("{COMMAND_NAME} install-skill: {err:#}");
+                    return ExitCode::FAILURE;
+                }
+            }
+        }
         [format, rest @ ..] if format == "fmt" => match parse_format_args(rest, false) {
             Ok(args) => Command::Format(args),
             Err(err) => {
@@ -226,6 +241,10 @@ fn main() -> ExitCode {
         println!("cargo-shallguard {}", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;
     }
+    if let Command::InstallSkill(args) = &command {
+        // The command finds the workspace itself, and only with --project.
+        return cli_install_skill::run(args);
+    }
 
     let doc_args = match &command {
         Command::Check(args) => args.as_slice(),
@@ -233,6 +252,7 @@ fn main() -> ExitCode {
         Command::Help
         | Command::Version
         | Command::Clean
+        | Command::InstallSkill(_)
         | Command::BaselineInit
         | Command::BaselinePrune
         | Command::Impact(_)
@@ -266,6 +286,9 @@ fn main() -> ExitCode {
     match command {
         Command::Help => unreachable!("help returned before workspace discovery"),
         Command::Version => unreachable!("version returned before workspace discovery"),
+        Command::InstallSkill(_) => {
+            unreachable!("install-skill returned before workspace discovery")
+        }
         Command::Clean => {
             return run_clean(&root, &config);
         }

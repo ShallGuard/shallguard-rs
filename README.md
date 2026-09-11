@@ -121,7 +121,7 @@ failure.
 Install the published Cargo subcommand:
 
 ```bash
-cargo install cargo-shallguard --version 0.1.1 --locked
+cargo install cargo-shallguard --version 0.1.2 --locked
 ```
 
 Or install from a local copy of this repository:
@@ -143,6 +143,14 @@ The `coverage` command also needs the tool `cargo-llvm-cov`. The `review`
 command needs a supported provider program, for example Codex or Claude. The
 check does not need a provider.
 
+If a coding agent works in your repository, also install the ShallGuard
+skill for the agent. The section [AI agent skill](#ai-agent-skill) explains
+the options:
+
+```bash
+cargo shallguard install-skill
+```
+
 ## Quick start in your repository
 
 Follow these five steps.
@@ -153,7 +161,7 @@ crate:
 
 ```toml
 [dependencies]
-shallguard = "0.1.1"
+shallguard = "0.1.2"
 ```
 
 **2. Create the file `shallguard.toml`** at the root of the repository. Copy
@@ -366,7 +374,7 @@ This is an example for GitHub Actions:
 ```yaml
 - name: Requirement assurance
   run: |
-    cargo install cargo-shallguard --version 0.1.1 --locked
+    cargo install cargo-shallguard --version 0.1.2 --locked
     cargo shallguard fmt --check
     cargo shallguard check
 ```
@@ -431,49 +439,72 @@ most likely to satisfy the check in the wrong way:
 - They reword requirements to match the code.
 - They remove assertions until a test cannot fail.
 
-The file [`docs/skill/SKILL.md`](docs/skill/SKILL.md) is a self-contained
-manual for agents. It describes the requirements-first workflow, the rules
-for anchor placement, the rules for honest evidence, the commands of the
-check, and a table that maps each failure to the correct response.
+The skill has two files in [`docs/skill/`](docs/skill/):
 
-The skill is one file with no external references. To install it, copy one
-file.
+- [`SKILL.md`](docs/skill/SKILL.md) is the same for every language. It
+  describes the requirements-first workflow, the rules for anchor
+  placement, the rules for honest evidence, the commands of the check, and
+  a table that maps each failure to the correct response.
+- [`rust.md`](docs/skill/rust.md) gives the Rust command, the anchor
+  syntax, and the rules that exist only in Rust.
 
-**Claude Code** finds skills automatically. It loads this skill when the
-agent works in a repository with a `shallguard.toml` file:
+Both files are a copy of the shared skill in the
+[specification repository](https://github.com/shallguard/spec/tree/master/skills/shallguard).
+Change the skill there, not here.
 
-```bash
-# For all your projects (personal skill):
-mkdir -p ~/.claude/skills/shallguard
-cp docs/skill/SKILL.md ~/.claude/skills/shallguard/
-
-# Or committed into one consuming repository (project skill):
-mkdir -p .claude/skills/shallguard
-cp <shallguard-checkout>/docs/skill/SKILL.md .claude/skills/shallguard/
-```
-
-**Codex** [finds skills automatically](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)
-in `.agents/skills` directories. Install the skill for all repositories, or
-commit it into one repository:
+The executable embeds the skill. Install it with one command:
 
 ```bash
-# For all your projects (personal skill):
-mkdir -p ~/.agents/skills/shallguard
-cp docs/skill/SKILL.md ~/.agents/skills/shallguard/SKILL.md
-
-# Or committed into one consuming repository (project skill):
-mkdir -p .agents/skills/shallguard
-cp <shallguard-checkout>/docs/skill/SKILL.md \
-  .agents/skills/shallguard/SKILL.md
+cargo shallguard install-skill
 ```
 
-Codex loads the full instructions when the description of the skill matches
-the task. It finds new and changed skills automatically. If a change does not
-appear, restart Codex.
+The command finds the agents on your machine. It writes the two files for
+**Claude Code** into `~/.claude/skills/shallguard/` when the directory
+`~/.claude` exists. It writes them for **Codex** into
+`~/.agents/skills/shallguard/` when the directory `~/.codex` exists. The
+command needs no repository. It prints one line per file, with the word
+`installed`, `updated`, or `unchanged` and the path.
 
-The skill has the same version as this repository. When your repository
-moves to a newer `shallguard` release, copy the skill again from the matching
-tag.
+The options select other destinations:
+
+```bash
+# One agent only. The option is repeatable.
+cargo shallguard install-skill --agent claude
+
+# A project skill, committed into the consuming repository. The
+# directories are .claude/skills/shallguard/ and .agents/skills/shallguard/
+# below the root of the Cargo workspace.
+cargo shallguard install-skill --project
+
+# Any other agent. The command writes the two files into <directory>.
+cargo shallguard install-skill --dir <directory>
+
+# Report only. The command prints current, outdated, or missing for each
+# file, never writes, and exits nonzero when a file is not current.
+cargo shallguard install-skill --check
+```
+
+Claude Code finds skills automatically. It loads this skill when the agent
+works in a repository with a `shallguard.toml` file. Codex
+[finds skills automatically](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)
+in `.agents/skills` directories. It loads the full instructions when the
+description of the skill matches the task. If a change does not appear,
+restart Codex.
+
+The skill is also a plugin for Claude Code and for Codex. The
+[specification repository](https://github.com/shallguard/spec#the-skill-for-a-coding-agent)
+explains how to install it. The plugin follows the version of the
+specification, and the command follows the version of the executable. Use
+one of the two, not both. Two copies give the agent two skills with the
+same rules.
+
+The front matter of `SKILL.md` names the version of the executable under
+`metadata.version` and the version of the shared skill under
+`metadata.spec`. When your repository moves to a newer `shallguard`
+release, install the matching `cargo-shallguard` and run
+`cargo shallguard install-skill` again. The command reports `updated`. A
+CI step with `--check` fails when a committed project skill is older than
+the executable.
 
 ## Command reference
 
@@ -484,6 +515,7 @@ the version.
 | Command | Purpose |
 |---|---|
 | `cargo shallguard version` / `--version` | Print the installed CLI version. This command does not need a configured repository. |
+| `cargo shallguard install-skill` | Write the AI agent skill of this release for Claude Code, for Codex, into a project, or into a named directory. This command does not need a configured repository. |
 | `cargo shallguard check` | Compare the requirements with the code anchors and the test anchors. This is the CI gate. |
 | `cargo shallguard fmt [--check]` | Format the requirement blocks, or verify their format. |
 | `cargo shallguard lint` | Examine the requirement documents without a write. |

@@ -21,6 +21,7 @@ implementation.
 | Continuous integration (CI) | An automated pipeline that builds and tests each proposed change. |
 | Gate | A CI step that must pass before a change can merge. |
 | Coding agent | A program that uses a large language model to write or change code. Examples are Claude Code, Codex, and Copilot. |
+| Skill | The manual for a coding agent. It teaches the agent the ShallGuard workflow and the evidence rules. The file `SKILL.md` is the same for every language, and a language file such as `rust.md` gives the command and the anchor syntax. The command `cargo shallguard install-skill` writes both files into the skill directory of the agent. |
 | Large language model (LLM) | A program that produces text from a prompt. ShallGuard uses an LLM only for advisory review, and every feature that needs an LLM is experimental. |
 | Provider | The command-line program that gives ShallGuard access to an LLM. The supported providers are Codex, Claude, and Copilot. |
 

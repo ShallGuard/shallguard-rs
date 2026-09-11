@@ -12,7 +12,12 @@ its version, and you do not publish it again.
 
 1. Increase the version of each package that you release. Change an internal
    dependency requirement only when the release needs a newer version of that
-   dependency. In all other cases, keep the published version.
+   dependency. In all other cases, keep the published version. When you
+   release `cargo-shallguard`, copy `skills/shallguard/` of the specification
+   repository into `docs/skill/`. Then set the version of the release under
+   `metadata.version` in `docs/skill/SKILL.md`, and the version of the shared
+   skill under `metadata.spec`. A test compares `metadata.version` with the
+   package version.
 2. Move the related entries in [`CHANGELOG.md`](../CHANGELOG.md) from the
    `Unreleased` section into a dated release section.
 3. Run the validation commands in
@@ -44,7 +49,7 @@ After all packages are available, verify a fresh installation from a
 directory outside this repository:
 
 ```bash
-cargo install cargo-shallguard --version 0.1.1 --locked
+cargo install cargo-shallguard --version 0.1.2 --locked
 cargo shallguard --help
 ```
 

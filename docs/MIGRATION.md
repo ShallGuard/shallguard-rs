@@ -39,8 +39,9 @@ flowchart LR
    `hard_verification = false`. You make an area hard at the end, one area
    at a time, when the area has no gaps.
 3. Install the [AI agent skill](skill/SKILL.md) for the agent that does the
-   work. The skill contains the anchor rules and the evidence rules. The
-   rest of this guide depends on the evidence rules.
+   work. The command `cargo shallguard install-skill` writes it. The skill
+   contains the anchor rules and the evidence rules. The rest of this guide
+   depends on the evidence rules.
 
 ## Phase 1: Recover the requirements
 

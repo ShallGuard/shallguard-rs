@@ -5,6 +5,17 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-10
+
+- Added `cargo shallguard install-skill`. The executable embeds the AI agent
+  skill and writes it for Claude Code, for Codex, into a project, or into a
+  named directory. The command needs no repository. The option `--check`
+  reports whether each installed skill is current, and the skill front
+  matter names the release under `metadata.version`.
+- Replaced the Rust-only skill with a copy of the shared skill of the
+  specification. `SKILL.md` is the same for every language, and `rust.md`
+  gives the Rust command and the anchor syntax. `install-skill` writes both
+  files.
 - Fixed `#[shallguard::verifies]` and the scanner so that they accept every
   test attribute whose name ends in `test`, such as
   `#[my_harness::container_test]`, as the documentation already said (#27).
@@ -25,6 +36,13 @@ follows [Semantic Versioning](https://semver.org/).
   pull-request workflow. The `review` command prints a notice, and the help
   output labels the commands. An experimental feature can change in any
   release.
+- Moved the repository to `shallguard/shallguard-rs` and updated every
+  manifest and link.
+- Restructured the README as a landing page, added animated workflow demos
+  with a recording pipeline, and added the friction log `docs/FRICTION.md`.
+- Added the planned requirements REQ-TRACE-009 to REQ-TRACE-017 for the
+  evidence floor. Their implementation stays on the branch
+  `feature/evidence-floor` and is not part of this release.
 
 ## [0.1.1] - 2026-08-17
 
@@ -53,6 +71,7 @@ follows [Semantic Versioning](https://semver.org/).
 - Public `shallguard::enforces`, `shallguard::verifies`, and
   `shallguard::enforces_here!` anchor API.
 
-[Unreleased]: https://github.com/shallguard/shallguard-rs/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/shallguard/shallguard-rs/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/shallguard/shallguard-rs/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/shallguard/shallguard-rs/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/shallguard/shallguard-rs/releases/tag/v0.1.0
