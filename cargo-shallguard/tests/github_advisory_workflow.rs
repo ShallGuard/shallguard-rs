@@ -29,6 +29,19 @@ fn advisory_review_is_isolated_from_the_required_deterministic_gate() {
 
     let same_repository_guard =
         "github.event.pull_request.head.repo.full_name == github.repository";
+    for job in [prepare, review, publish] {
+        let (settings, _) = job.split_once("    steps:").expect("job has steps");
+        let condition = settings
+            .lines()
+            .find_map(|line| line.strip_prefix("    if: "))
+            .expect("advisory job has a condition before it allocates a runner");
+        assert!(
+            condition == same_repository_guard
+                || condition == format!("always() && {same_repository_guard}"),
+            "fork pull requests must skip every advisory job: {condition}"
+        );
+    }
+    assert!(!ADVISORY_WORKFLOW.contains("allow-unsafe-pr-checkout: true"));
     assert!(review.contains(same_repository_guard));
     assert!(review.contains("ref: ${{ github.event.pull_request.base.sha }}"));
     assert!(review.contains("copilot-requests: write"));
