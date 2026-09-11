@@ -391,6 +391,7 @@ language model provider.
   `cli:src/cli_install_skill.rs` (`SKILL_FILES`, `front_matter_value`) ·
   *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
   (`embedded_skill_is_the_repository_skill`)
+
 - **REQ-CLI-014** — `cargo shallguard install-skill` SHALL write every
   embedded file into the directory `<home>/.claude/skills/shallguard/` for the
   agent `claude` and into `<home>/.agents/skills/shallguard/` for the agent
@@ -407,6 +408,7 @@ language model provider.
   `destinations`) · *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
   (`parses_agents_project_and_dir`, `selects_installed_agents_from_the_home_directory`),
   `cli:tests/install_skill.rs` (`installed_skill_command_works_without_repository`)
+
 - **REQ-CLI-015** — `install-skill` SHALL create a missing destination
   directory, SHALL print one line per file that starts with `installed`,
   `updated`, or `unchanged` and ends with the path, SHALL exit nonzero when a
@@ -416,6 +418,7 @@ language model provider.
   *Verified:* [test] `cli:src/cli_install_skill_tests.rs`
   (`reports_installed_updated_and_unchanged`), `cli:tests/install_skill.rs`
   (`installed_skill_command_works_without_repository`)
+
 - **REQ-CLI-016** — `install-skill --check` SHALL compare each file in each
   destination with the embedded file and SHALL NOT write. It SHALL print one
   line per file that starts with `current`, `outdated`, or `missing` followed
