@@ -154,28 +154,18 @@ fn format_text(text: &str, spec: &DocSpec, add_keywords: bool) -> FormattedText 
         {
             index += 1;
         }
+        // Leave trailing whitespace-only lines for the surrounding Markdown.
+        while index > start + 1 && lines[index - 1].trim().is_empty() {
+            index -= 1;
+        }
         let block = &lines[start..index];
         requirements += 1;
         let block_diagnostics = lint_block(block, spec, start + 1);
         if block_diagnostics.is_empty() {
             output.extend(format_block(block, add_keywords));
 
-            let mut next = index;
-            while next < lines.len() && lines[next].trim().is_empty() {
-                next += 1;
-            }
-
-            if next < lines.len() && candidate_re.is_match(lines[next]) {
-                // Consecutive requirements: exactly one blank line.
+            if index < lines.len() && candidate_re.is_match(lines[index]) {
                 output.push(String::new());
-                index = next;
-            } else {
-                // Not a requirement-to-requirement boundary:
-                // preserve the original blank lines.
-                while index < next {
-                    output.push(lines[index].to_string());
-                    index += 1;
-                }
             }
         } else {
             output.extend(block.iter().map(|line| (*line).to_string()));
@@ -388,17 +378,44 @@ mod tests {
 
     #[shallguard::verifies("REQ-SPEC-009")]
     #[test]
-    fn formats_consecutive_requirements_with_exactly_one_blank_line() {
-        let input = "before\n- **REQ-AA-001** — First requirement SHALL work. *Enforced:* `src/lib.rs` (`first`) · *Verified:* [test] `src/lib.rs` (`first_test`)\n  continuation\n\n\n- **REQ-AA-002** — Second requirement SHALL work. *Enforced:* `src/lib.rs` (`second`) · *Verified:* [test] `src/lib.rs` (`second_test`)\n  continuation\n\nafter\n";
+    fn formats_consecutive_requirements_with_at_least_one_blank_line() {
+        let first = "- **REQ-AA-001** — First requirement SHALL work.\n  *Enforced:* `src/lib.rs` (`first`) · *Verified:* [test]\n  `src/lib.rs` (`first_test`)\n  continuation\n";
+        let second = "- **REQ-AA-002** — Second requirement SHALL work.\n  *Enforced:* `src/lib.rs` (`second`) · *Verified:* [test]\n  `src/lib.rs` (`second_test`)\n  continuation\n";
 
-        let formatted = format_text(input, &spec(), true);
+        for blank_line in ["\n", "  \n", "\t\n"] {
+            for count in 0..=6 {
+                let separator = blank_line.repeat(count);
+                let input = format!("before\n{first}{separator}{second}\n\n\nafter\n");
+                let expected_separator = if count == 0 { "\n" } else { &separator };
+                let expected = format!("before\n{first}{expected_separator}{second}\n\n\nafter\n");
 
-        assert!(formatted.diagnostics.is_empty());
-        assert_eq!(formatted.requirements, 2);
-        assert!(formatted.text.contains("  continuation\n\n- **REQ-AA-002**"));
-        assert!(!formatted.text.contains("  continuation\n\n\n- **REQ-AA-002**"));
-        assert!(formatted.text.contains("- **REQ-AA-002** — Second requirement"));
-        assert!(formatted.text.contains("\n\nafter\n"));
+                for add_keywords in [false, true] {
+                    let formatted = format_text(&input, &spec(), add_keywords);
+
+                    assert!(formatted.diagnostics.is_empty());
+                    assert_eq!(formatted.requirements, 2);
+                    assert_eq!(formatted.text, expected, "separator: {separator:?}");
+                    verify_semantic_equivalence(&input, &formatted.text, &spec())
+                        .expect("formatting preserves requirement meaning");
+                    let twice = format_text(&formatted.text, &spec(), add_keywords);
+                    assert_eq!(twice.text, formatted.text, "formatting is idempotent");
+                }
+            }
+        }
+    }
+
+    #[shallguard::verifies("REQ-SPEC-005")]
+    #[test]
+    fn preserves_blank_lines_outside_requirement_blocks() {
+        let requirement = "- **REQ-AA-001** — The service SHALL retain state.\n  *Enforced:* `src/lib.rs` (`apply`) · *Verified:* [test]\n  `src/lib.rs` (`test_apply`)\n";
+
+        for suffix in ["", "\n", "\n\n\n", "  \n\t\n", "  \n\n\n## Next section\n"] {
+            let input = format!("# Story\n\n{requirement}{suffix}");
+            let formatted = format_text(&input, &spec(), true);
+
+            assert!(formatted.diagnostics.is_empty());
+            assert_eq!(formatted.text, input, "suffix: {suffix:?}");
+        }
     }
 
     #[shallguard::verifies("REQ-SPEC-005")]
