@@ -350,13 +350,14 @@ language model provider.
   `provider_environment_excludes_unrelated_ci_secrets`,
   `extracts_copilot_structured_output`)
 - **REQ-PORT-009** — The repository SHALL provide a separate GitHub Actions
-  pull-request workflow that prepares deterministic impact and bundle artifacts
-  without secrets, invokes Copilot only for same-repository pull requests from
+  workflow for same-repository pull requests that prepares deterministic impact and
+  bundle artifacts without secrets and invokes Copilot from
   trusted base-revision code, uploads the Markdown report, and upserts an
   advisory pull-request comment; provider absence, semantic verdicts, or review
   failure SHALL NOT fail the workflow, while the existing deterministic
   `shallguard-dev fmt --check` and `shallguard-dev check` validation steps SHALL
-  remain in the required Rust workflow. *Enforced:*
+  remain in the required Rust workflow. Fork pull requests SHALL skip all advisory
+  jobs and SHALL retain the required Rust validation. *Enforced:*
   `.github/workflows/shallguard-review.yml`, `.github/workflows/rust.yml` ·
   *Verified:* [test] ✅ `cli:tests/github_advisory_workflow.rs`
   (`advisory_review_is_isolated_from_the_required_deterministic_gate`)
