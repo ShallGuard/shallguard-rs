@@ -80,7 +80,7 @@ pub fn parse_doc(root: &Path, spec: &DocSpec) -> Result<ParsedDoc> {
 
 /// Parses requirement-document content supplied by callers such as the
 /// base-revision impact analyzer.
-#[shallguard::enforces("REQ-SPEC-001")]
+#[shallguard::enforces("REQ-SPEC-001", "REQ-SPEC-009")]
 pub(crate) fn parse_text(text: &str, spec: &DocSpec) -> ParsedDoc {
     let def_re =
         Regex::new(r"^- \*\*(REQ-([A-Z]{2,})-\d{3})\*\*").expect("BUG: invalid requirement regex");

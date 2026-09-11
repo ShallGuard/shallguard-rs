@@ -98,6 +98,73 @@ fn installed_subcommand_checks_a_single_package_fixture() {
     );
 }
 
+#[shallguard::verifies("REQ-SPEC-009")]
+#[test]
+fn requirement_spacing_is_checked_and_preserved() {
+    let fixture = tempdir().expect("create fixture repository");
+    write_fixture(fixture.path());
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_cargo-shallguard"))
+            .args(args)
+            .current_dir(fixture.path())
+            .output()
+            .expect("invoke ShallGuard")
+    };
+    assert!(
+        run(&["fmt"]).status.success(),
+        "format the first requirement"
+    );
+
+    let document = fixture.path().join("docs/requirements.md");
+    let first = fs::read_to_string(&document).expect("read the first requirement");
+    let second = first
+        .strip_prefix("# Requirements\n\n")
+        .expect("BUG: fixture starts with the requirements heading")
+        .replace("REQ-DEMO-001", "REQ-DEMO-002");
+    let source = fixture.path().join("src/lib.rs");
+    let anchors = fs::read_to_string(&source)
+        .expect("read fixture anchors")
+        .replace("\"REQ-DEMO-001\"", "\"REQ-DEMO-001\", \"REQ-DEMO-002\"");
+    fs::write(source, anchors).expect("anchor both requirements");
+
+    for separator in ["", "\n", "\n\n\n", "  \n\t\n"] {
+        let input = format!("{first}{separator}{second}");
+        fs::write(&document, &input).expect("write requirement spacing");
+
+        let checked = run(&["check"]);
+        assert!(
+            checked.status.success(),
+            "check accepts separator {separator:?}: {}",
+            String::from_utf8_lossy(&checked.stderr)
+        );
+        let format_check = run(&["fmt", "--check"]);
+        assert_eq!(format_check.status.success(), !separator.is_empty());
+        assert_eq!(
+            fs::read_to_string(&document).expect("read after format check"),
+            input,
+            "fmt --check must not write"
+        );
+
+        let formatted = run(&["fmt"]);
+        assert!(
+            formatted.status.success(),
+            "fmt succeeds: {}",
+            String::from_utf8_lossy(&formatted.stderr)
+        );
+        let expected_separator = if separator.is_empty() {
+            "\n"
+        } else {
+            separator
+        };
+        assert_eq!(
+            fs::read_to_string(&document).expect("read formatted requirements"),
+            format!("{first}{expected_separator}{second}")
+        );
+        assert!(run(&["fmt", "--check"]).status.success());
+        assert!(run(&["check"]).status.success());
+    }
+}
+
 #[shallguard::verifies("REQ-REV-010")]
 #[test]
 fn review_commands_are_labeled_experimental() {

@@ -57,14 +57,40 @@ cargo shallguard impact --target origin/main \
   --markdown requirement-impact.md
 ```
 
-`cargo shallguard fmt` puts exactly one empty line between consecutive requirement items.
-
 Two commands have more prerequisites:
 
 - The `coverage` command needs the tool `cargo-llvm-cov`.
 - The `review` command needs the selected provider program. The command can
   send bounded source capsules to that provider. The provider login and the
   data handling of the provider are outside this tool.
+
+## Requirement formatting
+
+Consecutive requirement items need at least one blank line between them.
+The formatter adds a blank line when none exists. It keeps existing blank
+lines between requirements and preserves the surrounding Markdown.
+
+To format the requirement documents selected by the repository configuration,
+run:
+
+```bash
+cargo shallguard fmt
+```
+
+Review and commit the formatted documents. To validate formatting without
+changing files, run:
+
+```bash
+cargo shallguard fmt --check
+```
+
+The format check reports missing separation. It accepts one or more blank
+lines between requirement items. The traceability check accepts requirement
+items with or without blank lines:
+
+```bash
+cargo shallguard check
+```
 
 ## Experimental features
 
@@ -122,13 +148,12 @@ The keyword is the canonical form. It survives editors, copy and paste, and
 diff tools, and `grep` finds it. The emoji is an optional alias with the same
 meaning. The parser and the lint accept both forms. The command
 `cargo shallguard fmt` adds the keyword before an emoji that has no keyword,
-and it keeps the emoji next to the keyword, for example `[test] ✅`. A
-document with only keywords stays as it is. The commands
+and it keeps the emoji next to the keyword, for example `[test] ✅`. The
+formatter keeps existing keyword marks. The commands
 `cargo shallguard fmt --check` and `cargo shallguard lint` accept a document
-with an emoji that lacks its keyword. They do not report it. An existing
-document therefore passes the checks without a change. To add the keywords
-to an existing document, run `cargo shallguard fmt` once and commit the
-result.
+with an emoji that lacks its keyword. The emoji alone does not cause a
+formatting failure. To add the keywords to an existing document, run
+`cargo shallguard fmt` once and commit the result.
 
 ## Requirement ID concurrency
 
