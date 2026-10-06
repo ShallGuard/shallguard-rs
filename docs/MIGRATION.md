@@ -152,18 +152,18 @@ is empty. From that point, the usual
 applies. New behavior arrives with its requirement, its anchors, and its
 evidence in the same merge request.
 
-## Case study: a production network service workspace
+## Case study: a production Rust workspace
 
-The migrated workspace is the production system of the author. Read the
-numbers as a best case and not as an independent benchmark. The migration
+The migrated workspace is a production system that the author leads, and the
+author wrote its specification. Read the numbers as a best case and not as an
+independent benchmark. The migration
 took two days because the specification already existed in the head of the
 author. A team that migrates unfamiliar code must expect the human review of
 the requirements to be the slowest step. The reason is the one given above:
 a wrong requirement that the document records as true is worse than none.
 
-The workspace is a production Rust workspace with 3 crates: a network
-service, a routing library, and a protocol crate. The 2 crates with behavior
-had 535 requirements in 16 areas, in 2 requirement documents of about 5,400
+The workspace is a production Rust workspace with 3 crates. The 2 crates
+with behavior had 535 requirements in 16 areas, in 2 requirement documents of about 5,400
 lines. At the start, the documents held prose user stories with no link to
 the code. The first check reported 576 warnings for both kinds of gaps. No
 area was hard.
@@ -192,17 +192,18 @@ The migration went as follows:
 The migration found four kinds of problems. They are the reason for the
 honesty rules:
 
-1. **A false `[test]` is the most common failure.** The review passes found an
-   authorization test that could not fail, because it asserted on an input
-   that the parser rejects. They found an end-to-end test without its core
-   component. They found mocks with no assertions. Each test was fixed or
+1. **A false `[test]` is the most common failure.** The review passes found
+   tests that could not fail, for example because they asserted on input that
+   the code rejects before it reaches the logic under test. They found an
+   end-to-end test that did not exercise the component it claimed to test.
+   They found mocks with no assertions. Each test was fixed or
    honestly downgraded. No test was anchored as it was. These are the
    patterns that
    [issue #13](https://github.com/shallguard/shallguard-rs/issues/13) proposes to
    detect with a deterministic check. The migration found them by hand
    first.
-2. **Anchors show real drift.** Two metric fields had become write-only
-   after a refactor. Nobody read them. The requirement forced an explicit
+2. **Anchors show real drift.** Some fields had become write-only after a
+   refactor. Nobody read them. The requirement forced an explicit
    decision to keep or retire them.
 3. **A requirement without an implementation becomes `[pending]`.** The migration
    found specified behavior that the code did not have. The document records

@@ -47,19 +47,19 @@ deleted test:
 
 ## Used in production
 
-The migration workflow has run once at scale, on the author's own production
-workspace. The author owns that workspace, so read the numbers as a best case
-and not as an independent benchmark.
+The migration workflow has run once at scale, on a production Rust workspace
+that the author leads. The author wrote the specification, so read the
+numbers as a best case and not as an independent benchmark.
 
 - The workspace has 3 crates and 535 requirements in 16 areas.
 - The first check reported 576 traceability warnings.
 - At the end, the committed baseline was empty and every area was hard.
-- The migration found real defects that a green test suite had hidden: an
-  authorization test that could not fail, an end-to-end test without its
-  core component, mocks without assertions, and 2 metric fields that the
-  code wrote but never read.
+- The migration found real defects that a green test suite had hidden:
+  tests that could not fail, an end-to-end test that did not exercise the
+  component it claimed to test, mocks without assertions, and fields that
+  the code wrote but never read.
 
-The [migration case study](docs/MIGRATION.md#case-study-a-production-network-service-workspace)
+The [migration case study](docs/MIGRATION.md#case-study-a-production-rust-workspace)
 gives the full numbers and their limits.
 
 ## How it works
